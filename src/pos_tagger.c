@@ -94,12 +94,17 @@ void kin_tag_token(Token *tok) {
     }
 
     /* 7. Conjugated verb heuristic */
-    int scls = 0;
+    int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
-    if (kin_is_verb_conjugated(w, stem, &scls, &vtense)) {
+    VerbExtension vext = VEXT_NONE;
+    bool is_neg = false;
+    if (kin_is_verb_conjugated(w, stem, &scls, &vtense, &obj_cls, &vext, &is_neg)) {
         tok->pos            = POS_VERB_CONJ;
         tok->noun_class     = scls;
         tok->verb_tense     = vtense;
+        tok->verb_ext       = vext;
+        tok->obj_class      = obj_cls;
+        tok->is_negative    = is_neg;
         tok->is_kinyarwanda = true;
         strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
         return;

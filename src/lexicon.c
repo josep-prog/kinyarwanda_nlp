@@ -323,6 +323,9 @@ static const InvEntry INVARIABLES[] = {
     { "yego",    POS_ADVERB       }, /* yes                               */
     { "oya",     POS_ADVERB       }, /* no                                */
     { "yee",     POS_INTERJECTION },
+    /* ── Negative existential particle ──────────────────────────────────── */
+    { "nta",     POS_ADVERB      }, /* there is no / none (nta muntu = no one)*/
+    { "ntacyo",  POS_ADVERB      }, /* nothing / it doesn't matter            */
     /* ── Akamamo (adverbs) ──────────────────────────────────────────────   */
     { "vuba",       POS_ADVERB }, /* quickly / soon                        */
     { "cyane",      POS_ADVERB }, /* very / a lot                          */
@@ -646,5 +649,15 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_SUBJUNCTIVE:  return "Isabira (Subjunctive/Conditional)";
         case TENSE_NARRATIVE:    return "Inshinga y'imigani (Narrative)";
         default:                 return "";
+    }
+}
+
+const char *kin_verb_ext_name(VerbExtension e) {
+    switch (e) {
+        case VEXT_PASSIVE:     return "Imbundo (Passive: -w-)";
+        case VEXT_CAUSATIVE:   return "Integeko (Causative: -ish-/-esh-)";
+        case VEXT_APPLICATIVE: return "Ikirango (Applicative: -ir-/-er-)";
+        case VEXT_RECIPROCAL:  return "Igisubizo (Reciprocal: -an-)";
+        default:               return "";
     }
 }

@@ -68,6 +68,22 @@ typedef enum {
     TENSE_NARRATIVE,       /* Inshinga y'imigani: SP+ka+stem+a      akagenda */
 } VerbTense;
 
+/* ─── Verb derivational extensions (itondaguranshinga) ───────────────────────
+ * REB Year-2 book, chapter 26:
+ *   Imbundo  = Passive      stem + -w-          gukor-w-a
+ *   Integeko = Causative    stem + -ish-/-esh-  gukor-ish-a
+ *   Ikirango = Applicative  stem + -ir-/-er-    gukor-er-a
+ * Plus the reciprocal (sociative):
+ *   Igisubizo = Reciprocal  stem + -an-         gukor-an-a
+ */
+typedef enum {
+    VEXT_NONE        = 0,
+    VEXT_PASSIVE,        /* Imbundo:   -w-    gukorwa, yakorwaga     */
+    VEXT_CAUSATIVE,      /* Integeko:  -ish-/-esh-  gukorisha        */
+    VEXT_APPLICATIVE,    /* Ikirango:  -ir-/-er-    gukorera         */
+    VEXT_RECIPROCAL,     /* Igisubizo: -an-         gukorana         */
+} VerbExtension;
+
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */
 typedef enum {
     PRON_NONE          = 0,
@@ -121,13 +137,16 @@ typedef struct {
     char surface[KIN_MAX_WORD];     /* Word as written in the input         */
     char lower[KIN_MAX_WORD];       /* Lowercased form                      */
     POS  pos;                       /* Part-of-speech tag                   */
-    PronounType pron_type;          /* If POS_PRONOUN, which subtype        */
-    VerbTense verb_tense;           /* If POS_VERB_CONJ, detected tense     */
+    PronounType   pron_type;        /* If POS_PRONOUN, which subtype        */
+    VerbTense     verb_tense;       /* If POS_VERB_CONJ, detected tense     */
+    VerbExtension verb_ext;         /* Derivational extension (imbundo etc) */
     int  noun_class;                /* 1-16 if applicable; 0 = unknown      */
-    char stem[KIN_MAX_STEM];        /* Igicumbi (root stem)                 */
+    int  obj_class;                 /* Object marker class (0 = none)       */
+    char stem[KIN_MAX_STEM];        /* Igicumbi – bare stem after OM/ext    */
     char detected_prefix[KIN_MAX_PREFIX]; /* D+RT detected                  */
     bool is_kinyarwanda;            /* False = likely foreign/unknown       */
     bool is_proper_noun;            /* Capitalised and not at start         */
+    bool is_negative;               /* nt- negative prefix detected         */
     int  error_count;               /* Number of errors on this token       */
 } Token;
 
@@ -153,7 +172,8 @@ int  kin_detect_noun_class(const char *word);
 bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out);
 bool kin_is_verb_infinitive(const char *word, char *stem_out);
 bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
-                            VerbTense *tense_out);
+                            VerbTense *tense_out, int *obj_class_out,
+                            VerbExtension *ext_out, bool *neg_out);
 bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
 
 /* lexicon.c */
@@ -168,6 +188,7 @@ const char *kin_pos_name(POS pos);
 const char *kin_class_name(int class_num);
 const char *kin_pron_type_name(PronounType t);
 const char *kin_verb_tense_name(VerbTense t);
+const char *kin_verb_ext_name(VerbExtension e);
 
 /* pos_tagger.c */
 void kin_tag_token(Token *tok);

@@ -54,9 +54,17 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                class_str,
                t->stem);
 
-        /* Verb tense (always shown for conjugated verbs) */
-        if (t->pos == POS_VERB_CONJ && t->verb_tense != TENSE_NONE) {
-            printf("  └─ %s\n", kin_verb_tense_name(t->verb_tense));
+        /* Verb details (always shown for conjugated verbs) */
+        if (t->pos == POS_VERB_CONJ || t->pos == POS_VERB_INF) {
+            if (t->is_negative)
+                printf("  └─ INSHINGA Y'UBUNYAGATIFU (Negative verb)\n");
+            if (t->verb_tense != TENSE_NONE)
+                printf("  └─ %s\n", kin_verb_tense_name(t->verb_tense));
+            if (t->obj_class > 0)
+                printf("  └─ Indangakinyazina y'inshinga (OM) → Nt.%d: %s\n",
+                       t->obj_class, kin_class_name(t->obj_class));
+            if (t->verb_ext != VEXT_NONE)
+                printf("  └─ %s\n", kin_verb_ext_name(t->verb_ext));
         }
         /* Extra pronoun info in verbose mode */
         if (verbose && t->pos == POS_PRONOUN && t->pron_type != PRON_NONE) {
