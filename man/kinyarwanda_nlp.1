@@ -1,0 +1,202 @@
+.\" Man page for kinyarwanda_nlp
+.\" Run with: man ./man/kinyarwanda_nlp.1
+.TH KINYARWANDA_NLP 1 "2026" "v1.2.0" "Kinyarwanda NLP Engine"
+.SH IZINA / NAME
+kinyarwanda_nlp \- Imashini isesengura Ikinyarwanda (Kinyarwanda NLP engine)
+.SH INCAMAKE / SYNOPSIS
+.B kinyarwanda_nlp
+[\fIOPTIONS\fR]
+.br
+.B kinyarwanda_nlp
+\fB\-s\fR \fI"interuro"\fR
+.br
+.B kinyarwanda_nlp
+\fB\-f\fR \fIdosiye.txt\fR
+.br
+.B kinyarwanda_nlp
+\fB\-p\fR \fIdosiye.pdf\fR
+.SH IBISOBANURO / DESCRIPTION
+.B kinyarwanda_nlp
+ni imashini isesengura indimi ikoreshwa mu Kinyarwanda.
+Isesengura interuro kandi yerekana:
+.IP \(bu 4
+Ubwoko bw'amagambo (POS tagging): izina, ntera, inshinga, ikinyazina, ...
+.IP \(bu 4
+Inteko y'izina (noun class Nt.1\-Nt.16)
+.IP \(bu 4
+Ibihe by'inshinga (verb tense): Indagihe, Impitagihe (Impitakere/Impitakera), Inzagihe, Isabira
+.IP \(bu 4
+Amakosa mu gushyira amagambo hamwe (agreement errors)
+.IP \(bu 4
+Ibitekerezo byo gusubiza (correction suggestions)
+.PP
+Inzego z'ubumenyi zikoreshwa ni iza mu gitabo:
+.I "Ikinyarwanda Amashuri Nderabarezi (TTC) \- REB 2020"
+hamwe na corpus ya
+.I "Bibiliya Yera 2001"
+(Bible Society of Rwanda).
+.SH IBIRANGO / OPTIONS
+.TP
+.BR \-s \ \fI"interuro"\fR
+Sesengura interuro imwe yo ku murongo w'itegeko.
+Analyze a single sentence given on the command line.
+.br
+Urugero: \fBkinyarwanda_nlp \-s "Umuntu munini aragenda"\fR
+.TP
+.BR \-f \ \fIdosiye.txt\fR
+Sesengura dosiye ya .txt. Buri murongo usesengurwa nk'interuro imwe.
+Analyze a plain text file, one sentence per line.
+.br
+Urugero: \fBkinyarwanda_nlp \-f inkuru.txt\fR
+.TP
+.BR \-p \ \fIdosiye.pdf\fR
+Hindura dosiye ya PDF ibe iy'inyandiko hanyuma usesengure (bisaba
+.BR pdftotext ,
+igice cya
+.I poppler-utils
+).
+Convert a PDF to text using
+.B pdftotext
+and analyse it.
+.br
+Urugero: \fBkinyarwanda_nlp \-p Bibiliya.pdf\fR
+.br
+Shyiraho: \fBsudo apt install poppler-utils\fR
+.TP
+.B \-v
+Werekana ibisobanuro by'inizi (verbose mode).
+Show detailed output including pronoun subtypes and more token info.
+.TP
+.BR \-h ", " \-\-help
+Werekana urupapuro rw'ubufasha (show this help).
+.TP
+.B \-\-version
+Werekana verisiyo y'imashini (show engine version and corpus info).
+.SH IBISOBANURO BY'IBIBONEKA / OUTPUT FORMAT
+Buri gahunda yerekana imbonerahamwe ifite inkingi enye:
+.PP
+.RS
+.nf
+Ijambo/Word    Ubwoko/Type              Inteko/Class  Igicumbi/Stem
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+Umuntu         Izina mbonera (Noun)     Nt.1          nt
+munini         Ntera (Adjective)        Nt.1          nini
+aragenda       Inshinga\-conjugated      Nt.1          gend
+  \[u2514]\[u2500] Indagihe y'ako kanya (Present \- immediate)
+.fi
+.RE
+.PP
+Agace k'ikosa \fB!\fR kabanziriza ijambo rifite ikosa ry'ingengabitekerezo.
+An error marker \fB!\fR precedes any word with a detected agreement error.
+.PP
+Ibihe by'inshinga (tense labels) ziboneka munsi y'inshinga ikonjugeshwa (REB 2020):
+.RS
+.IP \fBIndagihe\ y'ako\ kanya\fR 36
+Present immediate (SP+ra+stem+a): \fIaragenda\fR, \fIiravuga\fR
+.IP \fBIndagihe\ y'ubusanzwe\fR 36
+Habitual present (SP+stem+a): \fIibona\fR, \fIbarima\fR
+.IP \fBImpitakere\fR 36
+Recent past \- Impitagihe (SP+stem+ye): \fIyaremye\fR, \fIbagiye\fR
+.IP \fBImpitakera\fR 36
+Remote/habitual past \- Impitagihe (SP+stem+aga): \fIyagendaga\fR
+.IP \fBInzagihe\fR 36
+Future (SP+za+stem+a): \fIazagenda\fR, \fItuzakora\fR
+.IP \fBIsabira\fR 36
+Subjunctive/Conditional (SP+stem+e): \fIagende\fR, \fIakore\fR
+.IP \fBInshinga\ y'imigani\fR 36
+Narrative consecutive (SP+ka+stem+a): \fIakagenda\fR
+.RE
+.SH AMAKOSA ASESENGURWA / ERRORS DETECTED
+.TP
+.B ERR_ADJ_AGREEMENT
+Ntera ntishyikiye inteko y'izina iranga.
+The adjective concordance prefix does not match the noun class.
+.br
+Urugero: \fBumuntu binini\fR (nt.1 noun, nt.8 adjective) → should be \fBmunini\fR
+.TP
+.B ERR_POSS_AGREEMENT
+Ikinyazina ngenera ntishyikiye inteko y'izina.
+The possessive connector does not agree with the noun class.
+.br
+Urugero: \fBurugo wacu\fR (nt.11 noun, nt.1 possessive) → should be \fBrwacu\fR
+.TP
+.B ERR_NO_VERB
+Interuro ntagira inshinga. A complete sentence requires at least one verb.
+.TP
+.B ERR_UNKNOWN_WORD
+Ijambo ntiriziwe mu Kinyarwanda (unrecognised word, possibly foreign).
+.SH INGERO / EXAMPLES
+.TP
+Sesengura interuro imwe (analyse one sentence):
+.nf
+\fBkinyarwanda_nlp \-s "Imana yaremye ijuru n'isi"\fR
+.fi
+.TP
+Sesengura ufite ibisobanuro by'inizi (verbose):
+.nf
+\fBkinyarwanda_nlp \-v \-s "Urugo rwacu rurabaho"\fR
+.fi
+.TP
+Sesengura dosiye ya .txt:
+.nf
+\fBkinyarwanda_nlp \-f inkuru.txt\fR
+.fi
+.TP
+Sesengura dosiye ya PDF:
+.nf
+\fBkinyarwanda_nlp \-p Bibiliya.pdf\fR
+.fi
+.TP
+Uburyo bw'ikiganiro (interactive mode):
+.nf
+\fBkinyarwanda_nlp\fR
+>>> Umuntu munini aragenda
+>>> help
+>>> quit
+.fi
+.SH INTEKO Z'AMAZINA / NOUN CLASSES
+Ikinyarwanda gifite inteko z'amazina 16 (16 noun classes):
+.RS
+.nf
+Nt.1   umu\-   Human singular    umuntu (person)
+Nt.2   aba\-   Human plural      abantu (people)
+Nt.3   umu\-   Tree/thing sg.    umuti (tree)
+Nt.4   imi\-   Tree/thing pl.    imiti (trees)
+Nt.5   i\-     Singular          ibuye (stone)
+Nt.6   ama\-   Plural/mass       amabuye (stones)
+Nt.7   iki\-   Thing singular    ikitabo (book)
+Nt.8   ibi\-   Thing plural      ibitabo (books)
+Nt.9   in\-    Animal/thing sg.  inka (cow)
+Nt.10  in\-    Animal/thing pl.  inka (cows)
+Nt.11  uru\-   Long/thin things  urugo (home)
+Nt.12  aka\-   Diminutive sg.    akana (small child)
+Nt.13  utu\-   Diminutive pl.    utugabo (little men)
+Nt.14  ubu\-   Abstract nouns    uburezi (education)
+Nt.15  uku\-   Infinitives       ukugenda (going)
+Nt.16  aha\-   Locatives         ahantu (place)
+.fi
+.RE
+.SH DOSIYE / FILES
+.TP
+.I /usr/local/bin/kinyarwanda_nlp
+Binary executable (after sudo make install)
+.TP
+.I /usr/local/man/man1/kinyarwanda_nlp.1
+This man page (after sudo make install)
+.SH IBIJYANYE / SEE ALSO
+.BR pdftotext (1),
+.BR iconv (1)
+.PP
+Corpus: Bibiliya Yera 2001, Bible Society of Rwanda (BSR)
+.br
+Grammar: Ikinyarwanda Amashuri Nderabarezi (TTC) \- REB 2020
+.SH INZIRA YO KUGEZA / BUGS
+.PP
+Isesengura ry'inshinga riracyagorana ku magambo make cyangwa agambitse.
+Verb analysis may be inaccurate for very short or ambiguous words.
+Tuma makosa kuri: github.com/kinyarwanda-nlp/issues
+.SH UMWANDISHI / AUTHOR
+Yubakiwe hashingiwe ku bitabo by'ururimi Ikinyarwanda (REB 2020) na
+corpus ya Bibiliya Yera 2001 (Bible Society of Rwanda).
+Built from the Kinyarwanda grammar textbook (REB 2020) and the
+Bibiliya Yera 2001 corpus (Bible Society of Rwanda).

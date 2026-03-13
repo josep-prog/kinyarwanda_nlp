@@ -1,0 +1,192 @@
+/*
+ * kinyarwanda.h
+ * Rule-based Kinyarwanda NLP engine
+ * Based on: "Ikinyarwanda Amashuri Nderabarezi (TTC)" - REB 2020
+ *
+ * Grammar terms used throughout (from the book):
+ *   Izina mbonera   = Common noun      (D + RT + C structure)
+ *   Ntera           = Adjective        (RS + C structure)
+ *   Izina ntera     = Relative noun    (noun used as qualifier)
+ *   Igisantera      = Compound adj     (noun pair acting as adjective)
+ *   Inshinga        = Verb
+ *   Ikinyazina      = Pronoun          (many subtypes)
+ *   Amagambo adahinduka = Invariable words (prepositions, conjunctions, etc.)
+ *   Inteko          = Noun class (1-16)
+ *   Indanganteko    = Class marker (RT)
+ *   Indomo (D)      = Prefix vowel
+ *   Igicumbi (C)    = Stem/root
+ *   Indangasano(RS) = Concordance prefix (for adjectives)
+ */
+
+#ifndef KINYARWANDA_H
+#define KINYARWANDA_H
+
+#include <stdbool.h>
+#include <stddef.h>
+
+/* ─── limits ─────────────────────────────────────────────────────────────── */
+#define KIN_MAX_WORD      128
+#define KIN_MAX_STEM       96
+#define KIN_MAX_PREFIX     32
+#define KIN_MAX_TOKENS    256
+#define KIN_MAX_ERRORS     64
+#define KIN_MAX_MSG       256
+
+/* ─── Part-of-speech tags ─────────────────────────────────────────────────── */
+typedef enum {
+    POS_UNKNOWN        = 0,
+    POS_NOUN,              /* Izina mbonera                                */
+    POS_ADJECTIVE,         /* Ntera                                        */
+    POS_RELATIVE_NOUN,     /* Izina ntera                                  */
+    POS_COMPOUND_ADJ,      /* Igisantera                                   */
+    POS_VERB_INF,          /* Inshinga – infinitive (ku-/gu-/kw- form)     */
+    POS_VERB_CONJ,         /* Inshinga – conjugated form                   */
+    POS_PRONOUN,           /* Ikinyazina (any type)                        */
+    POS_PREPOSITION,       /* Umugereka / Ingera                           */
+    POS_CONJUNCTION,       /* Icyungo                                      */
+    POS_INTERJECTION,      /* Irangamutima                                 */
+    POS_ADVERB,            /* Akamamo                                      */
+    POS_LOCATIVE,          /* Indangahantu                                 */
+    POS_VERB_PARTICLE,     /* Ikegeranshinga: ngo, ko                      */
+    POS_FOREIGN,           /* Word not matching any Kinyarwanda pattern    */
+} POS;
+
+/* ─── Verb tense (ibihe by'inshinga) ─────────────────────────────────────────
+ * REB 2020 "Amashuri yisumbuye" terminology (section 1.8):
+ *   Indagihe   = Present tense  (3 sub-types: ako kanya / ubusanzwe / ikomeza)
+ *   Impitagihe = Past tense     (Impitakere = recent; Impitakera = remote)
+ *   Inzagihe   = Future tense   (Inzahato = near; Inzakera = remote)
+ */
+typedef enum {
+    TENSE_NONE         = 0,
+    TENSE_PRESENT,         /* Indagihe y'ako kanya: SP+ra+stem+a    aragenda */
+    TENSE_PRESENT_NORA,    /* Indagihe y'ubusanzwe: SP+stem+a       ibona    */
+    TENSE_PAST_PERF,       /* Impitakere: SP+stem+ye                yaremye  */
+    TENSE_PAST_IMPF,       /* Impitakera: SP+stem+aga               yagendaga*/
+    TENSE_FUTURE,          /* Inzagihe: SP+za+stem+a                azagenda */
+    TENSE_SUBJUNCTIVE,     /* Isabira: SP+stem+e                    agende   */
+    TENSE_NARRATIVE,       /* Inshinga y'imigani: SP+ka+stem+a      akagenda */
+} VerbTense;
+
+/* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */
+typedef enum {
+    PRON_NONE          = 0,
+    PRON_DEMONSTRATIVE,    /* Ikinyazina nyereka:  uyu, uwo, uno...        */
+    PRON_PERSONAL,         /* Ikinyazina ngenga:   nge, mwe, we, bo...     */
+    PRON_POSSESSIVE,       /* Ikinyazina ngenera:  wa, ya, rya...          */
+    PRON_REFLEXIVE,        /* Ikinyazina ngenera ngenga: wange, wacu...    */
+    PRON_RELATIVE,         /* Ikinyazina ngenera (relative connector)      */
+    PRON_INTERROGATIVE,    /* Ikinyazina kibaza:   nde, iki, iyihe...      */
+    PRON_INDEFINITE,       /* Ikinyazina ndafutura: umwe, bamwe...         */
+    PRON_CONCORDANCE,      /* Ikinyazina mboneranteko                      */
+    PRON_NUMERICAL,        /* Ikinyazina nyamubaro                         */
+    PRON_VOCATIVE,         /* Ikinyazina mpamagazi                         */
+} PronounType;
+
+/* ─── Noun class (Inteko) table entry ──────────────────────────────────────
+ *
+ * The book (p.61-62) defines 16 noun classes. Structure is D + RT + C.
+ * We store the combined surface prefix for fast matching.
+ */
+typedef struct {
+    int   num;                   /* 1-16                                   */
+    char  prefix[8];             /* Combined D+RT surface form, e.g. "umu" */
+    char  rt[4];                 /* Indanganteko alone, e.g. "mu"          */
+    char  concordance_adj[8];    /* Indangasano for ntera (adj) agreement  */
+    char  concordance_poss[8];   /* Possessive connector (ikinyazina ngenera) */
+    char  subj_prefix[8];        /* Verb subject agreement prefix          */
+    const char *description;
+} NounClass;
+
+/* ─── Error types ─────────────────────────────────────────────────────────── */
+typedef enum {
+    ERR_NONE              = 0,
+    ERR_ADJ_AGREEMENT,         /* Adj class doesn't match noun class       */
+    ERR_POSS_AGREEMENT,        /* Possessive doesn't match noun class      */
+    ERR_NO_VERB,               /* Sentence has no verb                     */
+    ERR_UNKNOWN_WORD,          /* Word not recognized                      */
+    ERR_INVALID_CLUSTER,       /* Invalid consonant cluster                */
+    ERR_SPELLING,              /* Likely spelling error                    */
+} ErrorType;
+
+typedef struct {
+    ErrorType type;
+    int       token_index;
+    char      message[KIN_MAX_MSG];
+    char      suggestion[KIN_MAX_MSG];
+} Error;
+
+/* ─── Analysed token ──────────────────────────────────────────────────────── */
+typedef struct {
+    char surface[KIN_MAX_WORD];     /* Word as written in the input         */
+    char lower[KIN_MAX_WORD];       /* Lowercased form                      */
+    POS  pos;                       /* Part-of-speech tag                   */
+    PronounType pron_type;          /* If POS_PRONOUN, which subtype        */
+    VerbTense verb_tense;           /* If POS_VERB_CONJ, detected tense     */
+    int  noun_class;                /* 1-16 if applicable; 0 = unknown      */
+    char stem[KIN_MAX_STEM];        /* Igicumbi (root stem)                 */
+    char detected_prefix[KIN_MAX_PREFIX]; /* D+RT detected                  */
+    bool is_kinyarwanda;            /* False = likely foreign/unknown       */
+    bool is_proper_noun;            /* Capitalised and not at start         */
+    int  error_count;               /* Number of errors on this token       */
+} Token;
+
+/* ─── Sentence analysis result ───────────────────────────────────────────── */
+typedef struct {
+    Token  tokens[KIN_MAX_TOKENS];
+    int    token_count;
+    Error  errors[KIN_MAX_ERRORS];
+    int    error_count;
+    bool   has_verb;
+    bool   is_complete;   /* Has subject + verb at minimum                  */
+} SentenceAnalysis;
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * Public API
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* tokenizer.c */
+int  kin_tokenize(const char *text, Token *out, int max_tokens);
+
+/* morphology.c */
+int  kin_detect_noun_class(const char *word);
+bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out);
+bool kin_is_verb_infinitive(const char *word, char *stem_out);
+bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
+                            VerbTense *tense_out);
+bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
+
+/* lexicon.c */
+bool kin_is_invariable(const char *word, POS *pos_out);
+bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out);
+bool kin_is_adj_stem(const char *stem);
+bool kin_is_known_verb_stem(const char *stem);
+bool kin_is_known_noun_stem(const char *stem, int *class_out);
+bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out);
+const NounClass *kin_get_noun_class(int num);
+const char *kin_pos_name(POS pos);
+const char *kin_class_name(int class_num);
+const char *kin_pron_type_name(PronounType t);
+const char *kin_verb_tense_name(VerbTense t);
+
+/* pos_tagger.c */
+void kin_tag_token(Token *tok);
+void kin_tag_sentence(SentenceAnalysis *sa);
+
+/* syntax.c */
+void kin_check_syntax(SentenceAnalysis *sa);
+
+/* corrector.c */
+void kin_suggest_corrections(SentenceAnalysis *sa);
+
+/* analysis.c  (main pipeline) */
+SentenceAnalysis kin_analyze(const char *text);
+void kin_print_analysis(const SentenceAnalysis *sa, bool verbose);
+
+/* utils */
+void kin_strlower(const char *src, char *dst, size_t dstlen);
+bool kin_starts_with(const char *s, const char *prefix);
+bool kin_ends_with(const char *s, const char *suffix);
+void kin_str_trim(char *s);
+
+#endif /* KINYARWANDA_H */
