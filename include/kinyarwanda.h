@@ -54,18 +54,29 @@ typedef enum {
 /* ─── Verb tense (ibihe by'inshinga) ─────────────────────────────────────────
  * REB 2020 "Amashuri yisumbuye" terminology (section 1.8):
  *   Indagihe   = Present tense  (3 sub-types: ako kanya / ubusanzwe / ikomeza)
- *   Impitagihe = Past tense     (Impitakere = recent; Impitakera = remote)
+ *   Impitagihe = Past tense     (Impitakare = recent; Impitakera = remote)
  *   Inzagihe   = Future tense   (Inzahato = near; Inzakera = remote)
+ *
+ * REB Year-4 book (section ITONDAGURANSHINGA) adds verb MODES (uburyo):
+ *   Ikirango    = Indicative  (assertion – uses all tenses above)
+ *   Inyifurizo  = Optative    (wish/blessing: SP+ra+ka+stem+a  urakabyara)
+ *   Integeko    = Imperative  (command: stem+a  genda / nimu+stem+e  nimugende)
+ *   Inkurikizo  = Sequential  (narr. sequence: SP+ka+stem+a  akagenda)  ← = NARRATIVE
+ *   Ikigombero  = Subjunctive (obligation/desire: SP+stem+e  agende)    ← = SUBJUNCTIVE
+ *   Inziganyo   = Conditional (if/would: SP+a+stem+a  twize/SP+nta+ku+stem+a)
  */
 typedef enum {
     TENSE_NONE         = 0,
     TENSE_PRESENT,         /* Indagihe y'ako kanya: SP+ra+stem+a    aragenda */
     TENSE_PRESENT_NORA,    /* Indagihe y'ubusanzwe: SP+stem+a       ibona    */
-    TENSE_PAST_PERF,       /* Impitakere: SP+stem+ye                yaremye  */
+    TENSE_PAST_PERF,       /* Impitakare: SP+stem+ye                yaremye  */
     TENSE_PAST_IMPF,       /* Impitakera: SP+stem+aga               yagendaga*/
     TENSE_FUTURE,          /* Inzagihe: SP+za+stem+a                azagenda */
-    TENSE_SUBJUNCTIVE,     /* Isabira: SP+stem+e                    agende   */
-    TENSE_NARRATIVE,       /* Inshinga y'imigani: SP+ka+stem+a      akagenda */
+    TENSE_SUBJUNCTIVE,     /* Ikigombero/Isabira: SP+stem+e         agende   */
+    TENSE_NARRATIVE,       /* Inkurikizo: SP+ka+stem+a              akagenda */
+    TENSE_OPTATIVE,        /* Inyifurizo: SP+ra+ka+stem+a           urakabyara*/
+    TENSE_IMPERATIVE,      /* Integeko: bare stem+a                 genda    */
+    TENSE_CONDITIONAL,     /* Inziganyo: SP+a+Ø+stem+a              twatsinda*/
 } VerbTense;
 
 /* ─── Verb derivational extensions (itondaguranshinga) ───────────────────────
@@ -123,6 +134,8 @@ typedef enum {
     ERR_UNKNOWN_WORD,          /* Word not recognized                      */
     ERR_INVALID_CLUSTER,       /* Invalid consonant cluster                */
     ERR_SPELLING,              /* Likely spelling error                    */
+    ERR_SUBJ_VERB_AGREEMENT,   /* Verb SP doesn't match subject noun class */
+    ERR_OBJ_VERB_AGREEMENT,    /* Verb OM doesn't match object noun class  */
 } ErrorType;
 
 typedef struct {

@@ -145,5 +145,46 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         }
     }
 
+    /* RULE 5: Subject-verb agreement (indangasubizi y'inshinga na izina)  *
+     * A conjugated verb's subject prefix (SP) must match the class of the  *
+     * subject noun that precedes it.  Book p.88 + year-4 p.102+.           *
+     * We only check adjacent noun → verb pairs where both classes are known */
+    for (int i = 0; i < sa->token_count - 1; i++) {
+        Token *noun = &sa->tokens[i];
+        Token *verb = &sa->tokens[i + 1];
+
+        if (noun->pos != POS_NOUN)      continue;
+        if (verb->pos != POS_VERB_CONJ) continue;
+        /* Skip when either side has an unknown or ambiguous class */
+        if (noun->noun_class == 0 || verb->noun_class == 0) continue;
+        /* Nt.1 and Nt.3 both use the same SP "a/u"; treat as compatible */
+        int nc = noun->noun_class;
+        int vc = verb->noun_class;
+        if ((nc == 1 || nc == 3) && (vc == 1 || vc == 3)) continue;
+        /* "ya" SP (stored as cls 6) is ambiguous: it is ALSO the Nt.1 past
+         * tense form (a-subject + past 'a' marker → "ya").  Do not flag   *
+         * agreement errors when verb SP class is 6 and noun is Nt.1/3/9.  *
+         * e.g.  "Imana yaremye ijuru" – Nt.9 noun + ya (Nt.1-past) verb.  */
+        if (vc == 6 && (nc == 1 || nc == 3 || nc == 9)) continue;
+
+        if (nc != vc) {
+            char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+            snprintf(msg, sizeof(msg),
+                "Inshinga '%s' ntishyikira izina '%s': "
+                "inteko y'inshinga=%d ariko inteko y'izina=%d. "
+                "Verb '%s' subject prefix (class %d) doesn't agree "
+                "with noun '%s' (class %d).",
+                verb->surface, noun->surface, vc, nc,
+                verb->surface, vc, noun->surface, nc);
+            const NounClass *ncls = kin_get_noun_class(nc);
+            snprintf(sug, sizeof(sug),
+                "Indangasubizi igomba kuba '%s' (inteko %d). "
+                "The subject prefix for class %d should be '%s'.",
+                ncls ? ncls->subj_prefix : "?", nc,
+                nc, ncls ? ncls->subj_prefix : "?");
+            add_error(sa, ERR_SUBJ_VERB_AGREEMENT, i + 1, msg, sug);
+        }
+    }
+
     sa->is_complete = sa->has_verb && (sa->error_count == 0);
 }

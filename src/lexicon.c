@@ -220,6 +220,42 @@ static const PronounEntry PRONOUNS[] = {
     { "rwabo",  PRON_REFLEXIVE, 11 }, { "kabo",   PRON_REFLEXIVE, 12 },
     { "twabo",  PRON_REFLEXIVE, 13 }, { "bwabo",  PRON_REFLEXIVE, 14 },
     { "kwabo",  PRON_REFLEXIVE, 15 }, { "habo",   PRON_REFLEXIVE, 16 },
+    /* 3rd singular (-e): we, be, rye, ye, cye, bye, ze, rwe, ke, twe, bwe...
+     * connector + ye → fusion: rya+ye → rye, cya+ye → cye, etc.         */
+    { "we",    PRON_REFLEXIVE,  1 },  /* his/her/its (Nt.1)                */
+    { "rye",   PRON_REFLEXIVE,  5 },  /* its (Nt.5) — izina rye            */
+    { "cye",   PRON_REFLEXIVE,  7 },  /* its (Nt.7)                        */
+    { "bye",   PRON_REFLEXIVE,  8 },  /* their (Nt.8)                      */
+    { "ze",    PRON_REFLEXIVE, 10 },  /* their (Nt.10)                     */
+    { "rwe",   PRON_REFLEXIVE, 11 },  /* its (Nt.11)                       */
+    { "ke",    PRON_REFLEXIVE, 12 },  /* its (Nt.12)                       */
+    { "twe",   PRON_REFLEXIVE, 13 },  /* their (Nt.13)                     */
+    { "bwe",   PRON_REFLEXIVE, 14 },  /* its (Nt.14)                       */
+    { "kwe",   PRON_REFLEXIVE, 15 },  /* its (Nt.15)                       */
+    { "he",    PRON_REFLEXIVE, 16 },  /* its (Nt.16)                       */
+    /* 2nd plural (-nyu): wanyu, banyu, ryanyu, yanyu, cyanyu... */
+    { "wanyu",  PRON_REFLEXIVE,  1 }, { "banyu",  PRON_REFLEXIVE,  2 },
+    { "yanyu",  PRON_REFLEXIVE,  4 }, { "ryanyu", PRON_REFLEXIVE,  5 },
+    { "yanyu",  PRON_REFLEXIVE,  6 }, { "cyanyu", PRON_REFLEXIVE,  7 },
+    { "byanyu", PRON_REFLEXIVE,  8 }, { "zanyu",  PRON_REFLEXIVE, 10 },
+    { "rwanyu", PRON_REFLEXIVE, 11 }, { "kanyu",  PRON_REFLEXIVE, 12 },
+    { "twanyu", PRON_REFLEXIVE, 13 }, { "bwanyu", PRON_REFLEXIVE, 14 },
+    { "kwanyu", PRON_REFLEXIVE, 15 }, { "hanyu",  PRON_REFLEXIVE, 16 },
+
+    /* ── 1sg possessive with emphatic -njye (e.g. ryanjye=mine Nt.5) ─────  */
+    { "ryanjye", PRON_REFLEXIVE,  5 },  /* mine (Nt.5) = rya + njye        */
+    { "cyanjye", PRON_REFLEXIVE,  7 },  /* mine (Nt.7) = cya + njye        */
+    { "byanjye", PRON_REFLEXIVE,  8 },  /* mine (Nt.8) = bya + njye        */
+    { "bwanjye", PRON_REFLEXIVE, 14 },  /* mine (Nt.14) = bwa + njye       */
+    { "rwanjye", PRON_REFLEXIVE, 11 },  /* mine (Nt.11) = rwa + njye       */
+    { "wanjye",  PRON_REFLEXIVE,  1 },  /* mine (Nt.1/3) = wa + njye       */
+    { "yanjye",  PRON_REFLEXIVE,  4 },  /* mine (Nt.4/6) = ya + njye       */
+    { "kanjye",  PRON_REFLEXIVE, 12 },  /* mine (Nt.12) = ka + njye        */
+    { "twanjye", PRON_REFLEXIVE, 13 },  /* mine (Nt.13) = twa + njye       */
+    { "hanjye",  PRON_REFLEXIVE, 16 },  /* mine (Nt.16) = ha + njye        */
+    /* Emphatic pronoun nanjye/nawe */
+    { "nanjye",  PRON_PERSONAL,   0 },  /* and I / also I (emphatic 1sg)   */
+    { "nawe",    PRON_PERSONAL,   0 },  /* and you / also you (2sg)        */
 
     /* ── Ikinyazina kibaza (interrogative pronouns) ─────────────────────  */
     { "nde",    PRON_INTERROGATIVE, 0 },  /* who?                          */
@@ -231,17 +267,223 @@ static const PronounEntry PRONOUNS[] = {
     { "bangahe",PRON_INTERROGATIVE, 0 },  /* how many?                     */
     { "kuki",   PRON_INTERROGATIVE, 0 },  /* why?                          */
 
-    /* ── Ikinyazina ndafutura (indefinite pronouns) ─────────────────────  */
-    { "umwe",   PRON_INDEFINITE, 1 },
-    /* "umuntu" is a noun, not listed here — context decides              */
-    { "bamwe",  PRON_INDEFINITE, 2 },
-    { "kimwe",  PRON_INDEFINITE, 7 },
-    { "bimwe",  PRON_INDEFINITE, 8 },
-    { "rimwe",  PRON_INDEFINITE, 5 },
-    { "bumwe",  PRON_INDEFINITE, 14 },
-    { "rumwe",  PRON_INDEFINITE, 11 },
-    { "kamwe",  PRON_INDEFINITE, 12 },
-    { "tumwe",  PRON_INDEFINITE, 13 },
+    /* ── Ikinyazina ndafutura (indefinite pronouns) p.115-116 ──────────  */
+    /* Short form (kigufi): undi, indi, andi... */
+    { "undi",   PRON_INDEFINITE,  1 }, /* another (cls1/3 sg)               */
+    { "indi",   PRON_INDEFINITE,  4 }, /* another (cls4/9 sg)               */
+    { "andi",   PRON_INDEFINITE,  6 }, /* other (cls6 pl)                   */
+    /* Long form (ikirekire) with indomo: uwundi, iyindi, ayandi... */
+    { "uwundi",  PRON_INDEFINITE,  1 }, { "uwundiwundi", PRON_INDEFINITE, 1 },
+    { "abandi",  PRON_INDEFINITE,  2 }, { "abandibandi",  PRON_INDEFINITE, 2 },
+    { "iyindi",  PRON_INDEFINITE,  4 }, { "iyindiyindi",  PRON_INDEFINITE, 4 },
+    { "irindi",  PRON_INDEFINITE,  5 }, { "irindirindi",  PRON_INDEFINITE, 5 },
+    { "ayandi",  PRON_INDEFINITE,  6 }, { "ayandiyandi",  PRON_INDEFINITE, 6 },
+    { "ikindi",  PRON_INDEFINITE,  7 }, { "ikindikindi",  PRON_INDEFINITE, 7 },
+    { "ibindi",  PRON_INDEFINITE,  8 }, { "ibindibindi",  PRON_INDEFINITE, 8 },
+    { "izindi",  PRON_INDEFINITE, 10 }, { "izindizindi",  PRON_INDEFINITE,10 },
+    { "urundi",  PRON_INDEFINITE, 11 }, { "urundirundi",  PRON_INDEFINITE,11 },
+    { "akandi",  PRON_INDEFINITE, 12 }, { "akandikandi",  PRON_INDEFINITE,12 },
+    { "utundi",  PRON_INDEFINITE, 13 }, { "utunditundi",  PRON_INDEFINITE,13 },
+    { "ubundi",  PRON_INDEFINITE, 14 }, { "ubundibundi",  PRON_INDEFINITE,14 },
+    { "ukundi",  PRON_INDEFINITE, 15 }, { "ukundikundi",  PRON_INDEFINITE,15 },
+    { "ahandi",  PRON_INDEFINITE, 16 }, { "ahandihandi",  PRON_INDEFINITE,16 },
+    /* Single-form indefinites used across classes */
+    { "umwe",   PRON_INDEFINITE,  1 }, { "bamwe",  PRON_INDEFINITE,  2 },
+    { "kimwe",  PRON_INDEFINITE,  7 }, { "bimwe",  PRON_INDEFINITE,  8 },
+    { "rimwe",  PRON_INDEFINITE,  5 }, { "bumwe",  PRON_INDEFINITE, 14 },
+    { "rumwe",  PRON_INDEFINITE, 11 }, { "kamwe",  PRON_INDEFINITE, 12 },
+    { "tumwe",  PRON_INDEFINITE, 13 }, { "imwe",   PRON_INDEFINITE,  4 },
+    { "amwe",   PRON_INDEFINITE,  6 }, { "zimwe",  PRON_INDEFINITE, 10 },
+
+    /* ── Ikinyazina nyamubaro (numerical pronouns) p.119-121 ────────── */
+    /* Nt.1/3 singular */
+    { "umwe",    PRON_NUMERICAL,  1 },
+    /* Nt.2 (human pl) */
+    { "babiri",  PRON_NUMERICAL,  2 }, { "batatu",   PRON_NUMERICAL,  2 },
+    { "bane",    PRON_NUMERICAL,  2 }, { "batanu",   PRON_NUMERICAL,  2 },
+    { "batandatu",PRON_NUMERICAL, 2 }, { "barindwi", PRON_NUMERICAL,  2 },
+    { "bamwe",   PRON_NUMERICAL,  2 },
+    /* Nt.4 (imiti pl) */
+    { "imwe",    PRON_NUMERICAL,  4 }, { "ibiri",    PRON_NUMERICAL,  4 },
+    { "itatu",   PRON_NUMERICAL,  4 }, { "ine",      PRON_NUMERICAL,  4 },
+    { "itanu",   PRON_NUMERICAL,  4 }, { "itandatu", PRON_NUMERICAL,  4 },
+    { "irindwi", PRON_NUMERICAL,  4 },
+    /* Nt.5 singular */
+    { "rimwe",   PRON_NUMERICAL,  5 },
+    /* Nt.6 (ama- pl) */
+    { "amwe",    PRON_NUMERICAL,  6 }, { "abiri",    PRON_NUMERICAL,  6 },
+    { "atatu",   PRON_NUMERICAL,  6 }, { "ane",      PRON_NUMERICAL,  6 },
+    { "atanu",   PRON_NUMERICAL,  6 }, { "atandatu", PRON_NUMERICAL,  6 },
+    { "arindwi", PRON_NUMERICAL,  6 },
+    /* Nt.7 singular */
+    { "kimwe",   PRON_NUMERICAL,  7 },
+    /* Nt.8 (ibi- pl) */
+    { "bimwe",   PRON_NUMERICAL,  8 }, { "bibiri",   PRON_NUMERICAL,  8 },
+    { "bitatu",  PRON_NUMERICAL,  8 }, { "bine",     PRON_NUMERICAL,  8 },
+    { "bitanu",  PRON_NUMERICAL,  8 }, { "bitandatu",PRON_NUMERICAL,  8 },
+    { "birindwi",PRON_NUMERICAL,  8 },
+    /* Nt.9 singular */
+    { "imwe",    PRON_NUMERICAL,  9 },
+    /* Nt.10 (zi- pl) – special forms: ebyiri/eshatu/enye/eshanu/esheshatu */
+    { "zimwe",   PRON_NUMERICAL, 10 }, { "ebyiri",   PRON_NUMERICAL, 10 },
+    { "eshatu",  PRON_NUMERICAL, 10 }, { "enye",     PRON_NUMERICAL, 10 },
+    { "eshanu",  PRON_NUMERICAL, 10 }, { "esheshatu",PRON_NUMERICAL, 10 },
+    { "zirindwi",PRON_NUMERICAL, 10 },
+    /* Nt.11 singular ONLY — Nt.11 nouns (uru-) have no plural number forms; */
+    /* their plural class is Nt.10, which uses ebyiri/eshatu/zirindwi etc.  */
+    { "rumwe",   PRON_NUMERICAL, 11 },
+    /* Nt.12 singular ONLY — Nt.12 nouns (aka-) have no plural number forms;*/
+    /* their plural class is Nt.13, which uses tubiri/dutatu etc.           */
+    { "kamwe",   PRON_NUMERICAL, 12 },
+    /* Nt.13 (utu- pl) — note: 3/5/6 use du- prefix (u→voiced before GR)  */
+    { "tumwe",   PRON_NUMERICAL, 13 }, { "tubiri",   PRON_NUMERICAL, 13 },
+    { "dutatu",  PRON_NUMERICAL, 13 }, { "tune",     PRON_NUMERICAL, 13 },
+    { "dutanu",  PRON_NUMERICAL, 13 }, { "dutandatu",PRON_NUMERICAL, 13 },
+    { "turindwi",PRON_NUMERICAL, 13 },
+    /* Nt.14 (ubu-) */
+    { "bumwe",   PRON_NUMERICAL, 14 }, { "bubiri",   PRON_NUMERICAL, 14 },
+    { "butatu",  PRON_NUMERICAL, 14 }, { "bune",     PRON_NUMERICAL, 14 },
+    { "butanu",  PRON_NUMERICAL, 14 }, { "butandatu",PRON_NUMERICAL, 14 },
+    { "burindwi",PRON_NUMERICAL, 14 },
+    /* Nt.15 singular ONLY — infinitive/verbal noun class                   */
+    { "kumwe",   PRON_NUMERICAL, 15 },
+    /* Nt.16 (aha- locative) */
+    { "hamwe",   PRON_NUMERICAL, 16 }, { "habiri",   PRON_NUMERICAL, 16 },
+    { "hatatu",  PRON_NUMERICAL, 16 }, { "hane",     PRON_NUMERICAL, 16 },
+    { "hatanu",  PRON_NUMERICAL, 16 }, { "hatandatu",PRON_NUMERICAL, 16 },
+    { "harindwi",PRON_NUMERICAL, 16 },
+    /* Plural-form numerical nouns (>7) – these behave like amazina nyamubaro */
+    { "icumi",   PRON_NUMERICAL,  0 }, /* ten                               */
+    { "ijana",   PRON_NUMERICAL,  0 }, /* hundred                           */
+    { "igihumbi",PRON_NUMERICAL,  0 }, /* thousand                          */
+
+    /* ── Ikinyazina mbanziriza (relative pronouns) p.114 ──────────────  */
+    /* These carry circumflex accent (isaku nyejuru -ô) vs demonstrative -o */
+    /* We normalize without accent; context distinguishes from demonstratives */
+    { "uwo",    PRON_RELATIVE,  1 },  /* whom/which (cls1)                  */
+    { "abo",    PRON_RELATIVE,  2 },  /* whom/which (cls2)                  */
+    { "iyo",    PRON_RELATIVE,  4 },  /* which (cls4/9)                     */
+    { "iryo",   PRON_RELATIVE,  5 },  /* which (cls5)                       */
+    { "ayo",    PRON_RELATIVE,  6 },  /* which (cls6)                       */
+    { "icyo",   PRON_RELATIVE,  7 },  /* which (cls7)                       */
+    { "ibyo",   PRON_RELATIVE,  8 },  /* which (cls8)                       */
+    { "izo",    PRON_RELATIVE, 10 },  /* which (cls10)                      */
+    { "urwo",   PRON_RELATIVE, 11 },  /* which (cls11)                      */
+    { "ako",    PRON_RELATIVE, 12 },  /* which (cls12)                      */
+    { "utwo",   PRON_RELATIVE, 13 },  /* which (cls13)                      */
+    { "ubwo",   PRON_RELATIVE, 14 },  /* which (cls14)                      */
+    { "uko",    PRON_RELATIVE, 15 },  /* which (cls15)                      */
+    { "aho",    PRON_RELATIVE, 16 },  /* where/which place                  */
+
+    /* ── Ikinyazina kibaza – complete table (p.117-119) ────────────────  */
+    /* Igicumbi -he? forms for each class */
+    { "wuhe",    PRON_INTERROGATIVE,  1 }, { "uwuhe",   PRON_INTERROGATIVE,  1 },
+    { "bahe",    PRON_INTERROGATIVE,  2 }, { "abahe",   PRON_INTERROGATIVE,  2 },
+    { "yihe",    PRON_INTERROGATIVE,  4 }, { "iyihe",   PRON_INTERROGATIVE,  4 },
+    { "rihe",    PRON_INTERROGATIVE,  5 }, { "irihe",   PRON_INTERROGATIVE,  5 },
+    { "yahe",    PRON_INTERROGATIVE,  6 }, { "ayahe",   PRON_INTERROGATIVE,  6 },
+    { "kihe",    PRON_INTERROGATIVE,  7 }, { "ikihe",   PRON_INTERROGATIVE,  7 },
+    { "bihe",    PRON_INTERROGATIVE,  8 }, { "ibihe",   PRON_INTERROGATIVE,  8 },
+    { "zihe",    PRON_INTERROGATIVE, 10 }, { "izihe",   PRON_INTERROGATIVE, 10 },
+    { "ruhe",    PRON_INTERROGATIVE, 11 }, { "uruhe",   PRON_INTERROGATIVE, 11 },
+    { "kahe",    PRON_INTERROGATIVE, 12 }, { "akahe",   PRON_INTERROGATIVE, 12 },
+    { "tuhe",    PRON_INTERROGATIVE, 13 }, { "utuhe",   PRON_INTERROGATIVE, 13 },
+    { "buhe",    PRON_INTERROGATIVE, 14 }, { "ubuhe",   PRON_INTERROGATIVE, 14 },
+    { "kuhe",    PRON_INTERROGATIVE, 15 }, { "ukuhe",   PRON_INTERROGATIVE, 15 },
+    { "hahe",    PRON_INTERROGATIVE, 16 }, { "ahahe",   PRON_INTERROGATIVE, 16 },
+    /* Igicumbi -ngahe? (how many?) – plural classes only */
+    { "bangahe",  PRON_INTERROGATIVE, 2 }, { "ingahe",   PRON_INTERROGATIVE, 4 },
+    { "angahe",   PRON_INTERROGATIVE, 6 }, { "bingahe",  PRON_INTERROGATIVE, 8 },
+    { "zingahe",  PRON_INTERROGATIVE,10 }, { "tungahe",  PRON_INTERROGATIVE,13 },
+    { "bungahe",  PRON_INTERROGATIVE,14 }, { "hangahe",  PRON_INTERROGATIVE,16 },
+    /* Igicumbi -e? (where? with locative) */
+    { "he",      PRON_INTERROGATIVE,  0 }, /* where? (locative)              */
+    /* Other interrogatives */
+    { "nde",     PRON_INTERROGATIVE,  0 }, /* who?                           */
+    { "nini",    PRON_INTERROGATIVE,  0 }, /* what? / which?                 */
+    { "iki",     PRON_INTERROGATIVE,  0 }, /* what?                          */
+    { "ryari",   PRON_INTERROGATIVE,  0 }, /* when?                          */
+    { "hehe",    PRON_INTERROGATIVE,  0 }, /* where? (informal)              */
+    { "bite",    PRON_INTERROGATIVE,  0 }, /* how?                           */
+    { "kuki",    PRON_INTERROGATIVE,  0 }, /* why?                           */
+    { "ese",     PRON_INTERROGATIVE,  0 }, /* yes/no question marker         */
+    { "mbese",   PRON_INTERROGATIVE,  0 }, /* so? / is it that?              */
+
+    /* ── Pronoun suffixes: -nyine (alone/only), -mbi (both), -se (all) ──  */
+    /* (imbonerahamwe p.93-94) these are pronouns with umusuma attached    */
+    { "wenyine",   PRON_PERSONAL,  1 }, { "bonyine",   PRON_PERSONAL,  2 },
+    { "wonyine",   PRON_PERSONAL,  3 }, { "yonyine",   PRON_PERSONAL,  4 },
+    { "ryonyine",  PRON_PERSONAL,  5 }, { "cyonyine",  PRON_PERSONAL,  7 },
+    { "byonyine",  PRON_PERSONAL,  8 }, { "zonyine",   PRON_PERSONAL, 10 },
+    { "rwonyine",  PRON_PERSONAL, 11 }, { "konyine",   PRON_PERSONAL, 12 },
+    { "twonyine",  PRON_PERSONAL, 13 }, { "bwonyine",  PRON_PERSONAL, 14 },
+    { "honyine",   PRON_PERSONAL, 16 },
+    { "twenyine",  PRON_PERSONAL,  0 }, { "mwenyine",  PRON_PERSONAL,  0 },
+    /* -mbi (both) */
+    { "yombi",    PRON_PERSONAL,  4 }, { "bombi",    PRON_PERSONAL,  2 },
+    { "byombi",   PRON_PERSONAL,  8 }, { "zombi",    PRON_PERSONAL, 10 },
+    { "twombi",   PRON_PERSONAL, 13 }, { "bwombi",   PRON_PERSONAL, 14 },
+    { "hombi",    PRON_PERSONAL, 16 }, { "mwembi",   PRON_PERSONAL,  0 },
+    { "twembi",   PRON_PERSONAL,  0 },
+    /* -se (all/every) */
+    { "bose",     PRON_PERSONAL,  2 }, { "yose",     PRON_PERSONAL,  4 },
+    { "cyose",    PRON_PERSONAL,  7 }, { "byose",    PRON_PERSONAL,  8 },
+    { "zose",     PRON_PERSONAL, 10 }, { "rwose",    PRON_PERSONAL, 11 },
+    { "kose",     PRON_PERSONAL, 12 }, { "twose",    PRON_PERSONAL, 13 },
+    { "bwose",    PRON_PERSONAL, 14 }, { "hose",     PRON_PERSONAL, 16 },
+    { "wose",     PRON_PERSONAL,  3 }, { "ryose",    PRON_PERSONAL,  5 },
+    { "mwese",    PRON_PERSONAL,  0 }, { "twese",    PRON_PERSONAL,  0 },
+
+    /* ── Personal pronoun: emphatic 1sg (jye = I/me emphatic) ──────────── */
+    { "jye",    PRON_PERSONAL,  0 },  /* emphatic I / me (also: nanjye)     */
+    { "jyewe",  PRON_PERSONAL,  0 },  /* emphatic I myself (stronger form)  */
+    { "jyeweho",PRON_PERSONAL,  0 },  /* I myself (jyewe + locative -ho)    */
+
+    /* ── Wese: all / every (indefinite, all classes) ────────────────────── */
+    { "wese",  PRON_INDEFINITE,  0 },  /* all / every / everyone            */
+
+    /* ── Indefinite: another/other ──────────────────────────────────────── */
+    /* -ndi (another/other) short forms: match the concordance prefix        *
+     * Nt.1/3: wundi (u→w before vowel: u+ndi); Nt.2: bandi; Nt.4: yindi;  *
+     * Nt.5: rindi; Nt.6: andi; Nt.7: kindi; Nt.8: bindi; Nt.9/10: zindi;  *
+     * Nt.11: rundi; Nt.12: kandi; Nt.13: tundi; Nt.14: bundi; Nt.15: kundi*/
+    { "wundi",  PRON_INDEFINITE,  1 },  /* another (Nt.1/3: u→w, umuntu wundi)*/
+    /* "yundi" does NOT exist – removed (native speaker correction)         */
+    { "rundi",  PRON_INDEFINITE, 11 },  /* another (Nt.11: urugendo rundi)  */
+    { "kundi",  PRON_INDEFINITE, 15 },  /* another (Nt.15)                  */
+    { "kindi",  PRON_INDEFINITE,  7 },  /* another thing (Nt.7: ikintu kindi)*/
+    { "bundi",  PRON_INDEFINITE, 14 },  /* another (Nt.14: ubundi)          */
+    { "bandi",  PRON_INDEFINITE,  2 },  /* others (Nt.2: abantu bandi)      */
+    { "yindi",  PRON_INDEFINITE,  4 },  /* other (Nt.4: imiti yindi)        */
+    { "zindi",  PRON_INDEFINITE, 10 },  /* other (Nt.10: inka zindi)        */
+    { "bindi",  PRON_INDEFINITE,  8 },  /* other (Nt.8: ibintu bindi)       */
+    { "rindi",  PRON_INDEFINITE,  5 },  /* another (Nt.5: ijambo rindi)     */
+    { "andi",   PRON_INDEFINITE,  6 },  /* another (Nt.6: amabuye andi)     */
+    { "kandi",  PRON_INDEFINITE, 12 },  /* another (Nt.12: akana kandi) — also conj*/
+    { "tundi",  PRON_INDEFINITE, 13 },  /* another (Nt.13: utugabo tundi)   */
+
+    /* ── Apostrophe-elided possessive connectors (2-char fragments) ──────  */
+    /* These appear when possessive connector + apostrophe elides before     */
+    /* a vowel-initial word: ry'amazi=rya amazi, cy'igihe=cya igihe etc.   */
+    { "ry",    PRON_POSSESSIVE,  5 },  /* truncated rya (Nt.5)              */
+    { "cy",    PRON_POSSESSIVE,  7 },  /* truncated cya (Nt.7)              */
+    { "by",    PRON_POSSESSIVE,  8 },  /* truncated bya (Nt.8)              */
+    { "bw",    PRON_POSSESSIVE, 14 },  /* truncated bwa (Nt.14)             */
+    { "rw",    PRON_POSSESSIVE, 11 },  /* truncated rwa (Nt.11)             */
+    { "tw",    PRON_POSSESSIVE, 13 },  /* truncated twa (Nt.13)             */
+    { "my",    PRON_POSSESSIVE,  4 },  /* truncated mya (Nt.4)              */
+
+    /* ── Apostrophe-elided demonstratives ───────────────────────────────── */
+    { "iby",   PRON_DEMONSTRATIVE,  8 },  /* truncated ibyo (Nt.8)          */
+    { "ab",    PRON_DEMONSTRATIVE,  2 },  /* truncated abo (Nt.2)           */
+
+    /* -bwe (reflexive-intensive: yourself, himself) */
+    { "wowe",     PRON_PERSONAL,  0 }, /* you yourself                       */
+    { "twebwe",   PRON_PERSONAL,  0 }, /* we ourselves                       */
+    { "mwebwe",   PRON_PERSONAL,  0 }, /* you yourselves                     */
+
+    /* ── Ikinyazina mpamagazi (vocative pronouns) ─────────────────────  */
+    { "wa",      PRON_VOCATIVE,  0 }, /* O! (to a person)                   */
 
     { NULL, PRON_NONE, 0 }
 };
@@ -265,102 +507,290 @@ bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out) {
 typedef struct { const char *word; POS pos; } InvEntry;
 
 static const InvEntry INVARIABLES[] = {
-    /* ── Umugereka / Ingera (prepositions) ─────────────────────────────── */
-    { "mu",      POS_PREPOSITION },
-    { "ku",      POS_PREPOSITION },
-    { "i",       POS_PREPOSITION },
-    { "kuri",    POS_PREPOSITION },
-    { "nka",     POS_PREPOSITION },  /* like / as                          */
+    /* ══ Umugereka / Ingera (prepositions / adverbs of manner/time/place) ═ */
+    /* Indangahantu (nt.17/18/19): ku=nt17, mu=nt18, i=nt19 – p.102        */
+    { "mu",      POS_PREPOSITION },  /* in / at (nt.18 locative)           */
+    { "ku",      POS_PREPOSITION },  /* on / at / to (nt.17 locative)      */
+    { "i",       POS_PREPOSITION },  /* at / in (nt.19 – proper nouns)     */
+    { "kuri",    POS_PREPOSITION },  /* to / towards / about               */
+    { "muri",    POS_PREPOSITION },  /* in / among (before pronouns)       */
+    { "nka",     POS_PREPOSITION },  /* like / as (ingereranya)            */
     { "bwa",     POS_PREPOSITION },  /* at the time of                     */
-    /* ── Icyungo (conjunctions) ──────────────────────────────────────────  */
+    { "kwa",     POS_PREPOSITION },  /* at / to (someone's place)          */
+    { "ava",     POS_PREPOSITION },  /* from (contraction of kuva)         */
+    { "kuva",    POS_PREPOSITION },  /* from / since                       */
+    { "hagati",  POS_PREPOSITION },  /* between / among                    */
+
+    /* ══ Icyungo (conjunctions) ════════════════════════════════════════════ */
+    /* Ibyungo ngombwa (necessary – remove changes meaning) */
     { "na",      POS_CONJUNCTION },  /* and / with                         */
-    { "kandi",   POS_CONJUNCTION },  /* and also                           */
+    { "nka",     POS_CONJUNCTION },  /* like / as (also ingereranya)       */
     { "cyangwa", POS_CONJUNCTION },  /* or                                 */
-    { "naho",    POS_CONJUNCTION },  /* whereas / while                    */
-    { "ariko",   POS_CONJUNCTION },  /* but                                */
-    { "nyamara", POS_CONJUNCTION },  /* however                            */
+    { "yuko",    POS_CONJUNCTION },  /* that (factual complement) – inyumane*/
+    { "kuko",    POS_CONJUNCTION },  /* because – inyumane                 */
+    /* Ibyungo ntagombwa (removable without changing meaning) */
+    { "kandi",   POS_CONJUNCTION },  /* and also / moreover                */
+    { "naho",    POS_CONJUNCTION },  /* whereas / while / even if          */
+    { "ariko",   POS_CONJUNCTION },  /* but / however                      */
+    { "nyamara", POS_CONJUNCTION },  /* however / yet                      */
     { "keretse", POS_CONJUNCTION },  /* except / unless                    */
-    { "mbese",   POS_CONJUNCTION },  /* so / therefore                     */
     { "kuko",    POS_CONJUNCTION },  /* because                            */
     { "kubera",  POS_CONJUNCTION },  /* because of                         */
-    { "none",    POS_CONJUNCTION },  /* and then / now                     */
+    { "none",    POS_CONJUNCTION },  /* now / then / so                    */
     { "maze",    POS_CONJUNCTION },  /* and then (sequence)                */
+    { "erega",   POS_CONJUNCTION },  /* indeed / well then / you see       */
+    { "icyo",    POS_CONJUNCTION },  /* that is why (icyo bikora...)       */
+    { "bityo",   POS_CONJUNCTION },  /* thus / in that way                 */
+    { "nanone",  POS_CONJUNCTION },  /* also / and also                    */
+    { "ndetse",  POS_CONJUNCTION },  /* even / furthermore                 */
+    { "rero",    POS_CONJUNCTION },  /* therefore / so                     */
+    { "cyakora", POS_CONJUNCTION },  /* however / but                      */
+    { "nubwo",   POS_CONJUNCTION },  /* although / even though             */
+    { "n'iyo",   POS_CONJUNCTION },  /* even if / although                 */
+    { "niyo",    POS_CONJUNCTION },  /* even if / although                 */
+    { "kugira",  POS_CONJUNCTION },  /* in order to (kugira ngo)           */
     { "ngo",     POS_VERB_PARTICLE },/* that / in order to (ikegeranshinga)*/
     { "ko",      POS_VERB_PARTICLE },/* that (complementizer)              */
-    /* ── Irangamutima (interjections) ──────────────────────────────────── */
+    { "no",      POS_CONJUNCTION  }, /* and also / plus (na + o fusion)    */
+    { "bene",    POS_ADVERB       }, /* own / themselves (intensifier)     */
+    { "gituma",  POS_CONJUNCTION  }, /* that is why / the reason being     */
+
+    /* ══ Copula (inshinga nkene) ════════════════════════════════════════════ */
+    /* ni/si are equative verbs (copulas); POS_VERB_CONJ makes has_verb work */
+    { "ni",      POS_VERB_CONJ   }, /* copula / is (equative verb)         */
+    { "si",      POS_VERB_CONJ   }, /* negative copula: is not             */
+    /* Conjugated copula forms of kuba */
+    { "ari",     POS_VERB_CONJ   }, /* 3sg/pl cls1 present                 */
+    { "ndi",     POS_VERB_CONJ   }, /* 1sg copula: I am                    */
+    { "uri",     POS_VERB_CONJ   }, /* 2sg copula: you are                 */
+    { "turi",    POS_VERB_CONJ   }, /* 1pl copula: we are                  */
+    { "bari",    POS_VERB_CONJ   }, /* 3pl copula: they are                */
+    { "kari",    POS_VERB_CONJ   }, /* nt.12 copula                        */
+    { "iri",     POS_VERB_CONJ   }, /* nt.5 copula: it is                  */
+    { "riri",    POS_VERB_CONJ   }, /* nt.5 copula (alternate)             */
+    { "biri",    POS_VERB_CONJ   }, /* nt.8 copula: they are               */
+    { "ziri",    POS_VERB_CONJ   }, /* nt.10 copula: they are              */
+    { "yari",    POS_VERB_CONJ   }, /* nt.1/6 past copula: was             */
+    { "wari",    POS_VERB_CONJ   }, /* 2sg past copula: you were           */
+    { "tari",    POS_VERB_CONJ   }, /* 1pl past copula: we were            */
+    { "mwari",   POS_VERB_CONJ   }, /* 2pl past copula: you were           */
+    { "bwari",   POS_VERB_CONJ   }, /* nt.14 past copula                   */
+    { "hari",    POS_VERB_CONJ   }, /* existential: there is/was (nt.16)   */
+    { "rwari",   POS_VERB_CONJ   }, /* nt.11 past copula: was              */
+    { "twari",   POS_VERB_CONJ   }, /* 1pl past copula: we were            */
+    { "byari",   POS_VERB_CONJ   }, /* nt.8  past copula: they were        */
+    { "cyari",   POS_VERB_CONJ   }, /* nt.7  past copula: it was           */
+    { "zwari",   POS_VERB_CONJ   }, /* nt.10 past copula: they were        */
+    { "atari",   POS_VERB_CONJ   }, /* nt.1  neg past copula: he was not   */
+    { "ntari",   POS_VERB_CONJ   }, /* 1sg   neg past copula: I was not    */
+    { "nari",    POS_VERB_CONJ   }, /* 1sg   past copula: I was            */
+    { "zari",    POS_VERB_CONJ   }, /* nt.10 past copula: they were        */
+    { "kwari",   POS_VERB_CONJ   }, /* nt.15 past copula: it was           */
+    { "ruri",    POS_VERB_CONJ   }, /* nt.11 copula: it is (present)       */
+    { "kiri",    POS_VERB_CONJ   }, /* nt.12 copula: it is (present)       */
+    { "amen",    POS_INTERJECTION}, /* Amen (Hebrew loanword, invariable)   */
+    /* ── "kuzizi" (to know) conjugated forms ─────────────────────────────  */
+    /* These end in -i (not standard -a/-e), caught here as special forms   */
+    { "nzi",     POS_VERB_CONJ   }, /* 1sg: I know                          */
+    { "uzi",     POS_VERB_CONJ   }, /* 2sg: you know                        */
+    { "bazi",    POS_VERB_CONJ   }, /* nt.2: they know                      */
+    { "tuzi",    POS_VERB_CONJ   }, /* 1pl: we know                         */
+    /* "muzi" (2pl: you know) OMITTED — conflicts with umuzi (homestead) in KNOWN_WORDS */
+    /* ── Short verb forms too small for morphological detection ──────────  */
+    { "mpa",     POS_VERB_CONJ   }, /* 1sg: I give (guha, 1sg n→m before p) */
+    { "mbe",     POS_VERB_CONJ   }, /* 1sg subj/request: let me (be)        */
+    { "be",      POS_VERB_CONJ   }, /* nt.2 subj: let them be               */
+    /* ── Common adverbs not yet in the table ──────────────────────────────  */
+    { "nyakuri",  POS_ADVERB     }, /* truly / certainly / indeed           */
+    { "kongera",  POS_ADVERB     }, /* again / also / furthermore           */
+    { "utari",    POS_VERB_CONJ  }, /* nt.3/2sg neg copula: you/it was not  */
+    { "uwari",    POS_VERB_CONJ  }, /* relative copula: the one who was     */
+    { "ne",       POS_CONJUNCTION}, /* and (variant of 'na' before vowel)   */
+    /* ── Negative forms with inner verbs ending in 'i' ───────────────────  */
+    { "ntuzi",    POS_VERB_CONJ  }, /* nt.1sg neg: we don't know (kuzizi)   */
+    { "ntiyari",  POS_VERB_CONJ  }, /* neg copula Nt.1 past: was not        */
+    { "sinzongera",POS_VERB_CONJ }, /* neg: will not add again (si+zongera) */
+    { "ntabwo",  POS_ADVERB      }, /* not at all / absolutely not         */
+    { "ntiho",   POS_VERB_CONJ   }, /* there was not (locative neg)        */
+
+    /* ══ Quotative & complementizer particles ══════════════════════════════ */
+    { "iti",     POS_VERB_PARTICLE}, /* quotative: (s)he said "..."        */
+    { "ati",     POS_VERB_PARTICLE}, /* quotative: he/she said "..." (cls1)*/
+    { "bati",    POS_VERB_CONJ   }, /* suppletive: they said (ba+ti)       */
+    { "uti",     POS_VERB_CONJ   }, /* suppletive: you said (u+ti)         */
+    { "nti",     POS_VERB_CONJ   }, /* suppletive: I say/said (n+ti)       */
+    { "yati",    POS_VERB_CONJ   }, /* suppletive: he/she said (ya+ti)     */
+    { "mwati",   POS_VERB_CONJ   }, /* suppletive: you-pl said (mwa+ti)    */
+    { "twati",   POS_VERB_CONJ   }, /* suppletive: we said (twa+ti)        */
+    { "rwati",   POS_VERB_CONJ   }, /* suppletive: Nt.11 said (rwa+ti)     */
+
+    /* ══ Elided forms (before apostrophe) ══════════════════════════════════ */
+    { "n",       POS_CONJUNCTION  }, /* elided 'na' before vowel           */
+    { "y",       POS_CONJUNCTION  }, /* elided 'ya' possessive connector   */
+    { "k",       POS_PREPOSITION  }, /* elided 'ku/ka' before vowel        */
+    { "b",       POS_CONJUNCTION  }, /* elided 'ba' before vowel           */
+    { "w",       POS_CONJUNCTION  }, /* elided 'wa' before vowel           */
+    { "r",       POS_CONJUNCTION  }, /* elided 'rya' before vowel          */
+    { "c",       POS_CONJUNCTION  }, /* elided 'cya' before vowel          */
+    { "nk",      POS_PREPOSITION  }, /* elided 'nka' (like/as) before vowel*/
+    { "cy",      POS_CONJUNCTION  }, /* elided 'cya' Nt.7 possessive       */
+    { "ry",      POS_CONJUNCTION  }, /* elided 'rya' Nt.5 possessive       */
+    { "bw",      POS_CONJUNCTION  }, /* elided 'bwa' Nt.14 possessive      */
+    { "rw",      POS_CONJUNCTION  }, /* elided 'rwa' Nt.11 possessive      */
+    { "by",      POS_CONJUNCTION  }, /* elided 'bya' Nt.8 possessive       */
+    { "tw",      POS_CONJUNCTION  }, /* elided 'twa' Nt.13 possessive      */
+    { "my",      POS_CONJUNCTION  }, /* elided 'mya' Nt.4 possessive       */
+    { "iby",     POS_CONJUNCTION  }, /* elided 'ibyo/ibya' Nt.8 demonstr.  */
+    { "icy",     POS_CONJUNCTION  }, /* elided 'icya' Nt.7 possessive/rel. */
+    { "ab",      POS_CONJUNCTION  }, /* elided 'abo' Nt.2 demonstrative    */
+    { "abe",     POS_CONJUNCTION  }, /* elided 'abe' Nt.2 / let them be    */
+    { "kw",      POS_PREPOSITION  }, /* elided 'kwa' before vowel           */
+    { "uw",      POS_PRONOUN      }, /* elided 'uwa' Nt.1 possessive        */
+    { "iy",      POS_PRONOUN      }, /* elided 'iya' Nt.4 possessive        */
+    { "ubw",     POS_PRONOUN      }, /* elided 'ubwa' Nt.14 possessive      */
+    { "mwa",     POS_CONJUNCTION  }, /* elided 'mwa' Nt.1 past SP fragment  */
+    { "urw",     POS_PRONOUN      }, /* elided 'urwa' Nt.11 possessive      */
+
+    /* ══ Irangamutima (interjections) – p.103-104 ══════════════════════════ */
+    /* Kwemeza (affirm) */
+    { "yee",     POS_INTERJECTION },
+    { "yego",    POS_ADVERB       }, /* yes                                */
+    { "oya",     POS_ADVERB       }, /* no                                 */
+    /* Gutangara (surprise / amazement) */
+    { "ahahaa",  POS_INTERJECTION }, /* amazement!                         */
+    { "ahaa",    POS_INTERJECTION }, /* surprise!                          */
     { "ah",      POS_INTERJECTION },
-    { "aye",     POS_INTERJECTION },
+    { "aye",     POS_INTERJECTION }, /* well / so                          */
     { "eeh",     POS_INTERJECTION },
     { "hee",     POS_INTERJECTION },
     { "ooh",     POS_INTERJECTION },
-    { "wa",      POS_INTERJECTION },
+    { "asyi",    POS_INTERJECTION }, /* wow / unbelievable!                */
+    { "ashwi",   POS_INTERJECTION }, /* expression of frustration/dismissal*/
+    { "yooo",    POS_INTERJECTION }, /* wow / oh no!                       */
+    { "yuuu",    POS_INTERJECTION }, /* expression of distress / doubt     */
+    { "ayi",     POS_INTERJECTION }, /* no! / stop! / surprise             */
+    { "apu",     POS_INTERJECTION }, /* disgust / contempt                 */
+    /* Kubabara (grief) */
+    { "ararara",  POS_INTERJECTION}, /* grief / lamentation                */
+    { "orororooo",POS_INTERJECTION}, /* grief / crying out                 */
+    { "ahiii",   POS_INTERJECTION }, /* pain / sorrow                      */
+    { "ahwiii",  POS_INTERJECTION }, /* relief / exhaustion                */
+    { "ahuuu",   POS_INTERJECTION }, /* relief                             */
+    /* Gushima/gucecekesha/kwikanga */
+    { "ashyiii", POS_INTERJECTION }, /* admiration                         */
+    { "shiii",   POS_INTERJECTION }, /* silence! / shhh!                   */
+    { "yebaba",  POS_INTERJECTION }, /* surprise / exclamation             */
+    { "dore",    POS_INTERJECTION }, /* look! / behold! (also ikegeranshinga)*/
+    { "pyo",     POS_INTERJECTION }, /* thief/swift movement sound         */
+    { "bwe",     POS_INTERJECTION }, /* sound of hitting                   */
+    /* Generic exclamatives */
     { "wee",     POS_INTERJECTION },
-    { "pyo",     POS_INTERJECTION },
-    { "asyi",    POS_INTERJECTION },
-    { "dore",    POS_INTERJECTION }, /* look! / behold!                   */
-    { "ni",      POS_CONJUNCTION  }, /* copula / is (equative verb)        */
-    { "si",      POS_CONJUNCTION  }, /* negative copula / is not           */
-    /* ── Copula forms of kuba (to be) ──────────────────────────────────── */
-    { "ari",     POS_VERB_CONJ   }, /* 3sg class1 copula: (s)he/it is     */
-    { "ndi",     POS_VERB_CONJ   }, /* 1sg copula: I am                   */
-    { "uri",     POS_VERB_CONJ   }, /* 2sg copula: you are                */
-    { "turi",    POS_VERB_CONJ   }, /* 1pl copula: we are                 */
-    { "muri",    POS_VERB_CONJ   }, /* 2pl copula: you all are            */
-    { "bari",    POS_VERB_CONJ   }, /* 3pl copula: they are               */
-    { "kari",    POS_VERB_CONJ   }, /* Nt.12 copula: it (ka-class) is     */
-    { "biri",    POS_VERB_CONJ   }, /* Nt.8 copula: they are              */
-    { "riri",    POS_VERB_CONJ   }, /* Nt.5 copula: it is                 */
-    { "ziri",    POS_VERB_CONJ   }, /* Nt.10 copula: they are             */
-    /* ── Quotative & other particles ──────────────────────────────────── */
-    { "iti",     POS_VERB_PARTICLE}, /* quotative particle: saying "..."   */
-    { "n",       POS_CONJUNCTION  }, /* elided 'na' before apostrophe      */
-    { "y",       POS_CONJUNCTION  }, /* elided 'ya' possessive connector   */
-    { "k",       POS_PREPOSITION  }, /* elided 'ku/ka' before apostrophe   */
-    { "b",       POS_CONJUNCTION  }, /* elided 'ba' before apostrophe      */
-    { "w",       POS_CONJUNCTION  }, /* elided 'wa' before apostrophe      */
-    { "se",      POS_ADVERB       }, /* father (sometimes invariable use)  */
-    { "ko",      POS_VERB_PARTICLE}, /* complementizer 'that'              */
-    { "yego",    POS_ADVERB       }, /* yes                               */
-    { "oya",     POS_ADVERB       }, /* no                                */
-    { "yee",     POS_INTERJECTION },
-    /* ── Negative existential particle ──────────────────────────────────── */
-    { "nta",     POS_ADVERB      }, /* there is no / none (nta muntu = no one)*/
-    { "ntacyo",  POS_ADVERB      }, /* nothing / it doesn't matter            */
-    /* ── Akamamo (adverbs) ──────────────────────────────────────────────   */
-    { "vuba",       POS_ADVERB }, /* quickly / soon                        */
-    { "cyane",      POS_ADVERB }, /* very / a lot                          */
-    { "gato",       POS_ADVERB }, /* a little                              */
-    { "hanze",      POS_ADVERB }, /* outside                               */
-    { "imbere",     POS_ADVERB }, /* in front / before                     */
-    { "mbere",      POS_ADVERB }, /* firstly / before (short form of imbere)*/
-    { "inyuma",     POS_ADVERB }, /* behind / after                        */
-    { "hejuru",     POS_ADVERB }, /* above / up                            */
-    { "munsi",      POS_ADVERB }, /* below / down                          */
-    { "neza",       POS_ADVERB }, /* well / nicely                         */
-    { "bidasanzwe", POS_ADVERB }, /* unusually                             */
-    { "buri",       POS_ADVERB }, /* every                                 */
-    { "ubwira",     POS_ADVERB }, /* alone                                 */
-    { "hamwe",      POS_ADVERB }, /* together                              */
+    { "we",      POS_INTERJECTION }, /* hey you! (vocative attention)      */
+    { "yewe",    POS_INTERJECTION }, /* hey! (attention – informal)        */
+    { "yewe",    POS_ADVERB       },
+
+    /* ══ Akamamo particles (p.102-103) ═════════════════════════════════════ */
+    /* Note: da=male, ma=female – follows commands/suggestions              */
+    { "da",      POS_ADVERB       }, /* (male) come on / please / relax    */
+    { "ma",      POS_ADVERB       }, /* (female) come on / please          */
+    { "ga",      POS_ADVERB       }, /* emphasis / go ahead                */
+    { "ye",      POS_ADVERB       }, /* listen / you hear?                 */
+    { "ra",      POS_ADVERB       }, /* still / already (emphasis)         */
+    { "re",      POS_ADVERB       }, /* emphasis particle (dore re)        */
+    { "sha",     POS_ADVERB       }, /* come on / already                  */
+    { "ngo",     POS_ADVERB       }, /* they say / apparently (hearsay)    */
+
+    /* ══ Ikegeranshinga (particles / imperatives) – p.101-102 ══════════════ */
+    { "cyono",   POS_VERB_PARTICLE}, /* come! / let's go (attention)       */
+    { "ngwino",  POS_VERB_PARTICLE}, /* come here!                         */
+    { "ngaho",   POS_VERB_PARTICLE}, /* go on / let's go (directional)     */
+    { "mpano",   POS_VERB_PARTICLE}, /* bring here!                        */
+    { "enda",    POS_VERB_PARTICLE}, /* go ahead                           */
+    { "mbiswa",  POS_VERB_PARTICLE}, /* let me be shown / help me          */
+    { "hinga",   POS_VERB_PARTICLE}, /* come on (motivation)               */
+    { "have",    POS_VERB_PARTICLE}, /* come away from there               */
+    { "hoshi",   POS_VERB_PARTICLE}, /* come out!                          */
+    { "gira",    POS_VERB_PARTICLE}, /* take / do (imperative)             */
+    { "ishi",    POS_VERB_PARTICLE}, /* here / take this                   */
+
+    /* ══ Negative particles ═════════════════════════════════════════════════ */
+    { "nta",     POS_ADVERB      }, /* there is no / none (nta muntu)     */
+    { "ntacyo",  POS_ADVERB      }, /* nothing / it doesn't matter         */
+    { "ntaho",   POS_ADVERB      }, /* nowhere                             */
+    { "nta na",  POS_ADVERB      }, /* not even                            */
+
+    /* ══ Umugereka w'igihe (time adverbs) ══════════════════════════════════ */
+    { "ubu",        POS_ADVERB }, /* now / currently                       */
+    { "none",       POS_ADVERB }, /* now / currently / then                */
+    { "ejo",        POS_ADVERB }, /* yesterday / tomorrow                  */
+    { "ejo hashize",POS_ADVERB }, /* yesterday                             */
+    { "kera",       POS_ADVERB }, /* long ago / in the old days            */
+    { "rimwe",      POS_ADVERB }, /* sometimes / once (also numerical)     */
+    { "buri gihe",  POS_ADVERB }, /* always / every time                   */
+    { "ntibigera",  POS_ADVERB }, /* never                                 */
+    { "ryari",      POS_ADVERB }, /* when? (as time adverb)                */
+    { "hanyuma",    POS_ADVERB }, /* afterwards / then                     */
+    { "mbere",      POS_ADVERB }, /* first / before                        */
+    { "bukeye",     POS_ADVERB }, /* the next day / the following day      */
+    { "uyu munsi",  POS_ADVERB }, /* today                                 */
+    { "vuba",       POS_ADVERB }, /* soon / quickly                        */
+    { "noneho",     POS_ADVERB }, /* right now / just now                  */
+    { "naho",       POS_ADVERB }, /* even / yet / still (also conjunction) */
+
+    /* ══ Umugereka w'uburyo (manner adverbs) ═══════════════════════════════ */
+    { "cyane",      POS_ADVERB }, /* very much / a lot                     */
+    { "gato",       POS_ADVERB }, /* a little / slightly                   */
+    { "neza",       POS_ADVERB }, /* well / nicely / properly              */
+    { "guhoro",     POS_ADVERB }, /* slowly / gently                       */
+    { "buhorobuhoro",POS_ADVERB}, /* slowly / gradually                    */
+    { "buhoro",     POS_ADVERB }, /* slowly (short form)                   */
+    { "gihoro",     POS_ADVERB }, /* quietly / calmly                      */
+    { "bucece",     POS_ADVERB }, /* silently / quietly                    */
+    { "hafi",       POS_ADVERB }, /* nearly / almost                       */
+    { "cyane cyane",POS_ADVERB }, /* especially / particularly             */
+    { "cyanecyane", POS_ADVERB }, /* especially                            */
     { "gusa",       POS_ADVERB }, /* only / just                           */
-    { "kera",       POS_ADVERB }, /* long ago / previously                 */
-    { "ubu",        POS_ADVERB }, /* now                                   */
-    { "ejo",        POS_ADVERB }, /* yesterday / tomorrow (context)        */
-    /* "uyu" is a demonstrative pronoun; NOT listed here                  */
-    { "rimwe",      POS_ADVERB }, /* sometimes / once                      */
-    { "ntaho",      POS_ADVERB }, /* nowhere                               */
-    /* ── Indangahantu (locatives / place adverbs) ───────────────────────   */
-    { "hano",    POS_LOCATIVE }, /* here                                   */
-    { "aho",     POS_LOCATIVE }, /* there (relative)                       */
-    { "hariya",  POS_LOCATIVE }, /* over there                             */
-    { "hejuru",  POS_LOCATIVE }, /* above                                  */
-    { "munsi",   POS_LOCATIVE }, /* below                                  */
+    { "rwose",      POS_ADVERB }, /* completely / totally / really         */
+    { "bidasanzwe", POS_ADVERB }, /* unusually / surprisingly              */
+    { "hamwe",      POS_ADVERB }, /* together / in the same place          */
+    { "ubwira",     POS_ADVERB }, /* alone / by oneself                    */
+    { "ubwabyo",    POS_ADVERB }, /* by itself / automatically             */
+    { "kenshi",     POS_ADVERB }, /* often / frequently                    */
+    { "inshuro",    POS_ADVERB }, /* times / frequency                     */
+    { "gatatu",     POS_ADVERB }, /* three times / thirdly                 */
+    { "incuro",     POS_ADVERB }, /* times / repetitions                   */
+
+    /* ══ Umugereka w'ahantu (place adverbs / indangahantu) ═════════════════ */
+    { "hasi",    POS_LOCATIVE }, /* below / down / on the ground           */
+    { "hano",    POS_LOCATIVE }, /* here / right here                      */
+    { "aho",     POS_LOCATIVE }, /* there (relative / general)             */
+    { "hariya",  POS_LOCATIVE }, /* over there (distant)                   */
+    { "hejuru",  POS_LOCATIVE }, /* above / up there                       */
+    { "haruguru",POS_LOCATIVE }, /* above / up there (formal/biblical)     */
+    { "hepfo",   POS_LOCATIVE }, /* below / southward                      */
+    { "munsi",   POS_LOCATIVE }, /* below / down                           */
     { "hanze",   POS_LOCATIVE }, /* outside                                */
-    { "imbere",  POS_LOCATIVE }, /* in front                               */
-    { "inyuma",  POS_LOCATIVE }, /* behind                                 */
-    { "hagati",  POS_LOCATIVE }, /* in the middle                          */
-    { "hafi",    POS_LOCATIVE }, /* near                                   */
-    { "hose",    POS_LOCATIVE }, /* everywhere                             */
-    { "hahandi", POS_LOCATIVE }, /* elsewhere                              */
+    { "imbere",  POS_LOCATIVE }, /* in front / forward                     */
+    { "inyuma",  POS_LOCATIVE }, /* behind / backward                      */
+    { "hagati",  POS_LOCATIVE }, /* in the middle / between                */
+    { "hafi",    POS_LOCATIVE }, /* near / close by                        */
+    { "hose",    POS_LOCATIVE }, /* everywhere / all over                  */
+    { "hahandi", POS_LOCATIVE }, /* elsewhere / somewhere else             */
+    { "epfo",    POS_LOCATIVE }, /* in the south / below (directional)     */
+    { "ruguru",  POS_LOCATIVE }, /* in the north / above (directional)     */
+    { "hirya",   POS_LOCATIVE }, /* over there / on that side              */
+    { "hino",    POS_LOCATIVE }, /* on this side / here                    */
+    { "iruhande", POS_LOCATIVE}, /* to the side / sideways                 */
+    { "hambavu",  POS_LOCATIVE}, /* beside / next to                       */
+
+    /* ══ Other common invariables ═══════════════════════════════════════════ */
+    { "koko",       POS_ADVERB }, /* indeed / truly / really               */
+    { "buri",       POS_ADVERB }, /* every / each                          */
+    { "se",         POS_ADVERB }, /* father / (question tag)               */
+    { "yego",       POS_ADVERB }, /* yes / indeed                          */
+    { "oya",        POS_ADVERB }, /* no / not                              */
+    { "mbese",      POS_ADVERB }, /* is it that / so / therefore           */
+
     { NULL, POS_UNKNOWN }
 };
 
@@ -482,7 +912,97 @@ static const char *VERB_STEMS[] = {
     "tabur",    /* gutabara    – to rescue / save                         */
     "ic",       /* kwica       – to kill                                  */
     "jyen",     /* kujyena     – to walk along                            */
-    "bw",       /* kubwa       – to fall (dup, harmless)                  */
+    /* ── Additional high-frequency stems (Year 4 book + corpus) ─────── */
+    "jy",       /* kujya       – to go to (directional: bajya i Kigali)   */
+    "jye",      /* kujya (past stem: yajyeye, alternate conjugated root)  */
+    "pfa",      /* gupfa       – to die (short/contracted form)           */
+    "gend",     /* kugenda     – to go/travel (general movement)          */
+    "giy",      /* kugenda past stem: bagiye (they went/have gone)        */
+    "shob",     /* gushobora   – to be able / can                        */
+    "subit",    /* gusubira    – to return / go back                     */
+    "yumv",     /* kumva       – to hear / understand                    */
+    "tah",      /* kutaha      – to go home                              */
+    "tum",      /* gutuma      – to send / cause                         */
+    "tor",      /* gutora      – to choose / vote                        */
+    "mer",      /* gumera      – to grow / sprout                        */
+    "ban",      /* kubana      – to live together / cohabit              */
+    "bar",      /* kubara      – to count                                */
+    "imb",      /* kwimba      – to dig                                  */
+    "tuk",      /* gutuka      – to insult / curse                       */
+    "zirik",    /* kuzirikan   – to meditate / contemplate               */
+    "shemez",   /* gushemeza   – to praise / glorify                     */
+    "onger",    /* kwongera    – to add / do again / increase            */
+    "pang",     /* gupanga     – to plan / arrange                       */
+    "kang",     /* gukanguka   – to wake up / be vigilant               */
+    "ish",      /* kwisha      – to finish / end                         */
+    "van",      /* guvana      – to part from / separate                 */
+    "nyur",     /* kunyura     – to pass through / traverse              */
+    "zam",      /* kuzamura    – to lift / raise up                      */
+    "vunik",    /* guvunika    – to break / fracture                     */
+    "hur",      /* guhura      – to meet / encounter                     */
+    "rong",     /* gurongora   – to marry (male perspective)             */
+    "ron",      /* gurona      – to find / discover                      */
+    "fung",     /* gufungura   – to open (a door/bottle/etc.)            */
+    "hem",      /* guhema      – to breathe with difficulty              */
+    "gor",      /* kugora      – to be difficult / tough                 */
+    "shirom",   /* gushiroma   – to be ashamed / embarrassed            */
+    "senyur",   /* gusenya     – to demolish / break down               */
+    "ting",     /* gutinga     – to forbid / prevent                     */
+    "kwib",     /* kwibuka     – to remember / recall                    */
+    "bwir",     /* kubwira  – already present; keep as kwibw variant     */
+    "umvikan",  /* kumvikana   – to be understood / reach agreement     */
+    "tond",     /* kwitondera  – to be careful / attentive              */
+    "rir",      /* kurira  – to cry (already present as rir)             */
+    "sangir",   /* gusenga – to worship for someone                      */
+    "sukum",    /* gusukuma    – to push                                 */
+    "tuhuk",    /* gutuhuka    – to rest / have a break                  */
+    "jyanir",   /* kujyanira   – to take for / bring to                  */
+    "fungurir",  /* gufungurira – to open for                            */
+    /* ── Additional high-frequency Bible corpus stems ─────────────────── */
+    "koherez",  /* gukohereza  – to send (on an errand)                  */
+    "komez",    /* gukomeza    – to continue / strengthen / keep going   */
+    "emer",     /* kwemera     – to believe / accept / agree             */
+    "eger",     /* kwegera     – to approach / come near                 */
+    "cungur",   /* gucungura   – to redeem / save / ransom               */
+    "cecek",    /* guceceka    – to be quiet / silent                    */
+    "cebur",    /* gucebura    – to humiliate / abase / put to shame     */
+    "himbaz",   /* guhimbaza   – to celebrate / honor / praise           */
+    "hish",     /* guhisha     – to hide / conceal                       */
+    "humur",    /* guhumura    – to comfort / console / reassure         */
+    "geragez",  /* gugerageza  – to try / attempt / make an effort      */
+    "erekez",   /* kwerekezeza – to direct toward / point at             */
+    "hinduk",   /* guhinduka   – to turn / change / transform            */
+    "hembur",   /* guhembura   – to console / wipe away tears            */
+    "honger",   /* kwongera    – to add / congratulate (ho+onger)        */
+    "hongez",   /* guhoreza    – to calm / pacify                        */
+    "hugur",    /* guhugura    – to prepare / train / instruct           */
+    "hungur",   /* guhungura   – to liberate / free / release            */
+    "humuk",    /* guhumuka    – to be freed / loosed / released         */
+    "humat",    /* guhumata    – to stick / adhere / cling               */
+    "huguk",    /* guhuguka    – to collapse / fall apart                */
+    "gendar",   /* kugendera   – to live / walk / behave                 */
+    "hengam",   /* guhenga     – to add beyond / go beyond              */
+    "hindir",   /* guhindira   – to pour out / shed                      */
+    "hishimir", /* guhishimira – to rejoice for / be happy for          */
+    "rek",      /* kureka      – to leave / let go / allow               */
+    "sab",      /* gusaba      – to ask / request / pray                 */
+    "pf",       /* gupfa       – to die (very short stem form)           */
+    "sim",      /* gusimba     – to replace / substitute                 */
+    "rob",      /* kuroha      – to sink / drown                        */
+    "boh",      /* guboha      – to tie / bind                          */
+    "hug",      /* guhugurika  – to be destroyed                        */
+    "cur",      /* kucura      – to forge / shape                       */
+    "bat",      /* kubata      – to press / oppress                     */
+    "hit",      /* guhita      – to pass / go through                   */
+    "nyw",      /* kunywa      – to drink (vowel-initial form)           */
+    "tur",      /* gutura      – to live (already present)               */
+    "ton",      /* gutona      – to drip / trickle                      */
+    "nyz",      /* kunyaza     – to urinate                              */
+    "honh",     /* guhonha     – to wipe / clean                        */
+    "gor",      /* kugora      – to be difficult (already present)      */
+    "teg",      /* gutega      – to set a trap / prepare                */
+    "tamb",     /* gutamba     – to work hard / be zealous              */
+    "gor",      /* kugora  (dup: keep for coverage)                     */
     NULL
 };
 
@@ -579,8 +1099,204 @@ static const KnownWord KNOWN_WORDS[] = {
     { "amahoro",  6,  "horo"   },  /* peace / greetings                   */
     { "amafaranga",6, "faranga"},  /* money                               */
     { "amata",    6,  "ta"     },  /* milk                                */
-    /* Other common irregulars */
+    /* Other common irregulars / frequently misanalysed words */
     { "ejo",      0,  ""       },  /* yesterday / tomorrow (context-dep.) */
+    /* Nt.5 words whose 'ri' class marker is elided (bare i- prefix) */
+    { "ishuri",   5,  "shuri"  },  /* school (also ishule)                */
+    { "isoko",    5,  "soko"   },  /* market                              */
+    { "ibuye",    5,  "buye"   },  /* stone / rock                        */
+    { "izina",    5,  "zina"   },  /* name                                */
+    { "itara",    5,  "tara"   },  /* lamp / light / fire (dim)           */
+    { "ifarasi",  5,  "farasi" },  /* horse (loanword)                    */
+    { "itonde",   5,  "tonde"  },  /* care / caution                      */
+    /* Common Nt.3 nouns (umw- before vowel: umwaka, umwami) */
+    { "umwaka",   3,  "waka"   },  /* year                                */
+    { "umwami",   1,  "wami"   },  /* king / lord / master (Nt.1)         */
+    { "umuriro",  3,  "riro"   },  /* fire                                */
+    { "umunsi",   3,  "nsi"    },  /* day                                 */
+    /* Common Nt.11 nouns */
+    { "urukundo", 11, "kundo"  },  /* love                                */
+    { "urugendo", 11, "gendo"  },  /* journey / trip                      */
+    { "urugo",    11, "go"     },  /* home / household (also nt.7 urugo)  */
+    /* Common Nt.14 abstract nouns */
+    { "ubugingo", 14, "gingo"  },  /* life / soul / breath                */
+    { "ubuzima",  14, "zima"   },  /* health / life                       */
+    { "ubwami",   14, "wami"   },  /* kingdom / reign                     */
+    { "ubwoba",   14, "woba"   },  /* fear / fright                       */
+    /* Common Nt.6 body/nature nouns */
+    { "amaraso",  6,  "raso"   },  /* blood                               */
+    { "amaboko",  6,  "boko"   },  /* arms / hands                        */
+    { "amaguru",  6,  "guru"   },  /* legs / feet                         */
+    { "amajwi",   6,  "jwi"    },  /* voices / words / sounds             */
+    { "amazina",  6,  "zina"   },  /* names (pl of izina)                 */
+    /* Common Nt.7 nouns */
+    { "icyaha",   7,  "yaha"   },  /* sin / fault / guilt                 */
+    { "igihe",    7,  "gihe"   },  /* time / moment / period              */
+    { "igihugu",  7,  "hugu"   },  /* country / nation                    */
+    /* Common Nt.9 nouns */
+    { "inzoga",   9,  "nzoga"  },  /* beer / alcohol                      */
+    /* Nt.1/3 nouns whose D vowel 'u' is dropped in informal writing       */
+    { "musomyi",  1,  "somyi"  },  /* reader / student (= umusomyi)        */
+    { "muntu",    1,  "ntu"    },  /* person (= umuntu)                    */
+    { "mugore",   1,  "gore"   },  /* woman (= umugore)                    */
+    { "mugabo",   1,  "gabo"   },  /* man (= umugabo)                      */
+    { "mwana",    1,  "wana"   },  /* child (= umwana)                     */
+    { "mwami",    1,  "wami"   },  /* king/lord (= umwami)                 */
+    /* Dropped D-vowel: Nt.7 words where prefix 'i' is elided in fast speech */
+    { "gihe",     7,  "gihe"   },  /* = igihe (time / moment)             */
+    { "gihugu",   7,  "hugu"   },  /* = igihugu (country / nation)        */
+    { "gice",     7,  "ce"     },  /* = igice (portion / part)            */
+    { "giciro",   7,  "ciro"   },  /* = igiciro (price)                   */
+    { "gicaniro", 7,  "caniro" },  /* = igicaniro (fireplace / altar)     */
+    { "gicumuro", 7,  "cumuro" },  /* = igicumuro (sin / offense)         */
+    /* Dropped D-vowel: Nt.4 (imiti) words where prefix 'i' is elided     */
+    { "mirongo",  4,  "rongo"  },  /* = imirongo (tens; counting 10s)     */
+    { "mirimo",   4,  "rimo"   },  /* = imirimo (works / tasks)           */
+    { "mibiri",   4,  "biri"   },  /* = imibiri (bodies)                  */
+    { "mibare",   4,  "bare"   },  /* = imibare (numbers / figures)       */
+    { "migabane", 4,  "gabane" },  /* = imigabane (shares / portions)     */
+    /* Dropped D-vowel: Nt.6 (ama-) words where prefix 'a' is elided      */
+    { "maso",     6,  "maso"   },  /* = amaso (eyes)                      */
+    { "magana",   6,  "gana"   },  /* = amagana (hundreds)                */
+    { "maboko",   6,  "boko"   },  /* = amaboko (arms / hands)            */
+    { "mabuye",   6,  "buye"   },  /* = amabuye (stones)                  */
+    { "mafi",     6,  "fi"     },  /* = amafi (fish)                      */
+    { "maraso",   6,  "raso"   },  /* = amaraso (blood)                   */
+    { "makosa",   6,  "kosa"   },  /* = amakosa (errors / faults)         */
+    { "majwi",    6,  "jwi"    },  /* = amajwi (voices / sounds)          */
+    { "masomo",   6,  "somo"   },  /* = amasomo (lessons)                 */
+    { "mateka",   6,  "teka"   },  /* = amateka (history)                 */
+    { "moko",     6,  "ko"     },  /* = amoko (types / species)           */
+    /* Dropped D-vowel: Nt.9 words where prefix 'i' is elided             */
+    { "nzu",      9,  "nzu"    },  /* = inzu (house)                      */
+    { "nzira",    9,  "nzira"  },  /* = inzira (path / road)              */
+    { "nzoga",    9,  "nzoga"  },  /* = inzoga (beer)                     */
+    /* Number words */
+    { "cumi",     7,  "cumi"   },  /* = icumi (ten)                       */
+    /* Informal / fast-speech noun forms */
+    { "mana",     9,  "mana"   },  /* = Imana (God — informal/elided)     */
+    { "data",     1,  "data"   },  /* father (informal: data = dada)      */
+    { "nyina",    1,  "nyina"  },  /* mother / her mother                 */
+    { "shebuja",  1,  "shebuja"},  /* master / lord (title)               */
+    /* Common Nt.14 nouns */
+    { "bwenge",  14,  "wenge"  },  /* = ubwenge (wisdom / intelligence)   */
+    { "bwami",   14,  "wami"   },  /* = ubwami (kingdom — alternate form) */
+    /* Common Nt.9 nouns from Bible corpus */
+    { "nteko",    9,  "nteko"  },  /* = inteko (class / group / council)  */
+    { "nyota",    9,  "nyota"  },  /* = inyota (thirst)                   */
+    /* Common Nt.11 nouns */
+    { "rugero",  11,  "gero"   },  /* = urugero (example / measure)       */
+    /* Nt.1/3 common nouns with dropped D-vowel 'u' from "umu" */
+    { "mudugudu",  3,  "dugudu" }, /* = umudugudu (village / neighborhood)*/
+    { "musozi",    3,  "sozi"   }, /* = umusozi (hill / mountain)          */
+    { "mugenzi",   1,  "genzi"  }, /* = umugenzi (friend / companion)      */
+    { "murimyi",   1,  "rimyi"  }, /* = umurimyi (farmer)                  */
+    { "muhana",    3,  "hana"   }, /* = umuhana (valley / stream)          */
+    { "mugisha",   3,  "gisha"  }, /* = umugisha (blessing)                */
+    { "musaza",    1,  "saza"   }, /* = umusaza (old man / elder)          */
+    { "musikari",  1,  "sikari" }, /* = umusikari (soldier / warrior)      */
+    { "mubyeyi",   1,  "byeyi"  }, /* = umubyeyi (parent)                 */
+    { "mukuru",    1,  "kuru"   }, /* = umukuru (elder / chief / senior)   */
+    { "mufuruki",  1,  "furuki" }, /* = umufuruki (stranger / foreigner)   */
+    /* Nt.14 common nouns with dropped D-vowel 'u' from "ubu" */
+    { "butayu",   14,  "tayu"   }, /* = ubutayu (desert / wilderness)      */
+    { "burenganzira",14,"renganzira"}, /* = uburenganzira (right/authority)*/
+    { "busabe",   14,  "sabe"   }, /* = ubusabe (prayer / request)         */
+    { "buhemu",   14,  "hemu"   }, /* = ubuhemu (betrayal / treason)       */
+    /* Nt.15 common nouns with dropped D-vowel 'u' from "uku" */
+    { "kwezi",    15,  "wezi"   }, /* = ukwezi (moon / month)              */
+    /* Nt.2 common nouns with dropped D-vowel 'a' from "aba" */
+    { "bantu",     2,  "ntu"    }, /* = abantu (people)                    */
+    /* Nt.9 common nouns with dropped D-vowel 'i' */
+    { "ntebe",     9,  "ntebe"  }, /* = intebe (chair / throne / seat)     */
+    { "nabi",      9,  "nabi"   }, /* = inabi (prophet)                    */
+    /* Nt.12 with dropped D-vowel 'a' from "aka" */
+    { "gakondo",  12,  "kondo"  }, /* = agakondo (ancestral land/heritage) */
+    /* Common titles and family terms */
+    { "databuja",  1,  "databuja"},/* master / lord / employer (title)     */
+    { "sogokuru",  1,  "sogokuru"},/* grandfather / ancestor (Nt.1)        */
+    { "sekuruza",  1,  "sekuruza"},/* forefather / ancestor                */
+    { "sekuru",    1,  "sekuru"  },/* grandfather / uncle (paternal)       */
+    { "nyogokuru", 1,  "nyogokuru"},/* grandmother (Nt.1)                  */
+    /* Common biblical/religious terms */
+    { "intumwa",   9,  "ntumwa"  },/* = intumwa (apostle / messenger)      */
+    { "umwuka",    3,  "wuka"    },/* = umwuka (spirit / breath)           */
+    { "izahabu",   9,  "zahabu"  },/* = izahabu (gold)                     */
+    { "pasika",    9,  "pasika"  },/* Passover / Easter (loanword)          */
+    /* Nt.3 nouns with dropped D-vowel */
+    { "muti",      3,  "ti"      },/* = umuti (tree / medicine / herb)     */
+    /* Nt.16 nouns with dropped D-vowel */
+    { "hantu",    16,  "ntu"     },/* = ahantu (place / location)          */
+    /* Nt.6 nouns with dropped D-vowel (wlen=4, below normal threshold)    */
+    { "mazi",      6,  "zi"      },/* = amazi (water — short drop form)    */
+    { "mari",      6,  "ri"      },/* = amari (intestines / guts)          */
+    { "amezi",     6,  "ezi"     },/* = amezi (months, pl of ukwezi)        */
+    /* Nt.8 nouns with dropped D-vowel */
+    { "bihugu",    8,  "hugu"    },/* = ibihugu (countries, pl of igihugu) */
+    { "bimwe",     8,  "mwe"     },/* = ibimwe (some things, pl)           */
+    { "bintu",     8,  "ntu"     },/* = ibintu (things, pl of ikintu)       */
+    /* Nt.7 nouns with dropped D-vowel (ki- prefix, voiceless) */
+    { "kintu",     7,  "ntu"     },/* = ikintu (thing / something)          */
+    /* Nt.12 nouns with dropped D-vowel (ga- variant) */
+    { "gasozi",   12,  "sozi"    },/* = agasozi (small hill / hillock)     */
+    { "gatabo",   12,  "tabo"    },/* = agatabo (small book)               */
+    { "gati",     12,  "ti"      },/* = igati (bridge) — k→g variant       */
+    /* Nt.2 nouns with dropped 'a' from "aba" → bare "ba" prefix          */
+    { "bami",      2,  "mi"      },/* = abami (kings, pl of umwami)         */
+    { "bagaragu",  2,  "garagu"  },/* = abagaragu (servants, pl)           */
+    { "bagenzi",   2,  "genzi"   },/* = abagenzi (friends, pl)             */
+    { "bahungu",   2,  "hungu"   },/* = abahungu (sons, pl)                */
+    { "bahanuzi",  2,  "hanuzi"  },/* = ababanuzi (interpreters, pl)       */
+    { "batambyi",  2,  "tambyi"  },/* = abatambyi (worshippers, pl)        */
+    /* Nt.9/10 nouns with fully dropped D+N prefix */
+    { "nzozi",     9,  "nzozi"   },/* = inzozi (dreams)                    */
+    { "ntoki",     9,  "ntoki"   },/* = intoki (finger / toe)              */
+    /* Nt.5 nouns with dropped 'i' prefix (starting with consonant) */
+    { "joro",      5,  "joro"    },/* = ijoro (night / evening)             */
+    { "tegeko",    5,  "tegeko"  },/* = itegeko (law / commandment)         */
+    { "jambo",     5,  "jambo"   },/* = ijambo (word / speech)              */
+    /* Nt.5 nouns too short for bare-i threshold */
+    { "ivu",       5,  "vu"      },/* = ivu (ash / ashes)                  */
+    /* Nt.11 nouns with dropped 'u' prefix */
+    { "ruzi",     11,  "zi"      },/* = uruzi (river / stream)             */
+    { "rugwi",    11,  "gwi"     },/* = urugwi (necklace / string)          */
+    /* Nt.1/3 nouns with dropped 'u' prefix (wlen≤4, below threshold) */
+    { "muzi",      1,  "zi"      },/* = umuzi (homestead / village)         */
+    /* Common nouns that appear without D-vowel */
+    { "bwato",    14,  "wato"    },/* = ubwato (boat / canoe)              */
+    { "ruganda",  11,  "ganda"   },/* = uruganda (factory / workshop)      */
+    { "rutoke",   11,  "toke"    },/* = urutoke (banana / finger)          */
+    /* Common Nt.13 nouns */
+    { "ugutwi",   13,  "gwi"     },/* = ututwi (ears, pl dim) / ugutwi     */
+    /* Common Kinyarwanda title words */
+    { "nyagasani", 1,  "nyagasani"},/* Lord / Sir (honorific, = Nyagasani)  */
+    { "sogokuruza",1,  "sogokuruza"},/* grandfather / forefather              */
+    { "sekurume",  1,  "sekurume" },/* uncle / elder male relative          */
+    { "vino",      9,  "vino"    },/* wine (loanword from Portuguese/French)*/
+    { "efa",       9,  "fa"      },/* ephah (unit of measure, biblical)    */
+    { "inzoga",    9,  "nzoga"   },/* beer / alcohol (standard form)        */
+    /* Common Nt.6 mass nouns not caught by prefix */
+    { "amavuta",   6,  "vuta"    },/* = amavuta (oil / fat / anointing oil) */
+    { "amarozi",   6,  "rozi"    },/* = amarozi (poison / venom)            */
+    { "amavunjwa", 6,  "vunjwa"  },/* = amavunjwa (ruins / rubble)          */
+    { "amagambo",  6,  "gambo"   },/* = amagambo (words / sentences)        */
+    /* Common Nt.9 nouns */
+    { "ndebe",     9,  "ndebe"   },/* = indebe (cup / calabash)             */
+    { "ngabo",     9,  "ngabo"   },/* = ingabo (army / shield / soldiers)   */
+    /* Nt.5 nouns with fully dropped prefix (no 'i' prefix at all) */
+    { "sezerano",  5,  "sezerano"},/* = isezerano (covenant / agreement)    */
+    /* Nt.11 short nouns with dropped D */
+    { "rugi",     11,  "gi"      },/* = urugi (door / gate — short form)   */
+    /* Common Nt.9 nouns from Bible corpus */
+    { "ntumbi",    9,  "ntumbi"  },/* = intumbi (dead body / corpse)        */
+    /* Nt.11 nouns with dropped D-vowel 'u' from "uru" */
+    { "rupfu",    11,  "pfu"     },/* = urupfu (death / mortality)          */
+    { "rugo",     11,  "go"      },/* = urugo (household — alt form)        */
+    /* Nt.8 nouns with dropped D-vowel */
+    { "biti",      8,  "ti"      },/* = ibiti (trees / plants)              */
+    /* Nt.2 nouns with dropped 'a' from "aba" → bare "ba" prefix          */
+    { "balewi",    2,  "lewi"    },/* = abalewi (Levites, tribe of Levi)    */
+    { "bafumu",    2,  "fumu"    },/* = ababafumu (diviners / soothsayers)  */
     { NULL, 0, "" }
 };
 
@@ -643,11 +1359,14 @@ const char *kin_verb_tense_name(VerbTense t) {
     switch (t) {
         case TENSE_PRESENT:      return "Indagihe y'ako kanya (Present – immediate)";
         case TENSE_PRESENT_NORA: return "Indagihe y'ubusanzwe (Present – habitual)";
-        case TENSE_PAST_PERF:    return "Impitakere (Impitagihe – recent past)";
+        case TENSE_PAST_PERF:    return "Impitakare (Impitagihe – recent past)";
         case TENSE_PAST_IMPF:    return "Impitakera (Impitagihe – remote/habitual past)";
         case TENSE_FUTURE:       return "Inzagihe (Future)";
-        case TENSE_SUBJUNCTIVE:  return "Isabira (Subjunctive/Conditional)";
-        case TENSE_NARRATIVE:    return "Inshinga y'imigani (Narrative)";
+        case TENSE_SUBJUNCTIVE:  return "Ikigombero (Subjunctive: SP+stem+e)";
+        case TENSE_NARRATIVE:    return "Inkurikizo (Narrative/Sequential: SP+ka+stem+a)";
+        case TENSE_OPTATIVE:     return "Inyifurizo (Optative: SP+ra+ka+stem+a)";
+        case TENSE_IMPERATIVE:   return "Integeko (Imperative: bare stem+a)";
+        case TENSE_CONDITIONAL:  return "Inziganyo (Conditional: SP+a+stem+a)";
         default:                 return "";
     }
 }
