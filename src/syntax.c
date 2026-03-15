@@ -28,6 +28,10 @@
 #include <stdio.h>
 #include "../include/kinyarwanda.h"
 
+static bool is_vowel_ch(char c) {
+    return c=='a'||c=='e'||c=='i'||c=='o'||c=='u';
+}
+
 /* Expected concordance prefix for adjective, keyed by noun class */
 static const char *adj_concordance[17] = {
     "",     /* 0 = unused     */
@@ -184,6 +188,45 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                 nc, ncls ? ncls->subj_prefix : "?");
             add_error(sa, ERR_SUBJ_VERB_AGREEMENT, i + 1, msg, sug);
         }
+    }
+
+    /* RULE 6: Vowel contact (iranya ry'impanvu) – Amategeko y'igenamajwi    *
+     * No two vowels may appear adjacent in a Kinyarwanda word.             *
+     * When VV contact occurs at a morpheme boundary one of these must apply:*
+     *   u→w  (mweza ← mu+iza),  i→y (cyeza ← ki+iza),                    *
+     *   a→Ø  elision (beza ← ba+iza),  a+i→e fusion (benja ← ba+inja).   *
+     * We flag words that contain VV hiatus and are tagged as Kinyarwanda.  */
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        /* Only check words we believe are Kinyarwanda and not interjections */
+        if (!t->is_kinyarwanda) continue;
+        if (t->pos == POS_INTERJECTION) continue;
+        if (t->is_proper_noun) continue;
+        if (!kin_has_vowel_hiatus(t->lower)) continue;
+
+        /* Determine which corrective rule should apply based on the pair    */
+        char pair[3] = {0};
+        const char *w = t->lower;
+        for (int j = 0; w[j] && w[j+1]; j++) {
+            if (is_vowel_ch(w[j]) && is_vowel_ch(w[j+1])) {
+                pair[0] = w[j]; pair[1] = w[j+1]; break;
+            }
+        }
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        const char *rule = "a→Ø (elision)";
+        if (pair[0] == 'u') rule = "u→w (glide: uX → wX)";
+        else if (pair[0] == 'i') rule = "i→y (glide: iX → yX)";
+        else if (pair[0] == 'a' && pair[1] == 'i') rule = "a+i→e (ubumwe)";
+        snprintf(msg, sizeof(msg),
+            "Iranya ry'impanvu: '%s' irimo impanvu ebyiri zisubiranya ('%c%c'). "
+            "Vowel hiatus in '%s': vowels '%c' and '%c' are adjacent.",
+            t->surface, pair[0], pair[1],
+            t->surface, pair[0], pair[1]);
+        snprintf(sug, sizeof(sug),
+            "Amategeko y'igenamajwi agomba gukurikizwa: %s. "
+            "Apply phonological rule: %s.",
+            rule, rule);
+        add_error(sa, ERR_VOWEL_HIATUS, i, msg, sug);
     }
 
     sa->is_complete = sa->has_verb && (sa->error_count == 0);

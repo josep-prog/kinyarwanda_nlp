@@ -136,6 +136,7 @@ typedef enum {
     ERR_SPELLING,              /* Likely spelling error                    */
     ERR_SUBJ_VERB_AGREEMENT,   /* Verb SP doesn't match subject noun class */
     ERR_OBJ_VERB_AGREEMENT,    /* Verb OM doesn't match object noun class  */
+    ERR_VOWEL_HIATUS,          /* Two adjacent vowels (iranya ry'impanvu)  */
 } ErrorType;
 
 typedef struct {
@@ -188,6 +189,32 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
                             VerbTense *tense_out, int *obj_class_out,
                             VerbExtension *ext_out, bool *neg_out);
 bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
+
+/* ── Vowel & consonant phonology rules ─────────────────────────────────────
+ * Amategeko y'igenamajwi (phonological rules) – REB book p.7-8, p.62
+ *
+ * VOWEL CONTACT RULE (Iranya ry'impanvu):
+ *   In Kinyarwanda, two vowels CANNOT appear adjacent within a word.
+ *   When morpheme boundaries would create VV contact, one of these applies:
+ *
+ *   1. u → w  (before any vowel)    ku+eza  → kweza
+ *   2. i → y  (before any vowel)    ki+eza  → kyeza / ikyeza
+ *   3. a → Ø  (elision before V)    na+amazi→ n'amazi;  ba+eza → b'eza
+ *   4. a+i→ e (vowel fusion)        ba+inja → benja;    mu+inja → menja
+ *   5. a+e→ e (a drops before e)    ya+eza  → yeza
+ *   6. a+o→ o (a drops before o)    ya+oya  → yoya (rarely contracted)
+ *
+ * CONSONANT CLUSTER RULE (Iteganyo ry'inzarara z'inkongi):
+ *   Valid clusters in Kinyarwanda (all nasal-initial):
+ *     mb  mp  mv  mf            (m before bilabials)
+ *     nd  ng  nk  nz  nj  nt   (n before dentals/velars)
+ *     nsh nzw ngw               (n + consonant cluster)
+ *   Invalid: any other CC combination (e.g. str, bl, tr, sk, ks...)
+ *
+ * These functions return true when the word VIOLATES the rule (error).
+ * ─────────────────────────────────────────────────────────────────────── */
+bool kin_has_vowel_hiatus(const char *word);
+bool kin_has_invalid_cluster(const char *word);
 
 /* lexicon.c */
 bool kin_is_invariable(const char *word, POS *pos_out);

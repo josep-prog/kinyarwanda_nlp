@@ -595,6 +595,7 @@ static const InvEntry INVARIABLES[] = {
     { "uzi",     POS_VERB_CONJ   }, /* 2sg: you know                        */
     { "bazi",    POS_VERB_CONJ   }, /* nt.2: they know                      */
     { "tuzi",    POS_VERB_CONJ   }, /* 1pl: we know                         */
+    { "sinzi",   POS_VERB_CONJ   }, /* 1sg neg kuzizi: I don't know         */
     /* "muzi" (2pl: you know) OMITTED — conflicts with umuzi (homestead) in KNOWN_WORDS */
     /* ── Short verb forms too small for morphological detection ──────────  */
     { "mpa",     POS_VERB_CONJ   }, /* 1sg: I give (guha, 1sg n→m before p) */
@@ -612,6 +613,32 @@ static const InvEntry INVARIABLES[] = {
     { "sinzongera",POS_VERB_CONJ }, /* neg: will not add again (si+zongera) */
     { "ntabwo",  POS_ADVERB      }, /* not at all / absolutely not         */
     { "ntiho",   POS_VERB_CONJ   }, /* there was not (locative neg)        */
+    /* ── "akiri" copula compounds ─────────────────────────────────────────  *
+     * "akiri" = a + kiri = "he/she is still". Used in age clauses, etc.    */
+    { "akiri",   POS_VERB_CONJ   }, /* Nt.1/3 copula: (s)he is still        */
+    { "ukiri",   POS_VERB_CONJ   }, /* 2sg copula: you are still            */
+    { "tukiri",  POS_VERB_CONJ   }, /* 1pl copula: we are still             */
+    { "bakiri",  POS_VERB_CONJ   }, /* Nt.2 copula: they are still          */
+    { "bikiri",  POS_VERB_CONJ   }, /* Nt.8 copula: they (things) are still */
+    { "rukiri",  POS_VERB_CONJ   }, /* Nt.11 copula: it (long) is still     */
+    /* ── kuzizwa (passive of kuzizi): to be known ─────────────────────────  *
+     * "-zwi" forms = contracted passive present of kuzizi                  */
+    { "zwi",     POS_VERB_CONJ   }, /* known (passive abs. form)            */
+    { "azwi",    POS_VERB_CONJ   }, /* 3sg: it/he is known                  */
+    { "bazwi",   POS_VERB_CONJ   }, /* 3pl: they are known                  */
+    { "arazwi",  POS_VERB_CONJ   }, /* 3sg present prog: he is known        */
+    { "ntazwi",  POS_VERB_CONJ   }, /* negative: not known                  */
+    { "atazi",   POS_VERB_CONJ   }, /* 3sg neg: he does not know            */
+    { "atabizi", POS_VERB_CONJ   }, /* 3sg neg with OM: he doesn't know them*/
+    { "atanazwi",POS_VERB_CONJ   }, /* neg past: was not known              */
+    { "awuzi",   POS_VERB_CONJ   }, /* 3sg + OM: he knows it (Nt.3)         */
+    /* ── Adverb compounds with 'a' augment ────────────────────────────────  */
+    { "akenshi", POS_ADVERB      }, /* often / frequently (a + kenshi)      */
+    { "ahenshi", POS_ADVERB      }, /* sometimes / often (variant)          */
+    { "amenshi", POS_ADVERB      }, /* often (wa + kenshi variant?)         */
+    /* ── Compound time adverbs ────────────────────────────────────────────  */
+    { "ejobundi",POS_ADVERB      }, /* the day before/after yesterday        */
+    { "ejuru",   POS_ADVERB      }, /* a long time ago / way back            */
 
     /* ══ Quotative & complementizer particles ══════════════════════════════ */
     { "iti",     POS_VERB_PARTICLE}, /* quotative: (s)he said "..."        */
@@ -790,6 +817,23 @@ static const InvEntry INVARIABLES[] = {
     { "yego",       POS_ADVERB }, /* yes / indeed                          */
     { "oya",        POS_ADVERB }, /* no / not                              */
     { "mbese",      POS_ADVERB }, /* is it that / so / therefore           */
+    { "gake",       POS_ADVERB }, /* rarely / seldom / few (akamamo)       */
+    { "kenshi",     POS_ADVERB }, /* often / frequently                    */
+    { "make",       POS_ADVERB }, /* little / few / a bit                  */
+    { "cyane",      POS_ADVERB }, /* very / much / a lot                   */
+    { "hanyuma",    POS_ADVERB }, /* then / afterwards / later             */
+    { "nanone",     POS_ADVERB }, /* also / again / moreover               */
+    { "ariko",      POS_CONJUNCTION }, /* but / however / yet               */
+    /* ── Interrogative adverbs (adverbes interrogatifs) ─────────────────  */
+    { "gute",       POS_ADVERB }, /* how? / in what way?                   */
+    { "gutyo",      POS_ADVERB }, /* like that / in that manner            */
+    { "guhe",       POS_ADVERB }, /* which / where (used in "ni guhe")     */
+    { "handi",      POS_LOCATIVE}, /* elsewhere / somewhere else           */
+    { "kati",       POS_ADVERB }, /* just / at that moment / right now     */
+    /* ── Additional copula compounds ─────────────────────────────────────  */
+    { "hakiri",     POS_VERB_CONJ }, /* Nt.16: there is still / it still is*/
+    { "hazwi",      POS_VERB_CONJ }, /* Nt.16: it is known (locative)      */
+    { "hatari",     POS_VERB_CONJ }, /* there is not (negative locative)   */
 
     { NULL, POS_UNKNOWN }
 };
@@ -1003,6 +1047,43 @@ static const char *VERB_STEMS[] = {
     "teg",      /* gutega      – to set a trap / prepare                */
     "tamb",     /* gutamba     – to work hard / be zealous              */
     "gor",      /* kugora  (dup: keep for coverage)                     */
+    /* ── Additional stems from this session's corpus analysis ─────────── */
+    "ter",      /* gutera      – to plant / cause / do to (very common)  */
+    "teger",    /* gutegera    – to wait for / expect                    */
+    "tekerez",  /* gutekereza  – to think / reflect / meditate           */
+    "tonderez", /* gutondereza – to be careful / attend to               */
+    "tondek",   /* gutondeka   – to arrange / organize                   */
+    "tontoy",   /* gutontoya   – to be naive / careless                  */
+    "terur",    /* guterura    – to measure / compare                    */
+    "terany",   /* guteranya   – to mix / combine                        */
+    "teranir",  /* guteraniriza – to unify / bring together              */
+    "teran",    /* guterana    – to gather / be united                   */
+    "tesh",     /* guteshwa    – to lose (passive of guteza)             */
+    "lot",      /* kulota      – to dream                                */
+    "loter",    /* kulotera    – to dream about / of                     */
+    "her",      /* guherana    – to make white / reconcile               */
+    "heng",     /* guhenga     – to migrate / go beyond / exceed         */
+    "twaz",     /* gutwaza     – to arm / equip / provide weapons        */
+    "nyag",     /* gunyaga     – to steal / plunder / loot               */
+    "kaz",      /* gukaza      – to tighten / strengthen                 */
+    "sengw",    /* gusengerwa  – to be prayed for (passive of gusenga)  */
+    "kubit",    /* gukubita    – to strike / hit / beat                  */
+    "pir",      /* kupira      – to blow / puff / breathe out            */
+    "zaner",    /* guzanirira  – to bring for (applicative of kuzana)   */
+    "bam",      /* kubama      – to be flat / spread out                 */
+    "gur",      /* kugura      – to buy / purchase                       */
+    "sig",      /* gusiga      – to leave / abandon / anoint             */
+    "ragir",    /* kuragira    – to advise / counsel / guide             */
+    "sezer",    /* gusezerera  – to say goodbye / dismiss                */
+    "ror",      /* kurora      – to look at / watch / examine            */
+    "konger",   /* gukongerera – to add more / give more to (applic.)   */
+    "vangur",   /* guvangura   – to mix / stir / blend                   */
+    "vom",      /* guvoma      – to fetch water / draw water             */
+    "tsind",    /* gutsinda    – to conquer / win / prevail              */
+    "geran",    /* kugereranya – to compare / equate                     */
+    "gereran",  /* kugereranya – full extended stem (ger+er+an) for imper.*/
+    "ganir",    /* kuganira    – to talk / discuss / converse             */
+    "ganirir",  /* kuganirira  – to talk to / converse with (applicative) */
     NULL
 };
 
@@ -1297,6 +1378,78 @@ static const KnownWord KNOWN_WORDS[] = {
     /* Nt.2 nouns with dropped 'a' from "aba" → bare "ba" prefix          */
     { "balewi",    2,  "lewi"    },/* = abalewi (Levites, tribe of Levi)    */
     { "bafumu",    2,  "fumu"    },/* = ababafumu (diviners / soothsayers)  */
+    /* ── Bare Nt.9 nouns (n-assimilation, conflict with verb SPs) ─────── */
+    { "mvura",     9,  "vura"   }, /* = imvura (rain) — mv SP conflict      */
+    { "mbuzi",     9,  "buzi"   }, /* = imbuzi (goat)                       */
+    { "mbabazi",   9,  "babazi" }, /* = imbabazi (mercy / compassion)       */
+    { "mboni",     9,  "boni"   }, /* = imboni (prophet / seer)             */
+    { "mbisi",     9,  "bisi"   }, /* = imbisi (raw/uncooked)               */
+    { "mbabazi",   9,  "babazi" }, /* = imbabazi (mercy)                    */
+    { "mbuni",     9,  "buni"   }, /* = imbuni (coffee plant)               */
+    { "mpamvu",    9,  "pamvu"  }, /* = impamvu (reason / cause)            */
+    { "mpiri",     9,  "piri"   }, /* = impiri (muscle / fibre)             */
+    { "mpore",     9,  "pore"   }, /* = impore (bean / legume)              */
+    { "nguku",     9,  "guku"   }, /* = inguku (hen / chicken)              */
+    { "ngazi",     9,  "gazi"   }, /* = ingazi (ladder / staircase)         */
+    { "ngubu",     9,  "gubu"   }, /* = ingubu (blanket / covering)         */
+    { "nguyu",     9,  "guyu"   }, /* = inguyu (fig / fig tree)             */
+    { "nguru",     9,  "guru"   }, /* = inguru (tribute / offering)         */
+    { "ngunzu",    9,  "gunzu"  }, /* = ingunzu (piglet / young pig)        */
+    { "ngenzi",    9,  "genzi"  }, /* = ingenzi (hero / worthy person)      */
+    { "ngobyi",    9,  "gobyi"  }, /* = ingobyi (calabash / gourd)          */
+    { "ngoyi",     9,  "goyi"   }, /* = ingoyi (chain / fetter)             */
+    { "nkumi",     9,  "kumi"   }, /* = inkumi (young woman)                */
+    { "nkwi",      9,  "kwi"    }, /* = inkwi (firewood)                    */
+    { "njiji",     9,  "jiji"   }, /* = injiji (cricket / grasshopper)      */
+    { "mbibi",     9,  "bibi"   }, /* = imbibi (boundary / border)          */
+    { "mbizi",     9,  "bizi"   }, /* = imbizi (wild animal)                */
+    { "nkozi",     9,  "kozi"   }, /* = inkozi (worker / hired hand)        */
+    { "nkomyi",    9,  "komyi"  }, /* = inkomyi (praise / flattery)         */
+    /* Nt.9 nouns that conflict with verb SP patterns */
+    { "ngoma",     9,  "ngoma"  }, /* = ingoma (drum / kingdom)             */
+    { "ngufu",     9,  "ngufu"  }, /* = ingufu (strength / power)           */
+    { "ngeri",     9,  "ngeri"  }, /* = ingeri (kind / type / variety)      */
+    { "nkabi",     9,  "nkabi"  }, /* = inkabi (ox / bull)                  */
+    { "ngali",     9,  "ngali"  }, /* = ingali (cassava leaves)             */
+    { "ngagi",     9,  "ngagi"  }, /* = ingagi (gorilla)                    */
+    { "ngibi",     9,  "gibi"   }, /* = ingibi (toad / frog)                */
+    { "ngiri",     9,  "giri"   }, /* = ingiri (warthog)                    */
+    /* ── Bible merger forms (preposition + noun, no apostrophe in source) */
+    { "yumwami",   1,  "wami"   }, /* = ya umwami (of the king)            */
+    { "numwami",   1,  "wami"   }, /* = na umwami (with the king)          */
+    { "nabantu",   2,  "ntu"    }, /* = na abantu (with the people)        */
+    { "nibihumbi", 8,  "humbi"  }, /* = na ibihumbi (with thousands)       */
+    { "nibindi",   8,  "ndi"    }, /* = na ibindi (and other things)       */
+    { "nibintu",   8,  "ntu"    }, /* = na ibintu (and things)             */
+    { "nubwami",  14,  "wami"   }, /* = na ubwami (with the kingdom)       */
+    { "yabisirayeli",2,"bisirayeli"},/* = ya Abisirayeli (of the Israelites)*/
+    { "wabisirayeli",2,"bisirayeli"},/* = wa Abisirayeli                    */
+    { "nabisirayeli",2,"bisirayeli"},/* = na Abisirayeli                    */
+    { "yumwuka",   3,  "wuka"   }, /* = ya umwuka (of the spirit)          */
+    { "numwuka",   3,  "wuka"   }, /* = na umwuka (with the spirit)        */
+    { "nabandi",   2,  "bandi"  }, /* = na abandi (with others)            */
+    { "yabantu",   2,  "ntu"    }, /* = ya abantu (of the people)          */
+    { "yabami",    2,  "mi"     }, /* = ya abami (of the kings)            */
+    { "yabana",    2,  "ana"    }, /* = ya abana (of the children)         */
+    { "yabagaragu",2,  "garagu" }, /* = ya abagaragu (of the servants)     */
+    { "nabami",    2,  "mi"     }, /* = na abami (with the kings)          */
+    { "nabagenzi", 2,  "genzi"  }, /* = na abagenzi (with friends)         */
+    { "shekeli",   9,  "shekeli"}, /* shekel (unit of weight, biblical)    */
+    { "riti",      5,  "riti"   }, /* = iriti (rite/measure, biblical)     */
+    /* ── Short nouns below normal detection threshold ─────────────────── */
+    { "buyu",     14,  "yu"     }, /* = ubuyu (baobab fruit / tree)        */
+    { "kafu",     12,  "fu"     }, /* = akafu (small cup / calabash)       */
+    { "kato",     12,  "to"     }, /* = akato (small canoe / boat)         */
+    { "biru",     14,  "ru"     }, /* = ubwiru (royal secret / ritual)     */
+    { "sinzi",     0,  ""       }, /* 1sg neg of kuzizi: I don't know      */
+    /* ── Nouns with dropped D-vowel (too short for threshold or irregular) */
+    { "gore",      1,  "gore"   }, /* = mugore (woman) — dropped mu-       */
+    { "hungu",     1,  "hungu"  }, /* = umuhungu (boy/son) — dropped umu-  */
+    { "cumu",      5,  "cumu"   }, /* = icumu (spear) — dropped i-         */
+    { "funguro",   5,  "funguro"}, /* = ifunguro (breakfast/meal)           */
+    { "feza",      5,  "feza"   }, /* = ifeza (silver) — dropped i-        */
+    { "fumbire",   5,  "fumbire"}, /* = ifumbire (fertilizer) — dropped i- */
+    { "fumbwe",   14,  "fumbwe" }, /* = ubufumbwe (secret/private matter)  */
     { NULL, 0, "" }
 };
 

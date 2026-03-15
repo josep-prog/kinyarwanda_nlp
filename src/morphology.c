@@ -53,6 +53,78 @@ static bool is_vowel(char c) {
 }
 
 /*
+ * kin_has_vowel_hiatus()
+ *
+ * Amategeko y'igenamajwi – IRANYA RY'IMPANVU (vowel contact rule):
+ *   In Kinyarwanda, no two vowels may appear ADJACENT within a word.
+ *   Valid words always resolve VV contact via:
+ *     u→w, i→y (glide formation), a→Ø (elision), or a+i→e (fusion).
+ *
+ *   This function detects illegal VV sequences in written Kinyarwanda.
+ *   Returns true (= error) when any two adjacent characters are both vowels.
+ *
+ *   Exceptions – these multi-vowel written forms are legitimate:
+ *     • Loanwords (they keep their foreign phonology, tagged POS_FOREIGN)
+ *     • Interjections: "ooh", "yee", "eeh" (already in INVARIABLES)
+ *     • Proper nouns (flagged is_proper_noun = true by the tokenizer)
+ *   The caller is responsible for skipping those categories.
+ *
+ *   Examples of WRONG forms that trigger this:
+ *     ✗ "baeza"  → should be "beza"   (ba+iza: a+i→e, not ba+eza)
+ *     ✗ "mueza"  → should be "mweza"  (mu+iza: u→w)
+ *     ✗ "kuamara"→ should be "kwamara"(ku+amara: u→w)
+ *     ✗ "baamara"→ should be "bamara" (ba+amara: a→Ø)
+ */
+bool kin_has_vowel_hiatus(const char *word) {
+    if (!word || !word[0]) return false;
+    for (int i = 0; word[i] && word[i+1]; i++) {
+        if (is_vowel(word[i]) && is_vowel(word[i+1]))
+            return true;
+    }
+    return false;
+}
+
+/*
+ * kin_has_invalid_cluster()
+ *
+ * Iteganyo ry'inzarara z'inkongi – CONSONANT CLUSTER RULE:
+ *   Kinyarwanda only allows nasal-initial consonant clusters:
+ *     mb  mp  mv  mf  (m before bilabials)
+ *     nd  ng  nk  nz  nj  nt  nr  nsh  nzw  ngw  (n before others)
+ *   Any other CC combination (two non-nasal consonants in a row)
+ *   is foreign to Kinyarwanda phonology and indicates a loanword or error.
+ *
+ *   Note: 'y' and 'w' are glide-consonants and can follow any consonant;
+ *   'h' can follow 's' (sha, shi); 'r' appears after many consonants.
+ *   These are excluded from the "invalid" check.
+ *
+ *   Returns true (= error) when an invalid cluster is found.
+ */
+bool kin_has_invalid_cluster(const char *word) {
+    if (!word) return false;
+    /* Nasal letters that can start a valid cluster */
+    static const char NASALS[]  = "mn";
+    /* Glides/semi-consonants that are always valid as second member */
+    static const char GLIDES[]  = "ywhr";
+    for (int i = 0; word[i] && word[i+1]; i++) {
+        char c1 = word[i], c2 = word[i+1];
+        /* Skip if either is a vowel (not a cluster) */
+        if (is_vowel(c1) || is_vowel(c2)) continue;
+        /* Valid: nasal + any consonant */
+        if (c1 == 'm' || c1 == 'n') continue;
+        /* Valid: any consonant + glide */
+        if (c2 == 'y' || c2 == 'w' || c2 == 'h' || c2 == 'r') continue;
+        /* Valid: 's' + 'h' (forms "sh" digraph) */
+        if (c1 == 's' && c2 == 'h') continue;
+        /* Valid: 'r' + any consonant (rw handled above, rk/rg are rare but ok) */
+        if (c1 == 'r') continue;
+        /* All other CC pairs are invalid in native Kinyarwanda */
+        return true;
+    }
+    return false;
+}
+
+/*
  * kin_detect_noun_class()
  *
  * Given a lowercased word, return the most likely noun class (1-16)
@@ -110,16 +182,39 @@ int kin_detect_noun_class(const char *w) {
      * or before another vowel-ending word.  These come AFTER the full prefix   *
      * checks so they never override the canonical forms.                        *
      *   Nt.7:  igi/iki+stem → gi+stem  (igihugu → gihugu, igihe → gihe)       *
+     *   Nt.8:  ibi+stem → bi+stem      (ibirori → birori, ibicumbi → bicumbi) *
+     *   Nt.7:  iki+stem → ki+stem      (ikigiti → kigiti, ikibindi → kibindi) *
+     *   Nt.5:  iri+stem → ri+stem      (irisoko? rihari, ribuyu)              *
      *   Nt.4:  imi+stem → mi+stem      (imirongo → mirongo)                    *
      *   Nt.6:  ama+stem → ma+stem      (amaso → maso, amafi → mafi)            *
      *   Nt.9:  in/im+stem → n/m drop   (inzu → nzu, handled by KNOWN_WORDS)   */
     if (kin_starts_with(w, "gi") && wlen > 3 && !is_vowel(w[2])) return 7;
+    /* Nt.8: bi+C+stem. Guard: NOT ending in 'a' or 'e' to avoid catching   *
+     * conjugated verbs like "bikora"(they work) or "bigenda"(they go).      *
+     * Words ending in 'i','u','o' are nouns: birori, bicumbi, binshuti.     */
+    if (kin_starts_with(w, "bi") && wlen > 4 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 8;
+    /* Nt.7: ki+C+stem (standard k, complement to gi for k→g voiced).       *
+     * Same guard as bi: exclude 'a'/'e' endings to avoid verb SPs.         *
+     * e.g. kigiti=ikigiti, kibindi=ikibindi, kinshi=ikinshi.                */
+    if (kin_starts_with(w, "ki") && wlen > 4 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 7;
+    /* Nt.5: ri+C+stem (ri = indanganteko of Nt.5, often elided → bare i-). *
+     * e.g. rihari (irihari?), ribuyu (iribuyu?).  Same FV guard.            */
+    if (kin_starts_with(w, "ri") && wlen > 4 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 5;
     if (kin_starts_with(w, "mi") && wlen > 4 && !is_vowel(w[2])) return 4;
     if (kin_starts_with(w, "ma") && wlen > 3 && !is_vowel(w[2])) return 6;
-    /* Nt.12: dropped D vowel 'a' from "aka" → bare "ka", k→g voiced → "ga"  *
-     * e.g. gasozi=agasozi (small hill), gatabo=agatabo (small book)          *
-     * MUST come AFTER "aga" check.  Gated to avoid "ga" akamamo particle.   */
-    if (kin_starts_with(w, "ga") && wlen > 3 && !is_vowel(w[2])) return 12;
+    /* Nt.12: dropped D vowel 'a' from "aka" → bare "ka" (voiceless variant)  *
+     * and k→g voiced → bare "ga".                                            *
+     * e.g. gasozi=agasozi, kabati=akabati, kanzu=akanzu, kabiri=akabiri      *
+     * Guard: NOT ending in 'a'/'e' to avoid catching Nt.12 verb SP "ka".    *
+     * MUST come AFTER "aka"/"aga" full-prefix checks.                        *
+     * Length > 4 to avoid very short ambiguous forms.                        */
+    if (kin_starts_with(w, "ka") && wlen > 4 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 12;
+    if (kin_starts_with(w, "ga") && wlen > 3 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 12;
     /* Nt.4: dropped D vowel 'i' from "imi" → bare "mi", i→y before vowel    *
      * → "my". e.g. myaka=imyaka (years), myambaro=imyambaro (clothes)       *
      * MUST come AFTER "imy" / "imi" / "mi" checks.                           */
@@ -130,17 +225,29 @@ int kin_detect_noun_class(const char *w) {
      * Excluded: words starting with mu+vowel (those are usually verbs)   */
     if (kin_starts_with(w, "mu") && wlen > 4 && !is_vowel(w[2])) return 1;
     /* Nt.14: dropped D vowel 'u' from "ubu" → bare "bu"                 *
-     * e.g. butayu=ubutayu, burenganzira=uburenganzira                    *
-     * MUST come AFTER "ubu" check.                                        */
-    if (kin_starts_with(w, "bu") && wlen > 4 && !is_vowel(w[2])
-        && w[2] != 'r' /* avoid "buri"=adverb */ ) return 14;
+     * e.g. burezi=uburezi, burayi=uburayi, burakari=uburakari           *
+     * MUST come AFTER "ubu" check.                                        *
+     * NOTE: "buri" (every/each) is already in INVARIABLES, checked first */
+    if (kin_starts_with(w, "bu") && wlen > 4 && !is_vowel(w[2])) return 14;
+    /* Nt.14: ubw+vowel → bw (u elided). e.g. bwangavu=ubwangavu.        *
+     * MUST come AFTER "ubw" check.  No vowel guard needed: "ubw+V" → bw  *
+     * is a standard phonological contraction (u+bw+angavu=ubwangavu).    */
+    if (kin_starts_with(w, "bw") && wlen > 4) return 14;
+    /* Nt.11: dropped D vowel 'u' from "uru" → bare "ru".               *
+     * e.g. rurimi=ururimi (language), rushyi=urushyi, rutoki=urutoki,   *
+     * rukali=urukali, rumanzi=urumanzi, rugezi=urugezi.                  *
+     * MUST come AFTER "uru"/"urw" checks.                                *
+     * Guard: NOT ending in 'a'/'e' to avoid conjugated verb SPs like    *
+     * "rugenda" (Nt.11 SP + gend + a) being misread as nouns.           */
+    if (kin_starts_with(w, "ru") && wlen > 4 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 11;
     /* Nt.2: dropped D vowel 'a' from "aba" → bare "ba".                 *
-     * Pattern: agent nouns (abahinzi, abakunzi, abakozi) appear as       *
-     * "bahinzi", "bakunzi", "bakozi" with 'a' dropped.                   *
-     * Guard: ends in 'i' (agent nouns) AND length > 5 to avoid           *
-     * colliding with verbs "bakora" (they work, ends in 'a').             */
+     * Pattern: agent/plural nouns (abahinzi, abarimu, abapfumu) appear  *
+     * as "bahinzi", "barimu", "bapfumu" with 'a' dropped.               *
+     * Guard: NOT ending in 'a' (would conflict with verbs bakora/bagenda)*
+     * Length > 5 to avoid very short ambiguous forms.                    */
     if (kin_starts_with(w, "ba") && wlen > 5 && !is_vowel(w[2])
-        && w[wlen-1] == 'i') return 2;
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 2;
 
     /* Fallback for Nt.1/Nt.3 words that surfaced as "umw-" (u→w) */
     if (kin_starts_with(w, "umw") && wlen > 4) return 1;
@@ -154,6 +261,55 @@ int kin_detect_noun_class(const char *w) {
     if (kin_starts_with(w, "iby") && wlen > 4) return 8;
     /* Nt.7 words surfaced as "icy-" */
     if (kin_starts_with(w, "icy") && wlen > 4) return 7;
+    /* Dropped 'i'/'u' from relative connectors before vowel-initial nouns:   *
+     * "iby'abantu" → "byabantu", "icy'umuntu" → "cyumuntu",                *
+     * "rw'igihugu" → "rwigihugu", "ry'igihugu" → "ryigihugu",              *
+     * "tw'ubwenge" → "twubwenge".                                            *
+     * These compound possessives appear merged in PDF/textbook sources.      */
+    if (kin_starts_with(w, "by") && wlen > 4 && is_vowel(w[2])) return 8;
+    if (kin_starts_with(w, "cy") && wlen > 4 && is_vowel(w[2])) return 7;
+    if (kin_starts_with(w, "rw") && wlen > 4 && is_vowel(w[2])) return 11;
+    if (kin_starts_with(w, "ry") && wlen > 4 && is_vowel(w[2])) return 5;
+    if (kin_starts_with(w, "tw") && wlen > 4 && is_vowel(w[2])) return 13;
+    /* "wa"/"w'" + vowel-initial noun → "wu/wi/we" merged forms (Nt.1/3 poss.)*
+     * "w'umuntu" → wumuntu; "w'ubucuruzi" → wubucuruzi.                    *
+     * Gated: wlen > 5, and NOT ending in 'a'/'e' to avoid verb SPs.        */
+    if (kin_starts_with(w, "wu") && wlen > 5 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 3;
+    /* "ya"/"y'" + vowel-initial noun → "yi/yu" merged forms (Nt.4/6 poss.) *
+     * "y'ibiti" → yibiti; "y'igihugu" → yigihugu; "y'imigani" → yimigani. *
+     * Gated: wlen > 5, not ending in verb FVs 'a'/'e'.                     */
+    if (kin_starts_with(w, "yi") && wlen > 5 && !is_vowel(w[2])
+        && w[wlen-1] != 'a' && w[wlen-1] != 'e') return 4;
+
+    /* "nka" + noun = comparison particle + noun (merged form in Bible text). *
+     * "nka" (= like/as/such as) is a preposition that appears fused with the *
+     * following noun: nkabantu (like people), nkamazi (like water).          *
+     * When present, recursively detect the class of the underlying noun.     *
+     * Length thresholds are lower here because the outer "nka" context makes *
+     * it safe to relax the dropped-D ambiguity guards.                       */
+    if (kin_starts_with(w, "nka") && wlen > 6) {
+        const char *sub = w + 3;   /* sub-word after "nka"               */
+        size_t slen = wlen - 3;
+        /* Try full-prefix forms first (these have no threshold issue)    */
+        int sub_cls = kin_detect_noun_class(sub);
+        if (sub_cls > 0) return sub_cls;
+        /* Relaxed dropped-D checks for short sub-words (>= 4 chars total) */
+        if (slen >= 4) {
+            if (kin_starts_with(sub,"ba") && !is_vowel(sub[2])) return 2;  /* abantu */
+            if (kin_starts_with(sub,"ma") && !is_vowel(sub[2])) return 6;  /* amazi */
+            if (kin_starts_with(sub,"bi") && !is_vowel(sub[2])) return 8;  /* ibintu */
+            if (kin_starts_with(sub,"ki") && !is_vowel(sub[2])) return 7;  /* ikintu */
+            if (kin_starts_with(sub,"bu") && !is_vowel(sub[2])) return 14; /* uburyo */
+            if (kin_starts_with(sub,"ru") && !is_vowel(sub[2])) return 11; /* urugo */
+            if (kin_starts_with(sub,"ha") && !is_vowel(sub[2])) return 16; /* ahantu */
+            if (kin_starts_with(sub,"mu") && !is_vowel(sub[2])) return 1;  /* umuntu */
+            if (kin_starts_with(sub,"mi") && !is_vowel(sub[2])) return 4;  /* imirimo */
+            if (kin_starts_with(sub,"ri") && !is_vowel(sub[2])) return 5;  /* iryo */
+            if (kin_starts_with(sub,"zi") && !is_vowel(sub[2])) return 10; /* izindi */
+            if (kin_starts_with(sub,"gi") && !is_vowel(sub[2])) return 7;  /* igiti */
+        }
+    }
 
     return 0;
 }
@@ -167,6 +323,45 @@ int kin_detect_noun_class(const char *w) {
  * Returns true if a class was detected.
  */
 bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
+    /* "nka" comparison prefix: strip "nka" and process the embedded noun.   *
+     * We call ourselves recursively on the sub-word. For short sub-words    *
+     * that fail the length guard in kin_detect_noun_class, we explicitly    *
+     * handle the common dropped-D prefixes (ba, ma, ha, bi, ki, etc.)       */
+    size_t wlencheck = strlen(word);
+    if (kin_starts_with(word, "nka") && wlencheck > 6) {
+        const char *sub = word + 3;
+        size_t slen = wlencheck - 3;
+        /* First try normal processing of the sub-word */
+        char sub_stem[KIN_MAX_STEM];
+        int  sub_cls = 0;
+        if (kin_strip_noun_prefix(sub, sub_stem, &sub_cls) && sub_cls > 0) {
+            if (class_out) *class_out = sub_cls;
+            strncpy(stem_out, sub_stem, KIN_MAX_STEM - 1);
+            stem_out[KIN_MAX_STEM - 1] = '\0';
+            return true;
+        }
+        /* Relaxed dropped-D handling for short sub-words */
+        if (slen >= 4) {
+            const char *st = NULL; int rc = 0;
+            if (kin_starts_with(sub,"ba") && !is_vowel(sub[2])) { rc=2; st=sub+2; }
+            else if (kin_starts_with(sub,"ma") && !is_vowel(sub[2])) { rc=6; st=sub+2; }
+            else if (kin_starts_with(sub,"bi") && !is_vowel(sub[2])) { rc=8; st=sub+2; }
+            else if (kin_starts_with(sub,"ki") && !is_vowel(sub[2])) { rc=7; st=sub+2; }
+            else if (kin_starts_with(sub,"gi") && !is_vowel(sub[2])) { rc=7; st=sub+2; }
+            else if (kin_starts_with(sub,"bu") && !is_vowel(sub[2])) { rc=14;st=sub+2; }
+            else if (kin_starts_with(sub,"ru") && !is_vowel(sub[2])) { rc=11;st=sub+2; }
+            else if (kin_starts_with(sub,"ha") && !is_vowel(sub[2])) { rc=16;st=sub+2; }
+            else if (kin_starts_with(sub,"mu") && !is_vowel(sub[2])) { rc=1; st=sub+2; }
+            else if (kin_starts_with(sub,"mi") && !is_vowel(sub[2])) { rc=4; st=sub+2; }
+            if (rc > 0 && st) {
+                if (class_out) *class_out = rc;
+                strncpy(stem_out, st, KIN_MAX_STEM - 1);
+                stem_out[KIN_MAX_STEM - 1] = '\0';
+                return true;
+            }
+        }
+    }
+
     int cls = kin_detect_noun_class(word);
     if (cls == 0) { stem_out[0] = '\0'; return false; }
     if (class_out) *class_out = cls;
@@ -179,6 +374,7 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             if (kin_starts_with(word, "umw"))      stem_start = word + 2; /* u+mu+V → umw+V */
             else if (kin_starts_with(word, "umu")) stem_start = word + 3;
             else if (kin_starts_with(word, "mw"))  stem_start = word + 1; /* short form mw+V*/
+            else if (kin_starts_with(word, "wu"))  stem_start = word + 1; /* w'+u-noun: wumuntu */
             else if (kin_starts_with(word, "mu"))  stem_start = word + 2; /* dropped D 'u'  */
             break;
         case 2:
@@ -191,11 +387,14 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             if (kin_starts_with(word,"imy"))       stem_start = word + 2; /* i+mi+V → imy+V*/
             else if (kin_starts_with(word,"imi"))  stem_start = word + 3;
             else if (kin_starts_with(word,"my"))   stem_start = word + 1; /* dropped D + i→y*/
+            else if (kin_starts_with(word,"yi"))   stem_start = word + 1; /* y'+i-noun: yibiti */
             else if (kin_starts_with(word,"mi"))   stem_start = word + 2; /* dropped D */
             break;
         case 5:
             if (kin_starts_with(word,"iri"))       stem_start = word + 3;
-            else                                   stem_start = word + 1; /* bare i- */
+            else if (kin_starts_with(word,"ry"))   stem_start = word + 2; /* ry+V compound */
+            else if (kin_starts_with(word,"ri"))   stem_start = word + 2; /* dropped D */
+            else                                   stem_start = word + 1; /* bare i-   */
             break;
         case 6:
             if (kin_starts_with(word,"ama"))       stem_start = word + 3; /* ama */
@@ -205,30 +404,40 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             if (kin_starts_with(word,"icy"))       stem_start = word + 2; /* ky→cy   */
             else if (kin_starts_with(word,"igi"))  stem_start = word + 3; /* k→g rule*/
             else if (kin_starts_with(word,"iki"))  stem_start = word + 3;
-            else if (kin_starts_with(word,"gi"))   stem_start = word + 2; /* dropped D */
+            else if (kin_starts_with(word,"gi"))   stem_start = word + 2; /* dropped D k→g */
+            else if (kin_starts_with(word,"ki"))   stem_start = word + 2; /* dropped D k   */
+            else if (kin_starts_with(word,"cy"))   stem_start = word + 2; /* dropped i: icy→cy */
             break;
         case 8:
             if (kin_starts_with(word,"iby"))       stem_start = word + 2;
             else if (kin_starts_with(word,"ibi"))  stem_start = word + 3;
+            else if (kin_starts_with(word,"bi"))   stem_start = word + 2; /* dropped D 'i' */
+            else if (kin_starts_with(word,"by"))   stem_start = word + 2; /* dropped i: iby→by */
             break;
         case 9: case 10:
             stem_start = word + 1; /* skip 'i', keep n/m as part of stem  */
             break;
         case 11:
-            if (kin_starts_with(word, "urw"))  stem_start = word + 2; /* u→w */
-            else                               stem_start = word + 3; /* uru */
+            if (kin_starts_with(word, "urw"))  stem_start = word + 2; /* u→w (urwanda) */
+            else if (kin_starts_with(word,"rw")) stem_start = word + 2; /* dropped D, u→w */
+            else if (kin_starts_with(word,"uru")) stem_start = word + 3; /* full form */
+            else if (kin_starts_with(word,"ru"))  stem_start = word + 2; /* dropped D 'u' */
+            else                               stem_start = word + 3; /* fallback */
             break;
         case 12:
             if (kin_starts_with(word, "aga"))  stem_start = word + 3; /* k→g variant */
-            else if (kin_starts_with(word,"ga")) stem_start = word + 2; /* dropped D */
+            else if (kin_starts_with(word,"ga")) stem_start = word + 2; /* dropped D k→g */
+            else if (kin_starts_with(word,"ka")) stem_start = word + 2; /* dropped D k   */
             else                               stem_start = word + 3; /* aka */
             break;
         case 13:
-            stem_start = word + 3; /* utu */
+            if (kin_starts_with(word, "tw"))  stem_start = word + 2; /* dropped D */
+            else                             stem_start = word + 3; /* utu */
             break;
         case 14:
             if (kin_starts_with(word, "ubw"))  stem_start = word + 2; /* u→w */
             else if (kin_starts_with(word, "ubu")) stem_start = word + 3; /* ubu */
+            else if (kin_starts_with(word, "bw"))  stem_start = word + 1; /* dropped D u+bw */
             else if (kin_starts_with(word, "bu"))  stem_start = word + 2; /* dropped D 'u' */
             break;
         case 15:
@@ -255,8 +464,16 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
  *   ku + C(voiceless)... + stem + a
  *   kw / gw + V + stem + a   (before vowel-initial stems)
  *
- * The final vowel is always -a.
- * Returns true and writes the bare stem (without prefix and final -a).
+ * The canonical final vowel is -a, but in relative and complement clauses
+ * the infinitive class verb can appear with derived endings:
+ *   -e      subjunctive/relative:    gukore (that it be done)
+ *   -ye     past perfect:            gupfuye (having died), guteye (having caused)
+ *   -tse    past perf (C-final st.): guhindutse, gutebutse
+ *   -we     passive:                 gufitwe, gutangirwe, gushyirwe
+ *   -rwe    passive applicative:     guhorerwe
+ *   -jewe   passive causative:       gusohozwe
+ *
+ * Returns true and writes the bare stem (without prefix and without FV/suffix).
  */
 bool kin_is_verb_infinitive(const char *word, char *stem_out) {
     size_t len = strlen(word);
@@ -275,9 +492,6 @@ bool kin_is_verb_infinitive(const char *word, char *stem_out) {
         return kin_is_verb_infinitive(locbuf, stem_out);
     }
 
-    /* Must end in 'a' (the final vowel of the infinitive)                 */
-    if (word[len - 1] != 'a') return false;
-
     const char *inner = NULL;  /* pointer past the prefix                  */
 
     if (kin_starts_with(word, "kw") && is_vowel(word[2]))   inner = word + 2;
@@ -286,16 +500,50 @@ bool kin_is_verb_infinitive(const char *word, char *stem_out) {
     else if (kin_starts_with(word, "ku") && !is_vowel(word[2])) inner = word + 2;
     else return false;
 
-    /* Inner must be at least 2 chars (1 consonant + final a) */
+    /* Inner must be at least 2 chars */
     size_t inner_len = strlen(inner);
     if (inner_len < 2) return false;
 
-    /* Strip final 'a' to get the stem */
-    if (stem_out) {
-        strncpy(stem_out, inner, inner_len - 1);
-        stem_out[inner_len - 1] = '\0';
+    /* ── CANONICAL: ends in 'a' ─────────────────────────────────────────── */
+    if (inner[inner_len - 1] == 'a') {
+        if (stem_out) {
+            strncpy(stem_out, inner, inner_len - 1);
+            stem_out[inner_len - 1] = '\0';
+        }
+        return true;
     }
-    return true;
+
+    /* ── EXTENDED: non-standard final vowels (relative/complement/passive) ─ *
+     * Only accept if the word is long enough (len ≥ 6) to avoid accidental  *
+     * matches on very short words.                                            */
+    if (len < 6) return false;
+
+    /* Past perfect -ye: gupfuye, guteye, gushavuye */
+    if (inner_len >= 3 && kin_ends_with(inner, "ye")) {
+        size_t sl = inner_len - 2;
+        if (stem_out) { strncpy(stem_out, inner, sl); stem_out[sl] = '\0'; }
+        return true;
+    }
+    /* Past perfect -tse (consonant-final stems): guhindutse, gutamurutse */
+    if (inner_len >= 4 && kin_ends_with(inner, "tse")) {
+        size_t sl = inner_len - 3;
+        if (stem_out) { strncpy(stem_out, inner, sl); stem_out[sl] = '\0'; }
+        return true;
+    }
+    /* Passive -we / -rwe / -jwe / -zwe: gufitwe, guhorerwe, gushyirwe */
+    if (inner_len >= 3 && kin_ends_with(inner, "we")) {
+        size_t sl = inner_len - 2;
+        if (stem_out) { strncpy(stem_out, inner, sl); stem_out[sl] = '\0'; }
+        return true;
+    }
+    /* Subjunctive / relative -e: gukore, gufashe, gushire */
+    if (inner_len >= 2 && inner[inner_len - 1] == 'e') {
+        size_t sl = inner_len - 1;
+        if (stem_out) { strncpy(stem_out, inner, sl); stem_out[sl] = '\0'; }
+        return true;
+    }
+
+    return false;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -483,9 +731,16 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "zi",   10  },
         { "ru",   11  },
         { "ka",   12  },
+        { "ga",   12  },  /* Nt.12 ka→ga before voiced (gahinda, gakora)  */
         { "bu",   14  },
         { "ku",   15  },
         { "ha",   16  },
+        /* Augmented locative SP: ha + u/i/o augment → hu/hi/ho            *
+         * In complement/passive constructions, ha+u-augment → "hu-"       *
+         * e.g. "hubakwa" = ha(SP16) + u(augment) + bak + w + a           *
+         *      "hifashishijwe" = ha(SP16) + i(augment) + fashi + sh + ijwe */
+        { "hu",   16  }, /* ha + u-augment (hubakwa, hubatswe, hubahirizwa) */
+        { "hi",   16  }, /* ha + i-augment (hifashishijwe, hitabwa, hitaka)*/
         /* 1-char prefixes – lowest priority */
         { "u",     3  },
         { "i",     4  },
@@ -624,12 +879,36 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     /* Minimum 3: allows short imperatives like "jya" (go!), "iga" (learn!) */
     if (len < 3) return false;
 
-    /* ── LAYER 1: Detect and strip nt- negation prefix ─────────────────── */
+    /* ── LAYER 1: Detect and strip nt- negation prefix ─────────────────── *
+     * The negative particle "nt-" is ALWAYS followed by a vowel-initial SP: *
+     *   ntaragenda = nt + a(SP cls1) + ra + gend + a                        *
+     *   ntiragenda = nt + i(SP cls4/7/9) + ra + gend + a                   *
+     *   ntuzagenda = nt + u(SP 2sg) + za + gend + a                        *
+     * When "nt" is followed by 'e', 'o', or a consonant, the "n" is the    *
+     * 1sg subject prefix and 't' begins the verb stem:                      *
+     *   ntega      = n(1sg) + teg + a   (gutega = to plan/trap)             *
+     *   ntege      = n(1sg) + teg + e   (subjunctive)                       *
+     *   ntegeko    = n(1sg) + tegek + o (gutegeka = to command)             */
     bool is_neg = false;
     const char *parse_word = word;
-    if (len > 3 && word[0] == 'n' && word[1] == 't') {
+    if (len > 3 && word[0] == 'n' && word[1] == 't' &&
+        (word[2] == 'a' || word[2] == 'i' || word[2] == 'u')) {
         is_neg   = true;
         parse_word = word + 2;
+    }
+
+    /* ── LAYER 1b: "si" negative prefix ────────────────────────────────── *
+     * "si" precedes the conjugated verb (SP + tense + stem) to form the    *
+     * negative for any person/class, especially 1sg forms:                 *
+     *   sinagira  = si + na(1sg past) + gir + a  (I did not do)            *
+     *   sindabona = si + nda(1sg pres) + bon + a (I don't see)             *
+     *   sinzabona = si + nza(1sg fut) + bon + a  (I won't see)             *
+     *   simbeshya = si + mb(1sg n→m/b) + eshya   (I don't lie)            *
+     *   simusiga  = si + mu(2pl/OM) + sig + a    (you don't leave)         *
+     * Length guard > 4: prevents stripping from short loanwords (sida etc) */
+    if (!is_neg && len > 4 && word[0] == 's' && word[1] == 'i') {
+        is_neg     = true;
+        parse_word = word + 2;   /* continue with SP detection on remainder */
     }
 
     /* ── LAYER 2: Core SP + tense matching ─────────────────────────────── */
@@ -673,6 +952,41 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
                     if (ext_out)       *ext_out       = imp_ext;
                     if (neg_out)       *neg_out       = false;
                     return true;
+                }
+            }
+            /* y-glide before final 'a': reciprocal -an + y glide (phonol.)  *
+             * "gereranya" = gereran + y + a → strip 'a' → "gererany",        *
+             * strip trailing 'y' → "gereran" → check stem, then ext_strip.  *
+             * e.g. ganiranya(talk together), beshyanya(lie to each other).   */
+            size_t implen = strlen(imp);
+            if (implen > 3 && imp[implen-1] == 'y') {
+                char imp_noy[KIN_MAX_STEM];
+                strncpy(imp_noy, imp, implen - 1);
+                imp_noy[implen - 1] = '\0';
+                if (kin_is_known_verb_stem(imp_noy)) {
+                    if (stem_out)      { strncpy(stem_out, imp_noy, KIN_MAX_STEM-1);
+                                         stem_out[KIN_MAX_STEM-1] = '\0'; }
+                    if (subj_class)    *subj_class    = 0;
+                    if (tense_out)     *tense_out     = TENSE_IMPERATIVE;
+                    if (obj_class_out) *obj_class_out = 0;
+                    if (ext_out)       *ext_out       = VEXT_NONE;
+                    if (neg_out)       *neg_out       = false;
+                    return true;
+                }
+                /* Also try ext_strip on the y-stripped form */
+                char bare_noy[KIN_MAX_STEM];
+                VerbExtension noy_ext = VEXT_NONE;
+                if (ext_strip(imp_noy, &noy_ext, bare_noy, sizeof(bare_noy))) {
+                    if (kin_is_known_verb_stem(bare_noy)) {
+                        if (stem_out)  { strncpy(stem_out, bare_noy, KIN_MAX_STEM-1);
+                                         stem_out[KIN_MAX_STEM-1] = '\0'; }
+                        if (subj_class)    *subj_class    = 0;
+                        if (tense_out)     *tense_out     = TENSE_IMPERATIVE;
+                        if (obj_class_out) *obj_class_out = 0;
+                        if (ext_out)       *ext_out       = noy_ext;
+                        if (neg_out)       *neg_out       = false;
+                        return true;
+                    }
                 }
             }
         }
@@ -743,13 +1057,16 @@ bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out) {
         { "me",  6  }, /* ma + inshi/iza → menshi/meza                    */
         { "ye",  4  }, /* ya + i-stem (Nt.4)                              */
         { "ze",  10 }, /* za + i-stem (Nt.10)                             */
+        { "he",  16 }, /* ha + iza/inshi → heza/henshi (Nt.16 a+i fusion) */
+        /* ha + vowel-initial stem: final 'a' of 'ha' elides before vowel */
+        { "h",   16 }, /* ha + other vowel stems (a→Ø elision): hinshi    */
         { NULL, 0 }
     };
 
     /* For the a+i→e fused prefixes, the stem stored in ADJ_STEMS starts
      * with 'i'.  We need to prepend 'i' to whatever follows the fused pfx.
      * We handle this by checking both the remainder AND 'i'+remainder.     */
-    static const char *FUSED_PREFIXES[] = { "be", "me", "ye", "ze", NULL };
+    static const char *FUSED_PREFIXES[] = { "be", "me", "ye", "ze", "he", NULL };
 
     for (int i = 0; ADJ_PREFIXES[i].pfx; i++) {
         size_t plen = strlen(ADJ_PREFIXES[i].pfx);

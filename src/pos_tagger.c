@@ -5,12 +5,16 @@
  * Priority order (from most specific to most general):
  *  1. Invariable words  → checked against the complete invariable table
  *  2. Pronouns          → checked against full pronoun table
- *  3. Verb infinitive   → pattern ku/gu/kw/gw + stem + -a
- *  4. Proper noun       → capital letter mid-sentence (heuristic)
- *  5. Noun              → D+RT prefix detection
- *  6. Adjective         → concordance prefix + known adjective stem
- *  7. Conjugated verb   → subject prefix + stem + -a pattern
- *  8. Foreign/Unknown
+ *  3. Known full word   → exact-match override for irregular/bare-prefix nouns
+ *  4. Verb infinitive   → pattern ku/gu/kw/gw + stem + -a
+ *  5. Proper noun       → capital letter mid-sentence (heuristic)
+ *  6. Noun              → D+RT prefix detection
+ *  7. Adjective         → concordance prefix + known adjective stem
+ *  8. Conjugated verb   → subject prefix + stem + -a pattern
+ *  9. Foreign/Unknown
+ *
+ * NOTE: Known full word (step 3) is checked early so that specific lexicon
+ * entries (like "mvura" = rain) override the general verb heuristics.
  */
 
 #include <string.h>
@@ -38,7 +42,22 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 3. Verb infinitive (ku/gu/kw/gw + stem + a)? */
+    /* 3. Known full word (exact-match lexicon override)
+     * Checked before verb heuristics so that specific nouns like "mvura"
+     * (rain) are not misanalysed as conjugated verbs (mv SP + ur stem).   */
+    {
+        int kcls = 0;
+        char kstem[KIN_MAX_STEM] = "";
+        if (kin_is_known_full_word(w, &kcls, kstem)) {
+            tok->pos            = POS_NOUN;
+            tok->noun_class     = kcls;
+            tok->is_kinyarwanda = true;
+            strncpy(tok->stem, kstem, KIN_MAX_STEM - 1);
+            return;
+        }
+    }
+
+    /* 4. Verb infinitive (ku/gu/kw/gw + stem + a)? */
     char stem[KIN_MAX_STEM];
     if (kin_is_verb_infinitive(w, stem)) {
         tok->pos            = POS_VERB_INF;
@@ -54,7 +73,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 4. Proper noun (capitalised mid-sentence)? */
+    /* 5. Proper noun (capitalised mid-sentence)? */
     if (tok->is_proper_noun) {
         tok->pos            = POS_NOUN;
         tok->noun_class     = 0;   /* class unknown for proper nouns       */
@@ -62,7 +81,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 5. Noun? — detect D+RT prefix */
+    /* 6. Noun? — detect D+RT prefix */
     int cls = 0;
     if (kin_strip_noun_prefix(w, stem, &cls)) {
         tok->pos            = POS_NOUN;
@@ -78,7 +97,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 6. Adjective? — RS prefix + known stem */
+    /* 7. Adjective? — RS prefix + known stem */
     int acls = 0;
     if (kin_strip_adj_prefix(w, stem, &acls)) {
         tok->pos            = POS_ADJECTIVE;
@@ -93,7 +112,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 7. Conjugated verb heuristic */
+    /* 8. Conjugated verb heuristic */
     int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
     VerbExtension vext = VEXT_NONE;
@@ -107,17 +126,6 @@ void kin_tag_token(Token *tok) {
         tok->is_negative    = is_neg;
         tok->is_kinyarwanda = true;
         strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
-        return;
-    }
-
-    /* 8. Known irregular word (full-word lookup for elided/special morphology) */
-    int kcls = 0;
-    char kstem[KIN_MAX_STEM] = "";
-    if (kin_is_known_full_word(w, &kcls, kstem)) {
-        tok->pos            = POS_NOUN;
-        tok->noun_class     = kcls;
-        tok->is_kinyarwanda = true;
-        strncpy(tok->stem, kstem, KIN_MAX_STEM - 1);
         return;
     }
 
