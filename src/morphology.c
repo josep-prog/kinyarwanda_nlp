@@ -21,11 +21,24 @@
 
 /* ── Utility: string helpers ─────────────────────────────────────────────── */
 
+/* kin_strlower: lower-case src into dst, also normalising UTF-8 macron vowels
+ * (ā/Ā→a  ē/Ē→e  ī/Ī→i  ō/Ō→o  ū/Ū→u) that appear in some Bible PDFs.
+ * All are 2-byte sequences:
+ *   C4 80/81=Āā  C4 92/93=Ēē  C4 AA/AB=Īī  C5 8C/8D=Ōō  C5 AA/AB=Ūū  */
 void kin_strlower(const char *src, char *dst, size_t dstlen) {
-    size_t i = 0;
-    for (; src[i] && i + 1 < dstlen; i++)
-        dst[i] = (char)tolower((unsigned char)src[i]);
-    dst[i] = '\0';
+    size_t i = 0, j = 0;
+    while (src[i] && j + 1 < dstlen) {
+        unsigned char c0 = (unsigned char)src[i];
+        unsigned char c1 = src[i + 1] ? (unsigned char)src[i + 1] : 0;
+        if (c0 == 0xC4 && (c1 == 0x80 || c1 == 0x81)) { dst[j++]='a'; i+=2; continue; }
+        if (c0 == 0xC4 && (c1 == 0x92 || c1 == 0x93)) { dst[j++]='e'; i+=2; continue; }
+        if (c0 == 0xC4 && (c1 == 0xAA || c1 == 0xAB)) { dst[j++]='i'; i+=2; continue; }
+        if (c0 == 0xC5 && (c1 == 0x8C || c1 == 0x8D)) { dst[j++]='o'; i+=2; continue; }
+        if (c0 == 0xC5 && (c1 == 0xAA || c1 == 0xAB)) { dst[j++]='u'; i+=2; continue; }
+        dst[j++] = (char)tolower(c0);
+        i++;
+    }
+    dst[j] = '\0';
 }
 
 bool kin_starts_with(const char *s, const char *prefix) {
@@ -712,6 +725,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "by",    8  },  /* Nt.8  bi+vowel → by  (byari, byemera, byibutse)  */
         { "ry",    5  },  /* Nt.5  ri+vowel → ry  (ryari, ryibutse)           */
         { "zy",   10  },  /* Nt.10 zi+vowel → zy  (zyari etc.)                */
+        { "zu",   10  },  /* Nt.10 zi+u-initial verb → zu  (zumva, zubaka)    */
         /* n→m before bilabials/labiodentals (p.7-8): 1sg "n" → "m"        */
         { "mb",    0  },  /* 1sg n→m before b: mbona, mbara, mbiruka          */
         { "mp",    0  },  /* 1sg n→m before p: mpaye, mpuye                   */

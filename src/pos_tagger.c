@@ -129,6 +129,40 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
+    /* 8b. Locative contraction: kw + (i|a)-initial noun
+     * Rule: ku + vowel-initial noun → kw + noun  (phonological fusion).
+     *   ku + isi   → kwisi   (on/at earth)
+     *   ku + ijuru → kwijuru (in heaven)
+     *   ku + amazi → kwamazi (of/with water)
+     *   ku + abantu→ kwabantu(of/belonging to people)
+     * Step 4 (VERB_INF) already succeeded for kw+verb patterns (kwigisha),
+     * so anything reaching here with kw+[ia] is a locative noun phrase.     */
+    if (w[0]=='k' && w[1]=='w' && (w[2]=='i' || w[2]=='a') && strlen(w) > 3) {
+        const char *rest = w + 2;
+        /* Try prefix-based noun detection first */
+        if (kin_strip_noun_prefix(rest, stem, &cls)) {
+            tok->pos            = POS_NOUN;
+            tok->noun_class     = cls;
+            tok->is_kinyarwanda = true;
+            strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
+            strncpy(tok->detected_prefix, w, 3);
+            tok->detected_prefix[3] = '\0';
+            return;
+        }
+        /* Fall back to known-word table (e.g. kwisi = ku+isi, isi in KNOWN_WORDS) */
+        char kstem[KIN_MAX_STEM] = "";
+        int  kcls = 0;
+        if (kin_is_known_full_word(rest, &kcls, kstem)) {
+            tok->pos            = POS_NOUN;
+            tok->noun_class     = kcls;
+            tok->is_kinyarwanda = true;
+            strncpy(tok->stem, kstem, KIN_MAX_STEM - 1);
+            strncpy(tok->detected_prefix, w, 3);
+            tok->detected_prefix[3] = '\0';
+            return;
+        }
+    }
+
     /* 9. Unknown / foreign */
     tok->pos            = POS_FOREIGN;
     tok->is_kinyarwanda = false;

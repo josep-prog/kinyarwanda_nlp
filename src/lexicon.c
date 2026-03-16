@@ -436,6 +436,7 @@ static const PronounEntry PRONOUNS[] = {
 
     /* ── Personal pronoun: emphatic 1sg (jye = I/me emphatic) ──────────── */
     { "jye",    PRON_PERSONAL,  0 },  /* emphatic I / me (also: nanjye)     */
+    { "jyeho",  PRON_PERSONAL,  0 },  /* emphatic I / me (jye + locative)   */
     { "jyewe",  PRON_PERSONAL,  0 },  /* emphatic I myself (stronger form)  */
     { "jyeweho",PRON_PERSONAL,  0 },  /* I myself (jyewe + locative -ho)    */
 
@@ -520,6 +521,7 @@ static const InvEntry INVARIABLES[] = {
     { "ava",     POS_PREPOSITION },  /* from (contraction of kuva)         */
     { "kuva",    POS_PREPOSITION },  /* from / since                       */
     { "hagati",  POS_PREPOSITION },  /* between / among                    */
+    { "nyiri",   POS_PREPOSITION },  /* owner of / possessor (nyiri inzu)  */
 
     /* ══ Icyungo (conjunctions) ════════════════════════════════════════════ */
     /* Ibyungo ngombwa (necessary – remove changes meaning) */
@@ -636,6 +638,9 @@ static const InvEntry INVARIABLES[] = {
     { "akenshi", POS_ADVERB      }, /* often / frequently (a + kenshi)      */
     { "ahenshi", POS_ADVERB      }, /* sometimes / often (variant)          */
     { "amenshi", POS_ADVERB      }, /* often (wa + kenshi variant?)         */
+    /* ── Locative adverbs: va + aho/ayo (from there) ─────────────────────  */
+    { "vaho",    POS_ADVERB      }, /* from there (va + aho, ablative)       */
+    { "vayo",    POS_ADVERB      }, /* from there/it (va + ayo, Nt.6)        */
     /* ── Compound time adverbs ────────────────────────────────────────────  */
     { "ejobundi",POS_ADVERB      }, /* the day before/after yesterday        */
     { "ejuru",   POS_ADVERB      }, /* a long time ago / way back            */
@@ -1059,8 +1064,8 @@ static const char *VERB_STEMS[] = {
     "teranir",  /* guteraniriza – to unify / bring together              */
     "teran",    /* guterana    – to gather / be united                   */
     "tesh",     /* guteshwa    – to lose (passive of guteza)             */
-    "lot",      /* kulota      – to dream                                */
-    "loter",    /* kulotera    – to dream about / of                     */
+    "rot",      /* kurota      – to dream                                */
+    "roter",    /* kurotera    – to dream about / of                     */
     "her",      /* guherana    – to make white / reconcile               */
     "heng",     /* guhenga     – to migrate / go beyond / exceed         */
     "twaz",     /* gutwaza     – to arm / equip / provide weapons        */
@@ -1278,7 +1283,6 @@ static const KnownWord KNOWN_WORDS[] = {
     { "musikari",  1,  "sikari" }, /* = umusikari (soldier / warrior)      */
     { "mubyeyi",   1,  "byeyi"  }, /* = umubyeyi (parent)                 */
     { "mukuru",    1,  "kuru"   }, /* = umukuru (elder / chief / senior)   */
-    { "mufuruki",  1,  "furuki" }, /* = umufuruki (stranger / foreigner)   */
     /* Nt.14 common nouns with dropped D-vowel 'u' from "ubu" */
     { "butayu",   14,  "tayu"   }, /* = ubutayu (desert / wilderness)      */
     { "burenganzira",14,"renganzira"}, /* = uburenganzira (right/authority)*/

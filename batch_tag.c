@@ -17,7 +17,7 @@ int main(void) {
 
         Token t = {0};
         strncpy(t.surface, word, KIN_MAX_WORD - 1);
-        strncpy(t.lower,   word, KIN_MAX_WORD - 1);
+        kin_strlower(word, t.lower, KIN_MAX_WORD);   /* normalize diacritics */
         t.is_proper_noun = false;
 
         kin_tag_token(&t);
