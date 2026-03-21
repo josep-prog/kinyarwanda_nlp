@@ -97,6 +97,36 @@ bool kin_is_adj_stem(const char *stem) {
     return false;
 }
 
+/*
+ * kin_is_adj_reduplicated()
+ *
+ * Reduplication (gukoresha indorerezi) of adjectives emphasises the quality:
+ *   -re  (long)  → mu+re+mu+re = muremure  (very tall/long, Nt.1)
+ *              → ba+re+ba+re = barebare  (Nt.2)
+ *              → ru+re+ru+re = rurerure  (Nt.11)
+ * Structure of the reduplicated form: RS + stem + RS + stem
+ * After stripping the initial RS prefix in kin_strip_adj_prefix, the
+ * remainder (sfx) should be:  stem + pfx + stem
+ * e.g.  sfx="rebare", pfx="ba"  →  "re" + "ba" + "re" ✓
+ * Returns true and fills stem_out with the base stem if matched.
+ */
+bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out) {
+    size_t pfxlen = strlen(pfx);
+    for (int i = 0; ADJ_STEMS[i]; i++) {
+        size_t slen = strlen(ADJ_STEMS[i]);
+        /* sfx must be at least  slen + pfxlen + slen  chars */
+        if (strlen(sfx) != slen + pfxlen + slen) continue;
+        /* Check: sfx starts with stem, then pfx, then stem again */
+        if (strncmp(sfx,                    ADJ_STEMS[i], slen)   == 0 &&
+            strncmp(sfx + slen,             pfx,          pfxlen) == 0 &&
+            strncmp(sfx + slen + pfxlen,    ADJ_STEMS[i], slen)   == 0) {
+            if (stem_out) strncpy(stem_out, ADJ_STEMS[i], KIN_MAX_STEM - 1);
+            return true;
+        }
+    }
+    return false;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
  * 3. PRONOUNS (Ibinyazina) – p.89-97
  *
@@ -556,6 +586,8 @@ static const InvEntry INVARIABLES[] = {
     { "no",      POS_CONJUNCTION  }, /* and also / plus (na + o fusion)    */
     { "bene",    POS_ADVERB       }, /* own / themselves (intensifier)     */
     { "gituma",  POS_CONJUNCTION  }, /* that is why / the reason being     */
+    { "niba",    POS_CONJUNCTION  }, /* if / whether / in case (conditional)*/
+    { "nibyo",   POS_CONJUNCTION  }, /* if that is so / if it is true       */
 
     /* ══ Copula (inshinga nkene) ════════════════════════════════════════════ */
     /* ni/si are equative verbs (copulas); POS_VERB_CONJ makes has_verb work */
@@ -655,6 +687,15 @@ static const InvEntry INVARIABLES[] = {
     { "mwati",   POS_VERB_CONJ   }, /* suppletive: you-pl said (mwa+ti)    */
     { "twati",   POS_VERB_CONJ   }, /* suppletive: we said (twa+ti)        */
     { "rwati",   POS_VERB_CONJ   }, /* suppletive: Nt.11 said (rwa+ti)     */
+    /* ── Complete -ti quotative paradigm (S6 textbook Ingirwanshinga) ──── */
+    /* Classes missing from the table above (p.141 of Kinyarwanda S6 SB)   */
+    { "kuti",    POS_VERB_PARTICLE}, /* Nt.15 quotative: ku+ti (also manner)*/
+    { "ruti",    POS_VERB_PARTICLE}, /* Nt.11 quotative: ru+ti              */
+    { "hati",    POS_VERB_PARTICLE}, /* Nt.16 quotative: ha+ti              */
+    { "kiti",    POS_VERB_PARTICLE}, /* Nt.7  quotative: ki+ti              */
+    { "tuti",    POS_VERB_PARTICLE}, /* Nt.13 quotative: tu+ti              */
+    { "buti",    POS_VERB_PARTICLE}, /* Nt.14 quotative: bu+ti              */
+    { "ziti",    POS_VERB_PARTICLE}, /* Nt.10 quotative: zi+ti              */
 
     /* ══ Elided forms (before apostrophe) ══════════════════════════════════ */
     { "n",       POS_CONJUNCTION  }, /* elided 'na' before vowel           */
@@ -832,6 +873,7 @@ static const InvEntry INVARIABLES[] = {
     /* ── Interrogative adverbs (adverbes interrogatifs) ─────────────────  */
     { "gute",       POS_ADVERB }, /* how? / in what way?                   */
     { "gutyo",      POS_ADVERB }, /* like that / in that manner            */
+    { "gutya",      POS_ADVERB }, /* like this / in this manner            */
     { "guhe",       POS_ADVERB }, /* which / where (used in "ni guhe")     */
     { "handi",      POS_LOCATIVE}, /* elsewhere / somewhere else           */
     { "kati",       POS_ADVERB }, /* just / at that moment / right now     */
@@ -839,6 +881,59 @@ static const InvEntry INVARIABLES[] = {
     { "hakiri",     POS_VERB_CONJ }, /* Nt.16: there is still / it still is*/
     { "hazwi",      POS_VERB_CONJ }, /* Nt.16: it is known (locative)      */
     { "hatari",     POS_VERB_CONJ }, /* there is not (negative locative)   */
+
+    /* ── High-frequency narrative & discourse particles (corpus-derived) ──  *
+     * These were previously misanalysed as conjugated verbs because their    *
+     * surface form accidentally matches an SP + tense + stem pattern.        *
+     * Adding them here ensures they are caught at step 1 (invariables),      *
+     * well before the verb heuristic.                                        */
+    { "nuko",    POS_CONJUNCTION }, /* narrative connector: "so / and then / *
+                                     * it came to pass that" – the most       *
+                                     * common sentence-initial particle in     *
+                                     * the Bible corpus (~2954 occurrences).  *
+                                     * Previously parsed as SP "nu" + stem    *
+                                     * "k" + FV "a" (wrong).                 */
+    { "ahubwo",  POS_ADVERB     }, /* contrastive adverb: "rather / instead / *
+                                     * on the contrary" (~1024 occurrences).   *
+                                     * Previously parsed as Nt.1 passive verb. */
+    { "wati",    POS_VERB_CONJ  }, /* quotative 2sg: "you said" (wa+ti)       *
+                                     * Completes the quotative paradigm:        *
+                                     * nti uti wati yati ati bati mwati twati  */
+
+    /* ── kuba + locative forms: "to be/exist there/in/from" ──────────────  *
+     * These are SP + ra(present) + b(kuba) + a + locative-suffix forms.      *
+     * They fall victim to the noun-before-verb priority: the "SP" prefix is  *
+     * also a noun class marker so the word is grabbed as a noun first.       *
+     * Listing them here as POS_VERB_CONJ short-circuits that ambiguity.      */
+    { "arabaho",   POS_VERB_CONJ }, /* Nt.1 sg: he/she exists / is there     */
+    { "rurabaho",  POS_VERB_CONJ }, /* Nt.11: it (urugo etc.) exists there   */
+    { "kirabaho",  POS_VERB_CONJ }, /* Nt.7: it (ikintu etc.) is there       */
+    { "birabaho",  POS_VERB_CONJ }, /* Nt.8: they (ibintu) are there         */
+    { "irabaho",   POS_VERB_CONJ }, /* Nt.5: it (ijambo etc.) is there       */
+    { "zirabaho",  POS_VERB_CONJ }, /* Nt.10: they (inka) are there          */
+    { "burabaho",  POS_VERB_CONJ }, /* Nt.14: it (ubuzima etc.) is there     */
+    { "turabaho",  POS_VERB_CONJ }, /* 1pl: we are there                     */
+    { "murabaho",  POS_VERB_CONJ }, /* 2pl: you all are there                */
+    { "barabaho",  POS_VERB_CONJ }, /* Nt.2: they (abantu) are there         */
+    /* kuba + -mo (in) */
+    { "arabamo",   POS_VERB_CONJ }, /* Nt.1: he/she is in it                 */
+    { "birabamo",  POS_VERB_CONJ }, /* Nt.8: they are in it                  */
+    /* kuba + -yo (Nt.6 locative "from/in there") */
+    { "arababayo", POS_VERB_CONJ }, /* Nt.1: he/she is among them (cls2 OM)  */
+
+    /* ── Negative existential "nta" ────────────────────────────────────────  *
+     * "nta" = "there is no / no / without" — used before noun phrases.       *
+     * Distinct from the conjunction "na" and pronoun uses.                   */
+    { "nta",     POS_ADVERB     }, /* negative existential: no / there is no */
+    { "ntaho",   POS_VERB_CONJ  }, /* locative neg: there is nothing there   */
+
+    /* ── Common temporal & conditional conjunctions ─────────────────────── */
+    { "igihe",   POS_CONJUNCTION}, /* temporal conj: when / at the time (also*
+                                     * Nt.7 noun "time" – dual use; conj form  *
+                                     * used sentence-initially as "igihe cyo…")*/
+    { "kugeza",  POS_CONJUNCTION}, /* until / up to (kugeza aho…)            */
+    { "ubwo",    POS_CONJUNCTION}, /* temporal: when / while / at that moment *
+                                     * (also used as Nt.14 pronoun – keep both)*/
 
     { NULL, POS_UNKNOWN }
 };
@@ -1089,6 +1184,72 @@ static const char *VERB_STEMS[] = {
     "gereran",  /* kugereranya – full extended stem (ger+er+an) for imper.*/
     "ganir",    /* kuganira    – to talk / discuss / converse             */
     "ganirir",  /* kuganirira  – to talk to / converse with (applicative) */
+    /* ── High-frequency stems derived from Bible corpus analysis ─────── */
+    /* These were missing and caused verb forms to be mis-tagged or       *
+     * flagged with false object-marker errors.                           */
+    "z",        /* kuza        – to come / arrive (very common!)         */
+    "b",        /* kuba        – to be / exist (copular: araba, rurabaho)*/
+    "rakar",    /* gurakarira  – to be angry / furious                   */
+    "rakaz",    /* gurakariza  – to make angry / enrage                  */
+    "mer",      /* gumera      – to grow / thrive (already "mer" added?) */
+    "nyag",     /* gunyaga     – to steal / plunder (already present)    */
+    "nywer",    /* kunywereza  – to water / make drink (causative base)  */
+    "vaner",    /* kuvana      – to separate / split from (also: van)    */
+    "nywish",   /* kunywesha   – to make drink / give to drink           */
+    "barik",    /* kubarika    – to bless (also: VERB: gutumabarika)      */
+    "yimb",     /* kwiyimba    – to swell / inflate                      */
+    "nyuran",   /* kunyurana   – to cross one another / pass each other  */
+    "seng",     /* gusenga     – to pray (already present; keep dup ok)  */
+    "shak",     /* gushaka     – to want / seek (already present)        */
+    "reber",    /* kureberera  – to look at / watch over (applicative)   */
+    "taber",    /* gutabarana  – to fight each other                     */
+    "rumir",    /* kurumira    – to swallow                              */
+    "rumb",     /* kurumba     – to be first-born / excel                */
+    "rog",      /* kuroga      – to bewitch / poison                     */
+    "rang",     /* kuranga     – to lead / be in front / precede         */
+    "renguk",   /* kurenguka   – to be light / easy / float              */
+    "rangam",   /* gurangama   – to be straight / upright                */
+    "giz",      /* kugiza      – to make good / fix / improve            */
+    "zor",      /* kuzora      – to be full / satisfied                  */
+    "rumuk",    /* kurumuka    – to loosen / untie                       */
+    "fot",      /* gufota      – to photograph / take a picture          */
+    "shor",     /* gushorera   – to urinate on (applicative)             */
+    "shon",     /* gushona     – to set (of sun) / sink / go under       */
+    "boher",    /* gubohereza  – to tighten / bind up                    */
+    "kub",      /* gukuba      – to fold / multiply                      */
+    "gob",      /* kugoba      – to surround / encircle                  */
+    "koter",    /* gukoresha   – extended applicative base               */
+    "witer",    /* kwitera     – to cause oneself / self-initiate        */
+    "yemrer",   /* kwiyemera   – already: yemr; add extended form        */
+    "imburan",  /* kwimburana  – to compete / contend with              */
+    "zunguran", /* kuzungurana – to alternate / take turns               */
+    "hurumban", /* guhuruza    – to separate / scatter                   */
+    "shish",    /* gushisha    – to be late / delayed                    */
+    "rangir",   /* kurangira   – to finish / complete / end              */
+    "berek",    /* kubereka    – to show / demonstrate to               */
+    "bimb",     /* kubimba     – to bury / cover with soil               */
+    /* ── Corpus-confirmed high-frequency stems (Bible analysis 2026) ── */
+    "hamagal",  /* guhamagara  – to call / summon / name (aramuhamagara) */
+    "sobanur",  /* gusobanura  – to explain / clarify (arabisobanurira)  */
+    "hanuzan",  /* guhanuriza  – to interpret / prophesy                 */
+    "sezeran",  /* gusezerana  – to make covenant / promise each other   */
+    "mbwir",    /* kumbwira    – to tell me (1sg OM mbwira: a+ra+m+bwir) */
+    "nyuran",   /* kunyurana   – to pass each other                      */
+    "gabany",   /* kugabanya   – to divide / reduce                      */
+    "vuzan",    /* guvuzana    – to sound together / harmonise           */
+    "rang",     /* kuranga     – to lead / be at front (already "rang"?) */
+    "tsindw",   /* gutsindwa   – to be defeated (passive of gutsinda)    */
+    /* ── Stems from S6 Kinyarwanda textbook (2026 analysis) ────────────── */
+    "rwany",    /* kurwanya    – to fight against / combat / resist       */
+    "ruhuk",    /* kuruhuka    – to rest / take a break / relax          */
+    "sarur",    /* gusarura    – to harvest / reap / select               */
+    "shishikariz", /* gushishikariza – to encourage / motivate / inspire  */
+    "kum",      /* gukumira    – to prevent / stop / block the spread     */
+    "kumur",    /* gukumura    – to vaccinate / treat (medical)           */
+    "sagamb",   /* gusagamba   – to stride / march / walk proudly        */
+    "riber",    /* guribirira  – to wait for eagerly                      */
+    "garagaz",  /* kugaragaza  – to show / demonstrate / reveal          */
+    "hangayik", /* guhangayika – to worry / be anxious                   */
     NULL
 };
 
@@ -1260,6 +1421,7 @@ static const KnownWord KNOWN_WORDS[] = {
     /* Number words */
     { "cumi",     7,  "cumi"   },  /* = icumi (ten)                       */
     /* Informal / fast-speech noun forms */
+    { "imana",    9,  "mana"   },  /* = Imana (God — full form with i-prefix; mid-sentence) */
     { "mana",     9,  "mana"   },  /* = Imana (God — informal/elided)     */
     { "data",     1,  "data"   },  /* father (informal: data = dada)      */
     { "nyina",    1,  "nyina"  },  /* mother / her mother                 */
@@ -1454,6 +1616,47 @@ static const KnownWord KNOWN_WORDS[] = {
     { "feza",      5,  "feza"   }, /* = ifeza (silver) — dropped i-        */
     { "fumbire",   5,  "fumbire"}, /* = ifumbire (fertilizer) — dropped i- */
     { "fumbwe",   14,  "fumbwe" }, /* = ubufumbwe (secret/private matter)  */
+
+    /* ── Religious / biblical titles (very high frequency in corpus) ────── */
+    /* "Uwiteka" = THE LORD (divine title, ~5178 occurrences).               *
+     * Without this entry it is mis-parsed as verb "u+witeka" (SP Nt.3 +     *
+     * stem witek + a).  Listed as Nt.1 human noun (divine person).          */
+    { "uwiteka",   1,  "witeka" }, /* The LORD (Yahweh — Kinyarwanda title)  */
+
+    /* Common high-frequency nouns missed by prefix rules or too short */
+    { "umutima",   1,  "tima"   }, /* heart / mind / conscience (Nt.1)       */
+    { "amahoro",   6,  "horo"   }, /* peace / greetings (Nt.6 mass)          */
+    { "ubwami",   14,  "wami"   }, /* kingdom / reign (Nt.14)                */
+    { "imfura",    9,  "fura"   }, /* firstborn / noble (Nt.9)               */
+    { "inzira",    9,  "nzira"  }, /* path / road / way (Nt.9)               */
+    { "ubuhanga",  14, "hanga"  }, /* skill / art / capability (Nt.14)       */
+    { "ubwiza",    14, "wiza"   }, /* beauty / goodness / grace (Nt.14)      */
+    { "ubutegetsi",14, "tegetsi"}, /* power / authority / government (Nt.14) */
+    { "ubuhamya",  14, "hamya"  }, /* testimony / witness (Nt.14)            */
+    { "iterambere", 5, "terambere"},/* progress / development (Nt.5)         */
+    { "amasezerano",6, "sezerano"},/* covenants / agreements (Nt.6 pl)       */
+    { "ubukiro",   14, "kiro"   }, /* salvation / redemption (Nt.14)         */
+    { "inzoga",    9,  "nzoga"  }, /* beer / alcoholic drink (Nt.9, dup ok)  */
+    { "inyumba",   9,  "nyumba" }, /* room / apartment (Nt.9)                */
+    { "urwego",   11,  "wego"   }, /* level / rank / tier (Nt.11)            */
+    { "uruhande",  11, "hande"  }, /* side / direction (Nt.11)               */
+    { "akazi",    12,  "zi"     }, /* work / job / task (Nt.12)              */
+    { "agaciro",  12,  "ciro"   }, /* value / dignity / worth (Nt.12)        */
+    { "agahe",    12,  "he"     }, /* a short time / while (Nt.12 dim.)      */
+
+    /* ── Nouns from S6 textbook vocabulary (2026 analysis) ─────────────── */
+    { "leta",      9,  "leta"   }, /* state / government (loanword fr. l'État)*/
+    { "ndimi",     4,  "dimi"   }, /* languages (pl. of ururimi, dropped 'i') */
+    { "mpamagazi", 1,  "pamagazi"},/* one who calls/summons; also grammar term*/
+    { "intore",    9,  "ntore"  }, /* warriors / trained youth (Nt.9)         */
+    { "imbwirwaruhame",9,"bwirwaruhame"},/* narrative poetry / praise poem    */
+
+    /* ── Nouns false-positived as verbs due to SP+OM+stem collision ─────── */
+    /* These words match SP+OM+known-verb-stem but are nouns, not verbs.     */
+    { "umucyo",    3,  "cyo"    }, /* light / beam of light (Nt.3)            */
+    { "icyizero",  7,  "izero"  }, /* hope / expectation (Nt.7)               */
+    { "ibihimba",  8,  "himba"  }, /* body members / created things (Nt.8)    */
+
     { NULL, 0, "" }
 };
 

@@ -6,6 +6,7 @@ MANPAGE  = man/kinyarwanda_nlp.1
 SRCS     = src/main.c \
            src/tokenizer.c \
            src/morphology.c \
+           src/ortho.c \
            src/lexicon.c \
            src/pos_tagger.c \
            src/syntax.c \
@@ -49,12 +50,12 @@ help:
 # Functional tests
 test: $(TARGET)
 	@echo "=== Test 1: noun+adjective agreement (correct) ==="
-	./$(TARGET) -s "Umuntu munini aragenda"
+	./$(TARGET) -s "Umuntu munini aragenda buhoro"
 	@echo ""
 	@echo "=== Test 2: adjective agreement ERROR ==="
 	./$(TARGET) -s "Umuntu binini aragenda"
 	@echo ""
-	@echo "=== Test 3: possessive agreement (correct) ==="
+	@echo "=== Test 3: possessive agreement (correct – rurabaho now verb) ==="
 	./$(TARGET) -s "Urugo rwacu rurabaho"
 	@echo ""
 	@echo "=== Test 4: possessive agreement ERROR ==="
@@ -86,6 +87,21 @@ test: $(TARGET)
 	@echo ""
 	@echo "=== Test 13: version ==="
 	./$(TARGET) --version
+	@echo ""
+	@echo "=== Test 14: kugenda/kujya RULE – ERROR (gend + dest. noun) ==="
+	./$(TARGET) -s "Umwana aragenda ishuri buri munsi"
+	@echo ""
+	@echo "=== Test 15: kugenda/kujya RULE – correct (kujya + dest. noun) ==="
+	./$(TARGET) -s "Umwana ajya ishuri buri munsi"
+	@echo ""
+	@echo "=== Test 16: nuko + ahubwo correctly tagged ==="
+	./$(TARGET) -s "Nuko Imana ibona ko byari byiza ahubwo ibihimba"
+	@echo ""
+	@echo "=== Test 17: Uwiteka now recognized as noun (not verb) ==="
+	./$(TARGET) -s "Uwiteka ni Imana"
+	@echo ""
+	@echo "=== Test 18: reduplicated adjectives (barebare, muremure) ==="
+	./$(TARGET) -s "Abantu barebare barakora kandi umuntu muremure aragenda"
 
 clean:
 	rm -f $(OBJS) $(SRCS:.c=.d) $(TARGET)

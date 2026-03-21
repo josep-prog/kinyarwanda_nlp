@@ -165,6 +165,10 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         int nc = noun->noun_class;
         int vc = verb->noun_class;
         if ((nc == 1 || nc == 3) && (vc == 1 || vc == 3)) continue;
+        /* Nt.4 and Nt.9 both use the same SP "i"; treat as compatible.
+         * e.g. "Imana iravuga" — Imana is Nt.9 but iravuga's SP "i" is
+         * stored as Nt.4 (first-match in the SP table).              */
+        if ((nc == 4 || nc == 9) && (vc == 4 || vc == 9)) continue;
         /* "ya" SP (stored as cls 6) is ambiguous: it is ALSO the Nt.1 past
          * tense form (a-subject + past 'a' marker → "ya").  Do not flag   *
          * agreement errors when verb SP class is 6 and noun is Nt.1/3/9.  *
@@ -227,6 +231,52 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             "Apply phonological rule: %s.",
             rule, rule);
         add_error(sa, ERR_VOWEL_HIATUS, i, msg, sug);
+    }
+
+    /* RULE 7: kugenda vs kujya — directional-motion verb selection
+     *
+     * In standard Kinyarwanda there are two distinct "to go" verbs:
+     *   kugenda  = manner/non-directional: "to walk / to travel / to move"
+     *              Takes manner adverbs:  "aragenda buhoro" (walks slowly) ✓
+     *              Takes path phrases:   "aragenda ku muhanda" (on the road) ✓
+     *              Does NOT take bare destination nouns.
+     *   kujya    = directional:          "to go TO (a destination)"
+     *              Takes destination NP: "ajya ishuri"  (goes to school) ✓
+     *                                    "azajya i Kigali" (will go to Kigali) ✓
+     *
+     * When a "gend"-stem verb is immediately followed by a bare destination
+     * noun (no intervening preposition), flag the error and suggest kujya.
+     *
+     * Source: native-speaker correction (2026-03-21).
+     */
+    for (int i = 0; i < sa->token_count - 1; i++) {
+        Token *verb = &sa->tokens[i];
+        Token *next = &sa->tokens[i + 1];
+
+        if (verb->pos != POS_VERB_CONJ) continue;
+        /* Only flag when the verb stem is "gend" or "end" (both map to kugenda) */
+        if (strcmp(verb->stem, "gend") != 0 && strcmp(verb->stem, "end") != 0)
+            continue;
+        /* Only flag when immediately followed by a bare noun (no preposition) */
+        if (next->pos != POS_NOUN) continue;
+        /* Skip if the noun is a proper noun (place names used with i/ku
+         * preposition are fine; mid-sentence capitals are proper nouns) */
+        if (next->is_proper_noun) continue;
+
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        snprintf(msg, sizeof(msg),
+            "Guhitamo inshinga nabi: '%s' (kugenda) ikurikirwa n'izina '%s' "
+            "nta mugereka wo hagati. "
+            "Wrong verb: 'kugenda' (manner of movement) followed directly by "
+            "destination noun '%s' without a preposition. "
+            "Use 'kujya' for going TO a destination.",
+            verb->surface, next->surface, next->surface);
+        snprintf(sug, sizeof(sug),
+            "Jyana inshinga 'kugenda' n'inshinga 'kujya' iyo ushaka kuvuga "
+            "kujya ahantu. Urugero: 'ajya ishuri' (not 'aragenda ishuri'). "
+            "Replace 'kugenda' with 'kujya' when going TO a place. "
+            "E.g. 'ajya ishuri' / 'yajya ishuri' / 'azajya ishuri'.");
+        add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
     }
 
     sa->is_complete = sa->has_verb && (sa->error_count == 0);

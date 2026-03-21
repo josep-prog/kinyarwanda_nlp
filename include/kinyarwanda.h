@@ -125,6 +125,26 @@ typedef struct {
     const char *description;
 } NounClass;
 
+/* ─── Orthographic violation types (igenantego) ──────────────────────────── *
+ * Each constant maps to a specific RALC rule section.                        */
+typedef enum {
+    ORTHO_OK             = 0,
+    ORTHO_VV_HIATUS,         /* §1.1/§2.1: two adjacent vowels (VV not resolved) */
+    ORTHO_NASAL_ASSIM,       /* §3.3:  n before f/p/b/v/h must become m/mp       */
+    ORTHO_NASAL_ELISION,     /* §3.1:  n before m/n/ny must elide                */
+    ORTHO_CY_UNFUSED,        /* §3.9:  C+y at morpheme boundary must fuse        */
+    ORTHO_STOP_UNDELETED,    /* §3.6:  epenthetic stop (t in nts, p in mpf) kept */
+    ORTHO_C_NOT_SH,          /* §3.6.2: nc must become nsh                       */
+    ORTHO_VOWEL_ASSIM,       /* §1.3:  -ir-/-ish- before o-stem must be -er-/-esh-*/
+} OrthoViolationType;
+
+typedef struct {
+    OrthoViolationType type;
+    int   pos;                   /* byte offset in the word where violation starts */
+    char  rule[16];              /* RALC rule ID, e.g. "§3.9.4"                    */
+    char  msg[KIN_MAX_MSG];      /* bilingual explanation (Kinyarwanda / English)  */
+} OrthoViolation;
+
 /* ─── Error types ─────────────────────────────────────────────────────────── */
 typedef enum {
     ERR_NONE              = 0,
@@ -137,6 +157,7 @@ typedef enum {
     ERR_SUBJ_VERB_AGREEMENT,   /* Verb SP doesn't match subject noun class */
     ERR_OBJ_VERB_AGREEMENT,    /* Verb OM doesn't match object noun class  */
     ERR_VOWEL_HIATUS,          /* Two adjacent vowels (iranya ry'impanvu)  */
+    ERR_VERB_SELECTION,        /* Wrong verb choice (e.g. kugenda vs kujya) */
 } ErrorType;
 
 typedef struct {
@@ -220,6 +241,7 @@ bool kin_has_invalid_cluster(const char *word);
 bool kin_is_invariable(const char *word, POS *pos_out);
 bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out);
 bool kin_is_adj_stem(const char *stem);
+bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out);
 bool kin_is_known_verb_stem(const char *stem);
 bool kin_is_known_noun_stem(const char *stem, int *class_out);
 bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out);
@@ -239,6 +261,29 @@ void kin_check_syntax(SentenceAnalysis *sa);
 
 /* corrector.c */
 void kin_suggest_corrections(SentenceAnalysis *sa);
+
+/* ortho.c  –  orthographic rule engine (RALC 2017) */
+
+/* Forward generation: apply all rules to '|'-delimited morpheme string.
+ * noun_class_9=true activates §2.4 (n+y→nz) for Nt.9/10 prefix context. */
+void kin_ortho_gen(const char *morphemes, bool noun_class_9,
+                   char *surface, size_t size);
+
+/* Validate a surface word; fill viol[0..max-1], return violation count. */
+int  kin_ortho_validate(const char *word, OrthoViolation *viol, int max);
+
+/* Recover candidate underlying verb roots from a surface conjugated stem.
+ * `raw_stem` is the stem AFTER stripping SP, tense markers, and final vowel.
+ * Returns number of candidates written to roots[][KIN_MAX_STEM] (0 = none). */
+int  kin_ortho_recover_verb_root(const char *raw_stem,
+                                  char roots[][KIN_MAX_STEM], int max_roots);
+
+/* Extract bare stem from a Nt.9/10 noun (the part after the outer 'i' D-vowel).
+ * Reverses §2.4, §3.1, §3.3, §3.6.2 prefix transformations. */
+void kin_ortho_nt9_stem(const char *after_i, char *stem_out, size_t size);
+
+/* Human-readable name for an OrthoViolationType. */
+const char *kin_ortho_rule_name(OrthoViolationType t);
 
 /* analysis.c  (main pipeline) */
 SentenceAnalysis kin_analyze(const char *text);

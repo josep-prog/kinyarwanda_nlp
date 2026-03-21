@@ -1021,6 +1021,28 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     bare[KIN_MAX_STEM - 1] = '\0';
     ext_strip(after_om, &vext, bare, sizeof(bare));
 
+    /* ── LAYER 3c: Validate OM; revert if bare stem is unknown ──────────── *
+     * If an OM was stripped but the resulting stem is not a known verb stem, *
+     * check whether the un-stripped raw_stem (or raw_stem after ext-strip)   *
+     * IS known.  If so, the OM was a false positive (e.g. "rw" OM eaten from *
+     * stem "rwany" → "any" unknown, but raw_stem "rwany" IS known).          *
+     * Example: zi+rwanya → raw_stem="rwany", OM=rw(Nt.11) → bare="any" → BAD*
+     *          revert: obj_cls=0, bare="rwany" (no OM, stem known).          */
+    if (obj_cls > 0 && !kin_is_known_verb_stem(bare)) {
+        char raw_bare[KIN_MAX_STEM];
+        VerbExtension raw_vext = VEXT_NONE;
+        strncpy(raw_bare, raw_stem, KIN_MAX_STEM - 1);
+        raw_bare[KIN_MAX_STEM - 1] = '\0';
+        ext_strip(raw_stem, &raw_vext, raw_bare, sizeof(raw_bare));
+        if (kin_is_known_verb_stem(raw_stem) || kin_is_known_verb_stem(raw_bare)) {
+            obj_cls = 0;
+            vext    = raw_vext;
+            strncpy(bare, kin_is_known_verb_stem(raw_stem) ? raw_stem : raw_bare,
+                    KIN_MAX_STEM - 1);
+            bare[KIN_MAX_STEM - 1] = '\0';
+        }
+    }
+
     /* ── Write outputs ──────────────────────────────────────────────────── */
     /* stem_out gets the bare stem (most useful for lexicon lookups)        */
     if (stem_out)      { strncpy(stem_out, bare, KIN_MAX_STEM-1);
@@ -1093,6 +1115,17 @@ bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out) {
             if (stem_out)  strncpy(stem_out, sfx, KIN_MAX_STEM - 1);
             if (class_out) *class_out = ADJ_PREFIXES[i].cls;
             return true;
+        }
+
+        /* Reduplication check: RS + stem + RS + stem
+         * e.g. barebare = ba + re + ba + re; sfx="rebare", pfx="ba"         */
+        {
+            char red_stem[KIN_MAX_STEM] = "";
+            if (kin_is_adj_reduplicated(sfx, ADJ_PREFIXES[i].pfx, red_stem)) {
+                if (stem_out)  strncpy(stem_out, red_stem, KIN_MAX_STEM - 1);
+                if (class_out) *class_out = ADJ_PREFIXES[i].cls;
+                return true;
+            }
         }
 
         /* a+i→e fusion check: for fused prefixes ("be","me","ye","ze"),

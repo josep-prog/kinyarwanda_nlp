@@ -81,9 +81,71 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 6. Noun? — detect D+RT prefix */
+    /* 6. Noun? — detect D+RT prefix
+     *
+     * Disambiguation guard: in Kinyarwanda the noun-class prefix (D+RT) is
+     * identical to the verb subject prefix for many classes (ru=Nt.11/SP11,
+     * ki=Nt.7/SP7, bi=Nt.8/SP8, bu=Nt.14/SP14, etc.).  If a word matches
+     * both a noun prefix AND a conjugated-verb pattern with a KNOWN stem and
+     * an unambiguous tense marker, we prefer the verb interpretation.
+     *
+     * We only override noun→verb when the tense is explicitly marked (not
+     * TENSE_PRESENT_NORA which is too permissive) to minimise false positives.
+     * Examples this fixes:
+     *   "rurabaho"  → Nt.11 present of kuba (ru+ra+b+a+ho), not an Nt.11 noun
+     *   "kirabaho"  → Nt.7  present of kuba
+     *   "burabaho"  → Nt.14 present of kuba
+     */
     int cls = 0;
     if (kin_strip_noun_prefix(w, stem, &cls)) {
+        /* Try verb detection before committing to noun */
+        char      v_stem[KIN_MAX_STEM] = "";
+        int       v_cls  = 0, v_obj = 0;
+        VerbTense v_tense = TENSE_NONE;
+        VerbExtension v_ext = VEXT_NONE;
+        bool      v_neg  = false;
+        if (kin_is_verb_conjugated(w, v_stem, &v_cls, &v_tense,
+                                   &v_obj, &v_ext, &v_neg)
+            /* PRESENT_NORA is normally too permissive, but safe when the
+             * extracted stem is a known verb (e.g. ibona=i+bon+a, ikora). */
+            && (v_tense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(v_stem))
+            && v_tense != TENSE_SUBJUNCTIVE
+            && v_tense != TENSE_IMPERATIVE
+            && kin_is_known_verb_stem(v_stem)) {
+            /* Verb interpretation wins */
+            tok->pos            = POS_VERB_CONJ;
+            tok->noun_class     = v_cls;
+            tok->verb_tense     = v_tense;
+            tok->verb_ext       = v_ext;
+            tok->obj_class      = v_obj;
+            tok->is_negative    = v_neg;
+            tok->is_kinyarwanda = true;
+            strncpy(tok->stem, v_stem, KIN_MAX_STEM - 1);
+            tok->stem[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
+        /* Before committing to noun, check if this is an adjective.
+         * Adjective concordance prefixes (RS) are identical to noun-class
+         * prefixes, so adjective detection at step 7 is never reached for
+         * words caught here first.  e.g. "munini" = mu(RS Nt.1)+nini → adj,
+         * NOT an Nt.1 noun with stem "nini". */
+        {
+            char a_stem[KIN_MAX_STEM] = "";
+            int  a_cls = 0;
+            if (kin_strip_adj_prefix(w, a_stem, &a_cls)) {
+                tok->pos            = POS_ADJECTIVE;
+                tok->noun_class     = a_cls;
+                tok->is_kinyarwanda = true;
+                strncpy(tok->stem, a_stem, KIN_MAX_STEM - 1);
+                tok->stem[KIN_MAX_STEM - 1] = '\0';
+                size_t astemlen = strlen(a_stem);
+                size_t awordlen = strlen(w);
+                size_t apfxlen  = (awordlen > astemlen) ? awordlen - astemlen : 0;
+                strncpy(tok->detected_prefix, w, apfxlen);
+                tok->detected_prefix[apfxlen] = '\0';
+                return;
+            }
+        }
         tok->pos            = POS_NOUN;
         tok->noun_class     = cls;
         tok->is_kinyarwanda = true;
