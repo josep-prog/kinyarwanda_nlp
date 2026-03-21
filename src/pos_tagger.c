@@ -111,7 +111,9 @@ void kin_tag_token(Token *tok) {
             && (v_tense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(v_stem))
             && v_tense != TENSE_SUBJUNCTIVE
             && v_tense != TENSE_IMPERATIVE
-            && kin_is_known_verb_stem(v_stem)) {
+            /* PAST_PERF bypasses stem check: surface form often differs from
+             * citation stem after phonological changes (kor→koz in murakoze). */
+            && (v_tense == TENSE_PAST_PERF || kin_is_known_verb_stem(v_stem))) {
             /* Verb interpretation wins */
             tok->pos            = POS_VERB_CONJ;
             tok->noun_class     = v_cls;

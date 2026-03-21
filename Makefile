@@ -11,7 +11,8 @@ SRCS     = src/main.c \
            src/pos_tagger.c \
            src/syntax.c \
            src/corrector.c \
-           src/analysis.c
+           src/analysis.c \
+           src/g2p.c
 OBJS     = $(SRCS:.c=.o)
 
 PREFIX   = /usr/local
@@ -102,6 +103,60 @@ test: $(TARGET)
 	@echo ""
 	@echo "=== Test 18: reduplicated adjectives (barebare, muremure) ==="
 	./$(TARGET) -s "Abantu barebare barakora kandi umuntu muremure aragenda"
+	@echo ""
+	@echo "=== Test 19: CONDITIONAL tense – niba + intervening noun ==="
+	./$(TARGET) -v -s "Niba umwana aragenda azagaruka vuba"
+	@echo ""
+	@echo "=== Test 20: CONDITIONAL tense – nibyo + direct verb ==="
+	./$(TARGET) -v -s "Nibyo azagenda azabona byiza"
+	@echo ""
+	@echo "=== Test 21: G2P – simple word (genda) ==="
+	./$(TARGET) --g2p -s "genda"
+	@echo ""
+	@echo "=== Test 22: G2P – digraphs (ishuri, nyuma, shyiga) ==="
+	./$(TARGET) --g2p -s "ishuri nyuma shyiga"
+	@echo ""
+	@echo "=== Test 23: G2P – nasal clusters (mbere, ntabwo, nshuti) ==="
+	./$(TARGET) --g2p -s "mbere ntabwo nshuti"
+	@echo ""
+	@echo "=== Test 24: G2P – labialized (bwana, rwacu, kwitonda) ==="
+	./$(TARGET) --g2p -s "bwana rwacu kwitonda"
+	@echo ""
+	@echo "=== Test 25: G2P – number normalization (3 km) ==="
+	./$(TARGET) --g2p -s "Azagenda 3 km"
+	@echo ""
+	@echo "=== Test 26: G2P – full sentence (Imana yaremye ijuru) ==="
+	./$(TARGET) --g2p -s "Imana yaremye ijuru"
+	@echo ""
+	@echo "=== Test 27: greeting – Murakoze (PAST_PERF, no ERR_NO_VERB) ==="
+	./$(TARGET) -s "Murakoze cyane"
+	@echo ""
+	@echo "=== Test 28: greeting – Muraho (interjection, no ERR_NO_VERB) ==="
+	./$(TARGET) -s "Muraho"
+	@echo ""
+	@echo "=== Test 29: greeting – Mwaramutse (PAST_PERF detected) ==="
+	./$(TARGET) -s "Mwaramutse"
+	@echo ""
+	@echo "=== Test 30: greeting – Mwiriwe (interjection, no ERR_NO_VERB) ==="
+	./$(TARGET) -s "Mwiriwe"
+	@echo ""
+	@echo "=== Test 31: stative – Afite inzu (has_verb via INVARIABLES) ==="
+	./$(TARGET) -s "Afite inzu nziza"
+	@echo ""
+	@echo "=== Test 32: 1sg knowledge – Ndabizi neza ==="
+	./$(TARGET) -s "Ndabizi neza"
+	@echo ""
+	@echo "=== Test 33: PAST_PERF ra+stem+e – Arakoze ==="
+	./$(TARGET) -s "Arakoze"
+	@echo ""
+	@echo "=== Test 34: personal pronoun – We uragenda hehe ==="
+	./$(TARGET) -v -s "We uragenda hehe"
+	@echo ""
+	@echo "=== Test 35: possessive label – wanjye (should show Possessive) ==="
+	./$(TARGET) -v -s "Inzu yanjye ni nziza"
+	@echo ""
+	@echo "=== Test 36: adverb – nabi tagwa neza ==="
+	./$(TARGET) -s "Ibikorwa bye byagaragaye nabi"
 
 clean:
 	rm -f $(OBJS) $(SRCS:.c=.d) $(TARGET)

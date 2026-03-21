@@ -73,12 +73,26 @@ static void add_error(SentenceAnalysis *sa, ErrorType type, int idx,
 }
 
 void kin_check_syntax(SentenceAnalysis *sa) {
-    /* RULE 3: Must have a verb */
+    /* RULE 3: Must have a verb
+     * Exception: a sentence composed entirely of interjections, particles,
+     * or adverbs is a valid elliptical utterance (e.g. greetings: "Muraho",
+     * "Amakuru", "Murakoze", "Yego", "Oya").  Do not flag these as errors. */
     if (!sa->has_verb && sa->token_count > 0) {
-        add_error(sa, ERR_NO_VERB, 0,
-            "Iri nteruro ntirigira inshinga (umuvugo) / "
-            "This sentence has no verb.",
-            "Ongeraho inshinga (Add a verb).");
+        bool all_interj = true;
+        for (int ii = 0; ii < sa->token_count; ii++) {
+            POS p = sa->tokens[ii].pos;
+            if (p != POS_INTERJECTION && p != POS_ADVERB &&
+                p != POS_VERB_PARTICLE && p != POS_CONJUNCTION) {
+                all_interj = false;
+                break;
+            }
+        }
+        if (!all_interj) {
+            add_error(sa, ERR_NO_VERB, 0,
+                "Iri nteruro ntirigira inshinga (umuvugo) / "
+                "This sentence has no verb.",
+                "Ongeraho inshinga (Add a verb).");
+        }
     }
 
     /* RULE 1 & 2: Agreement between adjacent noun → adjective / possessive */
@@ -277,6 +291,49 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             "Replace 'kugenda' with 'kujya' when going TO a place. "
             "E.g. 'ajya ishuri' / 'yajya ishuri' / 'azajya ishuri'.");
         add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
+    }
+
+    /* RULE 8: Conditional tense marking (Inziganyo)                           *
+     *                                                                           *
+     * When a conditional conjunction ("niba", "nibyo") precedes a conjugated   *
+     * verb, that verb is inside a conditional clause.  We upgrade its tense    *
+     * to TENSE_CONDITIONAL so the output names the clause type correctly.      *
+     *                                                                           *
+     * The verb is not necessarily the immediately next token — a subject noun  *
+     * may intervene ("niba umwana aragenda"). We look up to 3 tokens ahead.    *
+     *                                                                           *
+     * "iyo" as conditional connector (sentence-initial): handled when it       *
+     * appears as the first token or immediately after a conjunction.  In all   *
+     * other positions it is a demonstrative/relative pronoun and is left alone.*/
+    static const char *COND_MARKERS[] = { "niba", "nibyo", NULL };
+
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        bool is_cond = false;
+
+        /* Lexically-marked conditional conjunctions */
+        if (t->pos == POS_CONJUNCTION) {
+            for (int k = 0; COND_MARKERS[k]; k++) {
+                if (strcmp(t->lower, COND_MARKERS[k]) == 0) { is_cond = true; break; }
+            }
+        }
+
+        /* "iyo" as conditional: only sentence-initial or after a conjunction   *
+         * (e.g. "...ariko iyo...").  Elsewhere it is a demonstrative pronoun.  */
+        if (!is_cond && strcmp(t->lower, "iyo") == 0) {
+            if (i == 0)                                          is_cond = true;
+            else if (sa->tokens[i-1].pos == POS_CONJUNCTION)    is_cond = true;
+        }
+
+        if (!is_cond) continue;
+
+        /* Find the first conjugated verb within the next 3 tokens and mark it */
+        for (int j = i + 1; j < sa->token_count && j <= i + 3; j++) {
+            if (sa->tokens[j].pos == POS_VERB_CONJ) {
+                sa->tokens[j].verb_tense = TENSE_CONDITIONAL;
+                break;
+            }
+        }
     }
 
     sa->is_complete = sa->has_verb && (sa->error_count == 0);

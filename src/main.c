@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "../include/kinyarwanda.h"
+#include "../include/g2p.h"
 
 #define MAX_LINE   4096
 #define VERSION    "1.2.0"
@@ -144,7 +145,8 @@ static int analyse_pdf(const char *pdfpath, bool verbose) {
 }
 
 int main(int argc, char *argv[]) {
-    bool verbose = false;
+    bool verbose  = false;
+    bool g2p_mode = false;
     const char *sentence = NULL;
     const char *filename = NULL;
     const char *pdffile  = NULL;
@@ -160,6 +162,8 @@ int main(int argc, char *argv[]) {
             return 0;
         } else if (strcmp(argv[i], "-v") == 0) {
             verbose = true;
+        } else if (strcmp(argv[i], "--g2p") == 0) {
+            g2p_mode = true;
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             sentence = argv[++i];
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -171,6 +175,23 @@ int main(int argc, char *argv[]) {
                             "Gerageza: %s --help\n", argv[i], argv[i], argv[0]);
             return 1;
         }
+    }
+
+    /* G2P / phoneme mode: --g2p -s "text" */
+    if (g2p_mode && sentence) {
+        char norm[G2P_MAX_NORM];
+        kin_normalize_text(sentence, norm, sizeof(norm));
+        printf("Input:      %s\n", sentence);
+        printf("Normalized: %s\n", norm);
+
+        KinPhonemeSeq seq;
+        if (kin_g2p_sentence(sentence, &seq)) {
+            printf("Phonemes:   %s\n", seq.repr);
+            printf("Count:      %d phoneme tokens\n", seq.count);
+        } else {
+            printf("G2P failed: no phonemes produced.\n");
+        }
+        return 0;
     }
 
     /* Single sentence mode */

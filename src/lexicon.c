@@ -758,7 +758,9 @@ static const InvEntry INVARIABLES[] = {
     { "bwe",     POS_INTERJECTION }, /* sound of hitting                   */
     /* Generic exclamatives */
     { "wee",     POS_INTERJECTION },
-    { "we",      POS_INTERJECTION }, /* hey you! (vocative attention)      */
+    /* "we" removed here — it is the emphatic 2sg personal pronoun and is
+     * correctly listed in the pronouns table (PRON_PERSONAL).  Keeping it
+     * here as INTERJECTION caused step-1 to shadow the pronouns check.    */
     { "yewe",    POS_INTERJECTION }, /* hey! (attention – informal)        */
     { "yewe",    POS_ADVERB       },
 
@@ -934,6 +936,52 @@ static const InvEntry INVARIABLES[] = {
     { "kugeza",  POS_CONJUNCTION}, /* until / up to (kugeza aho…)            */
     { "ubwo",    POS_CONJUNCTION}, /* temporal: when / while / at that moment *
                                      * (also used as Nt.14 pronoun – keep both)*/
+
+    /* ── Greetings / social formulae (frozen verb/interjection forms) ──────── *
+     * These are lexically frozen utterances.  Listing them here prevents the   *
+     * verb heuristic from mis-tagging them or from triggering ERR_NO_VERB.     */
+    { "muraho",     POS_INTERJECTION }, /* hello / good day (lit. "you are there")*/
+    { "mwiriwe",    POS_INTERJECTION }, /* good afternoon/evening                  */
+    { "amakuru",    POS_INTERJECTION }, /* greetings / how are you? (lit. "news")  */
+    { "ni meza",    POS_INTERJECTION }, /* it's fine / I'm well                    */
+    { "nimeza",     POS_INTERJECTION }, /* it's fine (contracted)                  */
+
+    /* ── Stative "kuba na" (to have) conjugations ──────────────────────────── *
+     * Formed from kuba (to be) + na (with) contracted: SP + -fite / -fit-.     *
+     * Surface form: SP + fit + e.  Stem "fit" is not in VERB_STEMS so the verb *
+     * heuristic misses it.  Listed here so has_verb is set correctly.          */
+    { "nfite",   POS_VERB_CONJ }, /* 1sg: I have (n + fite)                       */
+    { "ufite",   POS_VERB_CONJ }, /* 2sg/Nt.3: you have / it has                  */
+    { "afite",   POS_VERB_CONJ }, /* Nt.1 3sg: he/she has                         */
+    { "bafite",  POS_VERB_CONJ }, /* Nt.2: they (human) have                      */
+    { "gifite",  POS_VERB_CONJ }, /* Nt.7: it has                                 */
+    { "bifite",  POS_VERB_CONJ }, /* Nt.8: they have                              */
+    { "ifite",   POS_VERB_CONJ }, /* Nt.4/9: it has                               */
+    { "zifite",  POS_VERB_CONJ }, /* Nt.10: they have                             */
+    { "rufite",  POS_VERB_CONJ }, /* Nt.11: it has                                */
+    { "gafite",  POS_VERB_CONJ }, /* Nt.12: it has (ga- variant before voiced)    */
+    { "dufite",  POS_VERB_CONJ }, /* 1pl: we have                                 */
+    { "mufite",  POS_VERB_CONJ }, /* 2pl: you all have                            */
+    { "bufite",  POS_VERB_CONJ }, /* Nt.14: it has                                */
+
+    /* ── 1sg knowledge / common fixed forms ────────────────────────────────── */
+    { "ndabizi", POS_VERB_CONJ }, /* I know it (1sg pres of kubizi, lit n+da+bizi)*/
+    { "mbizi",   POS_VERB_CONJ }, /* I know it (alt 1sg before labial)            */
+    { "nzi",     POS_VERB_CONJ }, /* I know (1sg of kumenya — short form)         */
+
+    /* ── Common adverb / manner fixes ──────────────────────────────────────── */
+    { "nabi",    POS_ADVERB },    /* badly / poorly (manner adverb)              */
+
+    /* ── Standalone numerals (used with saa / temporal / quantifier phrases) ─ */
+    { "tatu",      POS_ADVERB }, /* three (also in "saa tatu" = 9 AM)            */
+    { "kane",      POS_ADVERB }, /* four                                         */
+    { "gatanu",    POS_ADVERB }, /* five                                         */
+    { "gatandatu", POS_ADVERB }, /* six                                          */
+    { "karindwi",  POS_ADVERB }, /* seven                                        */
+    { "umunani",   POS_ADVERB }, /* eight                                        */
+    { "icyenda",   POS_ADVERB }, /* nine                                         */
+    { "icumi",     POS_ADVERB }, /* ten                                          */
+    { "kabiri",    POS_ADVERB }, /* two / twice (also used with saa)             */
 
     { NULL, POS_UNKNOWN }
 };
@@ -1456,7 +1504,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "bantu",     2,  "ntu"    }, /* = abantu (people)                    */
     /* Nt.9 common nouns with dropped D-vowel 'i' */
     { "ntebe",     9,  "ntebe"  }, /* = intebe (chair / throne / seat)     */
-    { "nabi",      9,  "nabi"   }, /* = inabi (prophet)                    */
+    /* "nabi" removed from here: it is the manner adverb "badly/poorly" and
+     * is listed in INVARIABLES (step 1) to prevent misanalysis as Nt.9 noun. */
     /* Nt.12 with dropped D-vowel 'a' from "aka" */
     { "gakondo",  12,  "kondo"  }, /* = agakondo (ancestral land/heritage) */
     /* Common titles and family terms */
@@ -1657,6 +1706,22 @@ static const KnownWord KNOWN_WORDS[] = {
     { "icyizero",  7,  "izero"  }, /* hope / expectation (Nt.7)               */
     { "ibihimba",  8,  "himba"  }, /* body members / created things (Nt.8)    */
 
+    /* ── Time-expression nouns ──────────────────────────────────────────────── */
+    { "saa",       9,  "saa"    }, /* hour / o'clock (Swahili loanword, Nt.9)  */
+    { "isaa",      9,  "saa"    }, /* hour (with i- prefix form)               */
+
+    /* ── Common biblical proper nouns (high frequency in corpus) ──────────── */
+    { "yohan",     1,  "yohan"  }, /* John (apostle name, Nt.1)                */
+    { "petero",    1,  "petero" }, /* Peter (apostle name, Nt.1)               */
+    { "pawulo",    1,  "pawulo" }, /* Paul (apostle name, Nt.1)                */
+    { "yakobo",    1,  "yakobo" }, /* James/Jacob (Nt.1)                       */
+    { "dawidi",    1,  "dawidi" }, /* David (Nt.1)                             */
+    { "yozefu",    1,  "yozefu" }, /* Joseph (Nt.1)                            */
+    { "mose",      1,  "mose"   }, /* Moses (Nt.1)                             */
+    { "abrahamu",  1,  "brahamu"}, /* Abraham (Nt.1)                           */
+    { "isaka",     1,  "isaka"  }, /* Isaac (Nt.1)                             */
+    { "yakobe",    1,  "yakobe" }, /* Jacob (alt spelling, Nt.1)               */
+
     { NULL, 0, "" }
 };
 
@@ -1704,7 +1769,7 @@ const char *kin_pron_type_name(PronounType t) {
         case PRON_DEMONSTRATIVE: return "Ikinyazina nyereka (Demonstrative)";
         case PRON_PERSONAL:      return "Ikinyazina ngenga (Personal)";
         case PRON_POSSESSIVE:    return "Ikinyazina ngenera (Possessive)";
-        case PRON_REFLEXIVE:     return "Ikinyazina ngenera ngenga (Reflexive)";
+        case PRON_REFLEXIVE:     return "Ikinyazina ngenera (Possessive)";
         case PRON_RELATIVE:      return "Ikinyazina ngenera (Relative)";
         case PRON_INTERROGATIVE: return "Ikinyazina kibaza (Interrogative)";
         case PRON_INDEFINITE:    return "Ikinyazina ndafutura (Indefinite)";

@@ -1,7 +1,7 @@
 # Kinyarwanda AI Platform — Project Vision & Technical Roadmap
 
 **Author:** Project Lead (Native Kinyarwanda Speaker)
-**Technical Partner:** Claude Code (AI Engineering)
+**Technical :** Joseph Nishimwe)
 **Date:** March 2026
 **Status:** Phase 1 in progress
 
@@ -198,6 +198,76 @@ The stack is split between training (where Python is necessary) and inference (w
 **Inference runs in C/C++.** Once a model is trained, it is exported and run through optimized C/C++ runtimes (whisper.cpp, llama.cpp, ONNX Runtime). This is how the same approach used by whisper.cpp and llama.cpp achieves offline, CPU-only, fast inference. The end user never needs Python installed.
 
 This architecture achieves the offline and speed requirements.
+
+### 4.1 Cython as the Bridge Layer — Rating: 72/100
+
+**The question:** Can Cython replace or improve upon pure Python for this project's training pipeline, given that it compiles to C and runs at near-C speed?
+
+**What Cython actually is:** Cython is a superset of Python that compiles to C extension modules (`.so` files) importable directly by Python. With explicit type annotations it achieves near-C speed for tight CPU loops. Without them it is just compiled Python — roughly the same speed, sometimes slower.
+
+**Where Cython is the right tool — the bridge use case:**
+
+Right now the C NLP engine is a standalone binary. Python training scripts that need to call it must use `subprocess`, write temporary files, and parse text output — which is slow and fragile. Cython solves this cleanly. The NLP engine becomes a native Python module:
+
+```cython
+# kinyarwanda_nlp.pyx
+cdef extern from "kinyarwanda.h":
+    ctypedef struct SentenceAnalysis:
+        int token_count
+        int error_count
+    SentenceAnalysis kin_analyze(const char *text)
+
+def analyze(text: str):
+    cdef bytes b = text.encode('utf-8')
+    cdef SentenceAnalysis sa = kin_analyze(b)
+    return {"tokens": sa.token_count, "errors": sa.error_count}
+```
+
+```python
+# In any Python training script:
+import kinyarwanda_nlp
+result = kinyarwanda_nlp.analyze("Imana yaremye ijuru")
+```
+
+The training pipeline can call `kin_analyze()` on every sentence for validation with zero process overhead. This is the genuine, practical win.
+
+**The revised stack with Cython bridges:**
+
+```
+NLP Engine      C (done)            C (done)
+                ↕ Cython bridge ↕
+G2P             C (done)            C (done)
+                ↕ Cython bridge ↕
+TTS             Python + PyTorch    ONNX → C++
+ASR             Python + PyTorch    whisper.cpp (C++)
+Translation     Python fine-tune    ONNX → C++
+Voice clone     Python + PyTorch    ONNX → C++
+Agent           Python              llama.cpp (C++)
+```
+
+**Where Cython cannot help — the training bottleneck:**
+
+When fine-tuning Whisper or training a TTS model, the compute path is:
+
+```
+Python call → PyTorch C++ frontend → CUDA kernel on GPU
+```
+
+The GPU is doing 99% of the work. The Python call overhead is microseconds against seconds of GPU matrix multiplication. Cython cannot make PyTorch faster. It cannot make CUDA faster. It cannot make GPU training faster in any way.
+
+Cython is useful for tight CPU loops you wrote yourself in Python. It is irrelevant when calling existing optimised libraries like PyTorch.
+
+**What to be aware of:**
+
+1. **Build step required.** Cython needs `setup.py`, a C compiler, and the correct headers. Adds build complexity, not insurmountable but not zero effort.
+2. **Type annotations are mandatory for speed.** Untyped Cython is compiled Python — still slow. `cdef int i` and typed memoryviews (`double[:]`) are what produce the speedup. Without them, maybe 20% faster. With them, up to 100x for tight loops.
+3. **Debugging shifts from Python to C.** Tracebacks become C tracebacks. `gdb` instead of `pdb`. More complex to debug.
+4. **Does not replace PyTorch.** Cython is not a training framework. Python + PyTorch remains mandatory for all model training phases.
+5. **ONNX already solves inference.** The path of train in Python → export ONNX → run in C++ is the industry standard. Cython is not needed at the inference layer — whisper.cpp and ONNX Runtime already handle it.
+
+**Verdict:** Use Cython for exactly one thing — wrapping the C NLP engine and G2P engine so Python training scripts can call them natively. Do not use it to try to speed up PyTorch training loops. The intuition (Python and C should talk to each other directly) is correct. The scope (Cython makes training faster) is the overestimate.
+
+**Score: 72/100.** The bridge use case is a genuinely excellent idea and the right tool for it. The score is not higher because Cython cannot help the GPU-bound training phases, which are where the real compute time is spent.
 
 ---
 

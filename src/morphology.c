@@ -763,7 +763,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "w",     3  },  /* Nt.3/2sg u+vowel → w (wera=u+er+a, wemera)  */
         /* Elided SP: ya+V-stem → y+V-stem (a→Ø before vowel, p.7-8)     *
          * e.g. ya+ig+a = "yiga" (SP ya→y before i-initial stem)         */
-        { "y",     6  },  /* elided "ya" SP (cls6 present or cls1 past)   */
+        { "y",     0  },  /* elided "ya" SP (ambiguous: cls1 past, cls6 pres, cls9 before vowel) */
         /* Elided Nt.2 SP: ba+vowel → b+vowel (biga, begereye, bemeye)    */
         { "b",     2  },  /* elided "ba" SP before vowel-initial stems     */
         { NULL, 0 }
@@ -841,6 +841,20 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (subj_class) *subj_class = SP[i].cls;
             if (tense_out)  *tense_out  = TENSE_PAST_PERF;
             return true;
+        }
+        /* PAST PERFECT with ra tense marker: SP + ra + stem + e               *
+         * e.g. murakoze = mu(SP) + ra + koz + e (2pl past perfect)            *
+         *      mwaramutse = mwa(SP) + ra + muts + e (2pl, good morning)        *
+         * Note: the "ara" special case above already handles Nt.1 3sg present. *
+         * This catches all other SPs where ra is a separate tense marker.      */
+        if (kin_starts_with(inner, "ra") && ilen >= 4 && inner[ilen-1] == 'e') {
+            const char *s = inner + 2; size_t sl = ilen - 3;
+            if (sl >= 1) {
+                if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                return true;
+            }
         }
         /* SUBJUNCTIVE: ends in e */
         if (ilen >= 2 && inner[ilen-1]=='e') {

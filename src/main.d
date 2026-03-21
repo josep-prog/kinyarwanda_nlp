@@ -1,2 +1,3 @@
-src/main.o: src/main.c src/../include/kinyarwanda.h
+src/main.o: src/main.c src/../include/kinyarwanda.h src/../include/g2p.h
 src/../include/kinyarwanda.h:
+src/../include/g2p.h:
