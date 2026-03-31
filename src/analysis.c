@@ -309,24 +309,27 @@ static void print_verb_morphemes(const Token *t) {
         printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes):");
         for (int i = 0; i < mb->n; i++) {
             const KinMorpheme *m = &mb->m[i];
-            /* Display surface (post-phonological) for SP; underlying form for
-             * root and EXT so the reader sees the bare morpheme clearly.      */
-            const char *disp = m->surface[0] ? m->surface : m->form;
+            /* Uturemajambo always shows the UNDERLYING form (m->form), never
+             * the phonological surface form.  Rule: individual morphemes in the
+             * breakdown must not contain compound consonants (tw, kw, ry, etc.);
+             * those are surface artefacts explained in the Itegeko (rules) line.
+             * Phonological rules (u→w, i→y, a+a→a) are shown in Ingingo/Guhuza. */
+            const char *form = m->form[0] ? m->form : m->surface;
             if (i > 0) printf(" +");
             if (strcmp(m->label, "SP") == 0) {
                 if (t->noun_class > 0)
-                    printf(" %s(SP\xC2\xB7Nt.%d)", disp, t->noun_class);
+                    printf(" %s(SP\xC2\xB7Nt.%d)", form, t->noun_class);
                 else
-                    printf(" %s(SP)", disp);   /* personal pronoun class */
+                    printf(" %s(SP)", form);   /* personal pronoun class */
             } else if (strcmp(m->label, "OM") == 0) {
-                printf(" %s(OM\xC2\xB7Nt.%d)", disp, t->obj_class);
+                printf(" %s(OM\xC2\xB7Nt.%d)", form, t->obj_class);
             } else if (strcmp(m->label, "root") == 0) {
-                printf(" %s(root)", m->form);
+                printf(" %s(root)", form);
             } else if (strcmp(m->label, "EXT") == 0) {
-                printf(" %s(EXT)", m->form);
+                printf(" %s(EXT)", form);
             } else {
-                /* TM, COND, FV: show label as-is */
-                printf(" %s(%s)", disp, m->label);
+                /* TM, COND, FV: show underlying form */
+                printf(" %s(%s)", form, m->label);
             }
         }
         /* Reflexive note: the i- prefix was elided (kwi- → i- dropped) */
@@ -531,15 +534,15 @@ static void print_inf_morphemes(const Token *t) {
         const KinMorpheme *ext_m  = has_ext ? &mb->m[2] : NULL;
         const KinMorpheme *fv_m   = &mb->m[mb->n - 1];
 
-        /* Morpheme line */
+        /* Morpheme line — use underlying form (never surface kw/gw; rule is in Itegeko) */
         if (has_ext) {
             printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
                    "%s(INF.PREF) + %s(root) + %s(EXT) + %s(FV)\n",
-                   pref_m->surface, root_m->form, ext_m->form, fv_m->form);
+                   pref_m->form, root_m->form, ext_m->form, fv_m->form);
         } else {
             printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
                    "%s(INF.PREF) + %s(root) + %s(FV)\n",
-                   pref_m->surface, root_m->form, fv_m->form);
+                   pref_m->form, root_m->form, fv_m->form);
         }
 
         /* Reconstruction */
@@ -562,10 +565,11 @@ static void print_inf_morphemes(const Token *t) {
                        lword, mb->verified ? "  \342\234\223" : "");
             }
         } else {
+            /* No prefix rule fired — surface == form, but show form for consistency */
             if (has_ext) {
                 printf("       Ingingo:  [PREF]%s + [root]%s + [EXT]%s + [FV]%s"
                        "  \342\206\222  %s%s%s%s%s\n",
-                       pref_m->surface, root_m->form, ext_m->form, fv_m->form,
+                       pref_m->form, root_m->form, ext_m->form, fv_m->form,
                        pref_m->surface, root_m->form, ext_m->form, fv_m->form,
                        mb->verified ? "  \342\234\223" : "");
                 if (ext_m->rule[0])
@@ -573,7 +577,7 @@ static void print_inf_morphemes(const Token *t) {
             } else {
                 printf("       Ingingo:  [PREF]%s + [root]%s + [FV]%s"
                        "  \342\206\222  %s%s%s%s\n",
-                       pref_m->surface, root_m->form, fv_m->form,
+                       pref_m->form, root_m->form, fv_m->form,
                        pref_m->surface, root_m->form, fv_m->form,
                        mb->verified ? "  \342\234\223" : "");
             }

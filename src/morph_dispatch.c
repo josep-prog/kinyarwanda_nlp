@@ -42,6 +42,26 @@
 
 static bool mv(char c) { return c=='a'||c=='e'||c=='i'||c=='o'||c=='u'; }
 
+/* Verbs whose lexicon stem looks consonant-initial but whose TRUE underlying
+ * root is vowel-initial.  Historical phonology: *kwubaka = ku + ubak + a, with
+ * u+u→u (§6.6) giving modern kubaka.  The surface root slot therefore begins
+ * with a consonant (bak) even though the underlying root is vowel-initial (ubak).
+ *
+ * Map: lexicon stem  →  true underlying root
+ * Add new entries alphabetically as more such verbs are confirmed.             */
+static const struct { const char *lex_stem; const char *true_root; } uu_stems[] = {
+    { "bak",  "ubak"  },   /* kubaka  ← *kwubaka (ku + ubak + a)  §6.6 */
+    { NULL,   NULL    }
+};
+
+/* Return the true vowel-initial root for a given lexicon stem, or NULL. */
+static const char *find_uu_root(const char *stem) {
+    for (int i = 0; uu_stems[i].lex_stem; i++)
+        if (strcmp(stem, uu_stems[i].lex_stem) == 0)
+            return uu_stems[i].true_root;
+    return NULL;
+}
+
 /* Fill one KinMorpheme slot */
 static void set_morph(KinMorpheme *m,
                       const char *label,
@@ -599,6 +619,12 @@ static void analyse_vconj(Token *tok)
     const char *tm  = tense_marker(tok->verb_tense);
     const char *fv  = final_vowel(tok->verb_tense, word);
     const char *root = tok->stem[0] ? tok->stem : "?";
+    /* u+u→u fusion: historically vowel-initial roots (e.g. twakubaka ← *twakwubaka).
+     * Remap lexicon stem "bak" → true root "ubak" so morpheme display is correct. */
+    {
+        const char *uu_root = find_uu_root(root);
+        if (uu_root) root = uu_root;
+    }
     const char *ext  = ext_suffix(tok->verb_ext);
     /* Reversive has two variants: -ur- and -uk-.  ext_suffix() returns the
      * canonical "ur", but we detect the actual surface variant from the word:
@@ -714,6 +740,22 @@ static void analyse_vconj(Token *tok)
         } else {
             cond_particle = "ku";
             strncpy(cond_particle_surface, "ku", sizeof(cond_particle_surface)-1);
+        }
+
+        /* u+u→u fusion at COND+root boundary (§6.6):
+         * When the conditional particle surface ends in 'u' and the (possibly
+         * remapped) root is vowel-initial (e.g., root="ubak"), the two 'u's
+         * merge → the particle contributes only its consonant(s) to the surface.
+         * Example: twakubaka = tw+a+[ku+ubak=kubak]+a.
+         * We shorten cond_particle_surface by one char and record the rule.    */
+        if (cond_particle[0] && root[0] == 'u') {
+            size_t cplen = strlen(cond_particle_surface);
+            if (cplen > 0 && cond_particle_surface[cplen - 1] == 'u') {
+                cond_particle_surface[cplen - 1] = '\0';  /* drop fused 'u' */
+                snprintf(cond_particle_rule, sizeof(cond_particle_rule),
+                         "u+u\342\206\222u \302\2476.6 (COND 'ku'+'%s'\342\206\222'k%s', from *kw%sa)",
+                         root, root, root);
+            }
         }
     }
 
@@ -911,11 +953,25 @@ static void analyse_vinf(Token *tok)
     if (strcmp(pref, "kw") == 0) {
         strncpy(pref_under, "ku", sizeof(pref_under)-1);
         snprintf(pref_rule, sizeof(pref_rule),
-                 "u→w §1.1 (ku+'%c' vowel → kw)", root[0]);
+                 "u\342\206\222w \302\2471.1 (ku+'%c' vowel \342\206\222 kw)", root[0]);
     } else if (strcmp(pref, "gw") == 0) {
         strncpy(pref_under, "gu", sizeof(pref_under)-1);
         snprintf(pref_rule, sizeof(pref_rule),
-                 "u→w §1.1 (gu+'%c' vowel → gw)", root[0]);
+                 "u\342\206\222w \302\2471.1 (gu+'%c' vowel \342\206\222 gw)", root[0]);
+    }
+
+    /* u+u→u fusion: historically vowel-initial roots (e.g. kubaka ← *kwubaka).
+     * The lexicon stores "bak" but the true root is "ubak".  The junction
+     * ku+ubak collapses to kubak by §6.6 (u+u→u), so the surface prefix
+     * loses its final 'u' (ku → k before the root's leading 'u').              */
+    const char *uu_root = find_uu_root(root);
+    bool uu_fused = (uu_root != NULL);
+    if (uu_fused) {
+        root = uu_root;
+        /* Build rule text showing the historical origin */
+        snprintf(pref_rule, sizeof(pref_rule),
+                 "u+u\342\206\222u \302\2476.6 (ku+'%s'+a \342\206\222 '%s', from *kw%s+a)",
+                 root, word, root);
     }
 
     /* Final vowel from surface */
@@ -931,20 +987,44 @@ static void analyse_vinf(Token *tok)
              && (wlen < 2 || (word[wlen-2]!='y' && word[wlen-2]!='w')))
         fv = "e";
 
-    /* Try to detect a derivational extension within the stem */
+    /* Try to detect a derivational extension within the stem.
+     * Exception: skip detection for vowel-initial roots (kw-/gw- prefix verbs,
+     * and uu_fused verbs like kubaka→ubak).  The initial vowel is PART of the
+     * root, not a suffix boundary — splitting e.g. "iruk" as "ir+uk(reversive)"
+     * is a false positive.  Derived forms (kwirukana etc.) are separate entries. */
     char bare_root[KIN_MAX_STEM]      = "";
     char ext_str  [KIN_MORPH_FORM_LEN] = "";
-    VerbExtension inf_ext = detect_ext_in_stem(root, bare_root,
-                                                ext_str, sizeof(ext_str));
+    VerbExtension inf_ext = VEXT_NONE;
+    if (!mv(root[0])) {
+        inf_ext = detect_ext_in_stem(root, bare_root, ext_str, sizeof(ext_str));
+    }
 
-    /* Verify against the surface word (using the full unsplit root for the check) */
+    /* Verify against the surface word.
+     * For u+u→u fused verbs: drop the prefix's final 'u' before concatenating
+     * (ku + ubak + a → k+ubak+a = kubaka).                                     */
     char built[KIN_MAX_WORD];
-    snprintf(built, sizeof(built), "%s%s%s", pref, root, fv);
+    if (uu_fused) {
+        size_t plen = strlen(pref);
+        snprintf(built, sizeof(built), "%.*s%s%s", (int)(plen - 1), pref, root, fv);
+    } else {
+        snprintf(built, sizeof(built), "%s%s%s", pref, root, fv);
+    }
     mb->verified = (strcmp(built, word) == 0);
+
+    /* PREF morpheme surface: for u+u→u, the prefix contributes only its
+     * consonant(s) to the surface (the final 'u' fuses with the root's 'u').   */
+    char pref_surf[8];
+    if (uu_fused) {
+        size_t pulen = strlen(pref_under);
+        snprintf(pref_surf, sizeof(pref_surf), "%.*s", (int)(pulen - 1), pref_under);
+    } else {
+        strncpy(pref_surf, pref, sizeof(pref_surf) - 1);
+        pref_surf[sizeof(pref_surf) - 1] = '\0';
+    }
 
     /* Store morphemes */
     int n = 0;
-    set_morph(&mb->m[n++], "PREF", pref_under, pref, pref_rule);
+    set_morph(&mb->m[n++], "PREF", pref_under, pref_surf, pref_rule);
 
     if (inf_ext != VEXT_NONE) {
         /* Split: bare_root + extension */
