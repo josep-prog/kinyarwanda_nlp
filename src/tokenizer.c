@@ -41,6 +41,19 @@ static const char *find_apostrophe(const char *p, const char *word_end,
     return NULL;
 }
 
+/* Returns true if p points to an ASCII or UTF-8 double-quote character:
+ *   ASCII " (U+0022)
+ *   UTF-8 U+201C LEFT  DOUBLE QUOTATION MARK  E2 80 9C  "
+ *   UTF-8 U+201D RIGHT DOUBLE QUOTATION MARK  E2 80 9D  "
+ * Safe to call with any non-NULL pointer (checks before dereferencing p[1]/p[2]). */
+static bool is_dquote(const char *p) {
+    if ((unsigned char)*p == '"') return true;
+    if ((unsigned char)p[0] == 0xE2 && (unsigned char)p[1] == 0x80 &&
+        ((unsigned char)p[2] == 0x9C || (unsigned char)p[2] == 0x9D))
+        return true;
+    return false;
+}
+
 int kin_tokenize(const char *text, Token *out, int max_tokens) {
     int count = 0;
     const char *p = text;
@@ -50,12 +63,20 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
         if (!*p) break;
 
-        /* Find end of current word (whitespace or punctuation) */
+        /* Skip leading double-quote characters (ASCII " and curly " ") so
+         * they are not emitted as Foreign tokens.  Trailing quotes are
+         * handled below in the post-word skip.                              */
+        while (*p == '"' || is_dquote(p))
+            p += ((unsigned char)*p == '"') ? 1 : 3;
+        if (!*p) break;
+
+        /* Find end of current word (whitespace, punctuation, or double quote) */
         const char *word_end = p;
         while (*word_end && *word_end != ' ' && *word_end != '\t' &&
                *word_end != '\n' && *word_end != '\r' &&
                !(*word_end=='.'||*word_end==','||*word_end=='!'||
-                 *word_end=='?'||*word_end==';'||*word_end==':'))
+                 *word_end=='?'||*word_end==';'||*word_end==':') &&
+               !is_dquote(word_end))
             word_end++;
 
         /* Handle apostrophe: split into two tokens.
@@ -97,10 +118,17 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         count++;
         p = word_end;
 
-        /* Skip trailing punctuation */
-        while (*p == '.' || *p == ',' || *p == '!' || *p == '?' ||
-               *p == ';' || *p == ':' || *p == '"')
-            p++;
+        /* Skip trailing punctuation and double-quote characters */
+        for (;;) {
+            if (*p == '.' || *p == ',' || *p == '!' || *p == '?' ||
+                *p == ';' || *p == ':' || *p == '"') {
+                p++;
+            } else if (is_dquote(p)) {
+                p += 3;
+            } else {
+                break;
+            }
+        }
     }
     return count;
 }

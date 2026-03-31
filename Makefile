@@ -9,6 +9,7 @@ SRCS     = src/main.c \
            src/ortho.c \
            src/lexicon.c \
            src/pos_tagger.c \
+           src/morph_dispatch.c \
            src/syntax.c \
            src/corrector.c \
            src/analysis.c \

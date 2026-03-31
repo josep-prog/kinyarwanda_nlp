@@ -20,6 +20,27 @@
 #include <string.h>
 #include "../include/kinyarwanda.h"
 
+/* Check if a noun token is a deverbative (izina rivuye mu nshinga).
+ * Pattern: strip the final vowel from the noun stem; if the result is a
+ * known verb stem (≥ 2 chars), the noun was derived from that verb.
+ * Example: umucyo (stem "cyo") → strip 'o' → "cy" → kugcya (to shine). */
+static void check_deverbative(Token *tok) {
+    if (tok->pos != POS_NOUN) return;
+    size_t slen = tok->stem[0] ? strlen(tok->stem) : 0;
+    if (slen < 3) return;                    /* stem must be ≥ 3 chars      */
+    char last = tok->stem[slen - 1];
+    bool ends_vowel = (last=='a'||last=='e'||last=='i'||last=='o'||last=='u');
+    if (!ends_vowel) return;                 /* nominalizer is always a vowel*/
+    char root[KIN_MAX_STEM];
+    strncpy(root, tok->stem, slen - 1);
+    root[slen - 1] = '\0';
+    if (strlen(root) >= 2 && kin_is_known_verb_stem(root)) {
+        tok->is_deverbative = true;
+        strncpy(tok->verb_root, root, KIN_MAX_STEM - 1);
+        tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+    }
+}
+
 /* Tag a single token in isolation */
 void kin_tag_token(Token *tok) {
     const char *w = tok->lower;
@@ -53,6 +74,7 @@ void kin_tag_token(Token *tok) {
             tok->noun_class     = kcls;
             tok->is_kinyarwanda = true;
             strncpy(tok->stem, kstem, KIN_MAX_STEM - 1);
+            check_deverbative(tok);
             return;
         }
     }
@@ -73,8 +95,43 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 5. Proper noun (capitalised mid-sentence)? */
+    /* 5. Proper noun (capitalised mid-sentence)?
+     * Try verb analysis first — capitalised verb forms occur at the start of
+     * quoted speech (e.g. "Habeho" = ha(SP16)+b+e+ho, SUBJUNCTIVE+LOC).
+     * Only accept the verb reading for distinctive tense markers; PRESENT_NORA
+     * and plain SUBJUNCTIVE are too permissive without additional context.   */
     if (tok->is_proper_noun) {
+        char      pn_stem[KIN_MAX_STEM] = "";
+        int       pn_cls = 0, pn_obj = 0;
+        VerbTense pn_tense = TENSE_NONE;
+        VerbExtension pn_ext = VEXT_NONE;
+        bool      pn_neg = false;
+        if (kin_is_verb_conjugated(tok->lower, pn_stem, &pn_cls, &pn_tense,
+                                   &pn_obj, &pn_ext, &pn_neg)
+            && pn_tense != TENSE_PRESENT_NORA
+            && pn_tense != TENSE_SUBJUNCTIVE
+            && pn_tense != TENSE_IMPERATIVE
+            && (pn_tense == TENSE_SUBJUNCTIVE_LOC
+                || pn_tense == TENSE_PAST_PERF
+                || pn_tense == TENSE_PAST_IMPF
+                || pn_tense == TENSE_NEG_RELATIVE
+                || pn_tense == TENSE_FUTURE
+                || pn_tense == TENSE_NARRATIVE
+                || pn_tense == TENSE_PRESENT
+                || pn_tense == TENSE_COPULA_PAST
+                || pn_tense == TENSE_COPULA_PRES
+                || kin_is_known_verb_stem(pn_stem))) {
+            tok->pos            = POS_VERB_CONJ;
+            tok->noun_class     = pn_cls;
+            tok->verb_tense     = pn_tense;
+            tok->verb_ext       = pn_ext;
+            tok->obj_class      = pn_obj;
+            tok->is_negative    = pn_neg;
+            tok->is_kinyarwanda = true;
+            strncpy(tok->stem, pn_stem, KIN_MAX_STEM - 1);
+            tok->stem[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
         tok->pos            = POS_NOUN;
         tok->noun_class     = 0;   /* class unknown for proper nouns       */
         tok->is_kinyarwanda = true; /* may be foreign name; mark true anyway*/
@@ -104,16 +161,46 @@ void kin_tag_token(Token *tok) {
         VerbTense v_tense = TENSE_NONE;
         VerbExtension v_ext = VEXT_NONE;
         bool      v_neg  = false;
+
+        /* Bare phonological-mutation SPs (cy/by/ry/zy without leading vowel
+         * D-prefix) are VERB markers — they arise only from the i→y rule on
+         * verb subject prefixes (ki→cy, bi→by, ri→ry, zi→zy before vowel-
+         * initial stems).  Nouns in those classes always keep the full prefix
+         * (iki-, ibi-, iri-, izi-) or at minimum drop only the D, yielding
+         * "ki-", "bi-" etc., never bare "cy-" or "by-".  When we see such a
+         * prefix, trust the verb analysis even for PRESENT_NORA with an
+         * unknown stem — the phonological pattern alone is strong evidence.   */
+        bool is_bare_phon_sp = (
+            (w[0]=='c' && w[1]=='y') ||   /* cy = ki + vowel-initial stem */
+            (w[0]=='b' && w[1]=='y') ||   /* by = bi + vowel-initial stem */
+            (w[0]=='r' && w[1]=='y') ||   /* ry = ri + vowel-initial stem */
+            (w[0]=='z' && w[1]=='y')      /* zy = zi + vowel-initial stem */
+        );
+
         if (kin_is_verb_conjugated(w, v_stem, &v_cls, &v_tense,
                                    &v_obj, &v_ext, &v_neg)
-            /* PRESENT_NORA is normally too permissive, but safe when the
-             * extracted stem is a known verb (e.g. ibona=i+bon+a, ikora). */
-            && (v_tense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(v_stem))
+            /* PRESENT_NORA: require known stem OR phon-mutation SP (bare_phon_sp). */
+            && (v_tense != TENSE_PRESENT_NORA
+                || kin_is_known_verb_stem(v_stem)
+                || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))
             && v_tense != TENSE_SUBJUNCTIVE
             && v_tense != TENSE_IMPERATIVE
-            /* PAST_PERF bypasses stem check: surface form often differs from
-             * citation stem after phonological changes (kor→koz in murakoze). */
-            && (v_tense == TENSE_PAST_PERF || kin_is_known_verb_stem(v_stem))) {
+            /* Tenses with unambiguous morphological markers bypass stem check:
+             * PAST_PERF  – surface differs from citation stem (murakoze→koz)
+             * PAST_IMPF  – -aga suffix is highly distinctive
+             * NEG_RELATIVE – -ta- marker uniquely identifies this form
+             * FUTURE / NARRATIVE / COPULA – markers are unambiguous enough
+             * bare_phon_sp – phonological mutation alone is sufficient signal */
+            && (v_tense == TENSE_PAST_PERF
+                || v_tense == TENSE_PAST_IMPF
+                || v_tense == TENSE_NEG_RELATIVE
+                || v_tense == TENSE_FUTURE
+                || v_tense == TENSE_NARRATIVE
+                || v_tense == TENSE_COPULA_PAST
+                || v_tense == TENSE_COPULA_PRES
+                || v_tense == TENSE_SUBJUNCTIVE_LOC
+                || kin_is_known_verb_stem(v_stem)
+                || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))) {
             /* Verb interpretation wins */
             tok->pos            = POS_VERB_CONJ;
             tok->noun_class     = v_cls;
@@ -158,6 +245,7 @@ void kin_tag_token(Token *tok) {
         size_t pfxlen  = (wordlen > stemlen) ? wordlen - stemlen : 0;
         strncpy(tok->detected_prefix, w, pfxlen);
         tok->detected_prefix[pfxlen] = '\0';
+        check_deverbative(tok);
         return;
     }
 
@@ -211,6 +299,7 @@ void kin_tag_token(Token *tok) {
             strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
             strncpy(tok->detected_prefix, w, 3);
             tok->detected_prefix[3] = '\0';
+            check_deverbative(tok);
             return;
         }
         /* Fall back to known-word table (e.g. kwisi = ku+isi, isi in KNOWN_WORDS) */
@@ -223,6 +312,7 @@ void kin_tag_token(Token *tok) {
             strncpy(tok->stem, kstem, KIN_MAX_STEM - 1);
             strncpy(tok->detected_prefix, w, 3);
             tok->detected_prefix[3] = '\0';
+            check_deverbative(tok);
             return;
         }
     }
@@ -237,6 +327,48 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
     sa->has_verb = false;
     for (int i = 0; i < sa->token_count; i++) {
         kin_tag_token(&sa->tokens[i]);
+        if (sa->tokens[i].pos == POS_VERB_INF ||
+            sa->tokens[i].pos == POS_VERB_CONJ)
+            sa->has_verb = true;
+    }
+
+    /* ── Context pass: indomo (initial vowel) elision recovery ─────────── *
+     * In Kinyarwanda, the initial vowel (indomo) of a noun is elided when   *
+     * the noun follows a demonstrative or relative pronoun that ends in a   *
+     * vowel (VV contact rule / Iranya ry'impanvu).                          *
+     * e.g. "iryo isanzure" → "iryo sanzure"  (i- of isanzure elided)       *
+     * The first pass tagged "sanzure" as verb (bare subj.); here we correct *
+     * it to noun when the preceding token is a demonstrative/relative.      */
+    for (int i = 1; i < sa->token_count; i++) {
+        Token *prev = &sa->tokens[i-1];
+        Token *curr = &sa->tokens[i];
+        /* Only re-tag if current is NOT already a noun */
+        if (curr->pos == POS_NOUN) continue;
+        /* Only when previous token is demonstrative or relative pronoun */
+        if (prev->pos != POS_PRONOUN ||
+            (prev->pron_type != PRON_DEMONSTRATIVE &&
+             prev->pron_type != PRON_RELATIVE)) continue;
+        /* Guard: word must be ≥ 5 chars to avoid short ambiguous stems */
+        if (strlen(curr->lower) < 5) continue;
+        int icls = 0;
+        if (!kin_is_known_noun_stem(curr->lower, &icls)) continue;
+        /* Re-tag as noun with elided indomo */
+        curr->pos               = POS_NOUN;
+        curr->noun_class        = icls;
+        curr->verb_tense        = TENSE_NONE;
+        curr->verb_ext          = VEXT_NONE;
+        curr->obj_class         = 0;
+        curr->is_negative       = false;
+        curr->is_kinyarwanda    = true;
+        strncpy(curr->stem, curr->lower, KIN_MAX_STEM - 1);
+        curr->stem[KIN_MAX_STEM - 1] = '\0';
+        curr->detected_prefix[0] = '\0';  /* indomo was elided */
+        check_deverbative(curr);
+    }
+
+    /* Re-check has_verb after context pass */
+    sa->has_verb = false;
+    for (int i = 0; i < sa->token_count; i++) {
         if (sa->tokens[i].pos == POS_VERB_INF ||
             sa->tokens[i].pos == POS_VERB_CONJ)
             sa->has_verb = true;

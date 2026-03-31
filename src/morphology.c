@@ -488,6 +488,44 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
  *
  * Returns true and writes the bare stem (without prefix and without FV/suffix).
  */
+
+/*
+ * kin_is_valid_verb_stem_shape() — phonological plausibility check.
+ *
+ * Replaces the word-list gate (kin_is_known_verb_stem) for tenses where
+ * the morphological context is distinctive enough that any phonologically
+ * legal stem can be accepted.
+ *
+ * Rules derived from Kinyarwanda amategeko y'igenamajwi (phonological rules):
+ *   1. Minimum 2 characters — monosyllabic stems do exist (e.g. "b" of kuba)
+ *      but we require ≥2 to avoid matching noise.
+ *   2. Must contain at least one consonant — pure vowel sequences are not
+ *      valid stems (no Kinyarwanda verb root is all vowels).
+ *   3. No run of 3+ consecutive consonants — Kinyarwanda phonotactics allow
+ *      two consonants in onset/coda but not three.
+ * These three rules accept all real stems (bon, gend, gir, tabar, fash…)
+ * while rejecting noise (aa, oo, ttt, …).
+ */
+bool kin_is_valid_verb_stem_shape(const char *stem) {
+    if (!stem) return false;
+    size_t len = strlen(stem);
+    if (len < 2) return false;
+
+    bool has_consonant = false;
+    int  cons_run      = 0;
+    for (size_t i = 0; i < len; i++) {
+        char c = (char)(stem[i] | 0x20);   /* to lower — stems are already lc */
+        bool vowel = (c=='a'||c=='e'||c=='i'||c=='o'||c=='u');
+        if (!vowel) {
+            has_consonant = true;
+            if (++cons_run > 2) return false;   /* triple consonant cluster */
+        } else {
+            cons_run = 0;
+        }
+    }
+    return has_consonant;
+}
+
 bool kin_is_verb_infinitive(const char *word, char *stem_out) {
     size_t len = strlen(word);
     if (len < 4) return false;
@@ -670,6 +708,37 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
             return true;
         }
     }
+    /* Stative: -ik (Ngirika: guhingika → hing+ik+a, gufatika → fat+ik+a)
+     * Checked before reversive -uk because both end in a consonant + k. */
+    if (slen > 4 && kin_ends_with(stem, "ik")) {
+        size_t blen = slen - 2;
+        strncpy(tmp, stem, blen); tmp[blen] = '\0';
+        if (blen >= 2) {
+            if (ext_out)  *ext_out = VEXT_STATIVE;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
+    /* Reversive -ur (Ngirura: gufungura → fung+ur+a, guhindura → hind+ur+a) */
+    if (slen > 4 && kin_ends_with(stem, "ur")) {
+        size_t blen = slen - 2;
+        strncpy(tmp, stem, blen); tmp[blen] = '\0';
+        if (blen >= 2) {
+            if (ext_out)  *ext_out = VEXT_REVERSIVE;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
+    /* Reversive -uk (Ngiruka: gufunguka → fung+uk+a, guhinduka → hind+uk+a) */
+    if (slen > 4 && kin_ends_with(stem, "uk")) {
+        size_t blen = slen - 2;
+        strncpy(tmp, stem, blen); tmp[blen] = '\0';
+        if (blen >= 2) {
+            if (ext_out)  *ext_out = VEXT_REVERSIVE;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
     /* Reciprocal: -an */
     if (slen > 4 && kin_ends_with(stem, "an")) {
         size_t blen = slen - 2;
@@ -720,6 +789,17 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "bw",   14  },  /* Nt.14 bu+vowel → bw (bwera, bwigisha)        */
         { "rw",   11  },  /* Nt.11 ru+vowel → rw (rwera, rwemera)         */
         { "tw",    0  },  /* 1pl   tu+vowel → tw (twemera, twiga)         */
+        /* Past augment variants: consonant SP + a(past augment) → 3-char SP  *
+         * In past tense, the vowel SP (ki/bi/ri/zi) fuses with the past      *
+         * augment 'a': ki+a = kya → surface cy before vowel = cya.           *
+         * e.g. byagiraga = bya(SP past Nt.8) + gir + aga                    *
+         *      cyagiraga = cya(SP past Nt.7) + gir + aga                    *
+         * These MUST appear before the 2-char by/cy/ry/zy entries so that    *
+         * bya/cya match before by/cy in the greedy prefix scan.              */
+        { "cya",   7  },  /* Nt.7  past (ki+a → kya → cya before vowel)      */
+        { "bya",   8  },  /* Nt.8  past (bi+a → bya)                         */
+        { "rya",   5  },  /* Nt.5  past (ri+a → rya)                         */
+        { "zya",  10  },  /* Nt.10 past (zi+a → zya)                         */
         /* i→y before vowel-initial stems (phonological rule p.7-8)       */
         { "cy",    7  },  /* Nt.7  ki+vowel → cy  (cyatumye, cyemera, cyari)  */
         { "by",    8  },  /* Nt.8  bi+vowel → by  (byari, byemera, byibutse)  */
@@ -795,6 +875,24 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (tense_out)  *tense_out  = TENSE_FUTURE;
             return true;
         }
+        /* FUTURE + LOCATIVE: za + stem + a + ho/mo/yo                        *
+         * e.g. nzabaho = n(1sg) + za + b(kuba) + a + ho                      *
+         *      azabaho = a(Nt.1) + za + b + a + ho                           *
+         *      bizabaho = bi(Nt.8) + za + b + a + ho                         *
+         * Structure: inner = "za" + stem + "a" + "ho/mo/yo" (len ≥ 6)        *
+         * The char at [ilen-3] must be 'a' (final vowel before locative).    */
+        if (kin_starts_with(inner, "za") && ilen >= 6 &&
+            (kin_ends_with(inner,"ho") || kin_ends_with(inner,"mo") ||
+             kin_ends_with(inner,"yo")) &&
+            inner[ilen-3] == 'a') {
+            /* stem = between "za" and the "a+loc" at the end */
+            const char *s = inner + 2; size_t sl = ilen - 5;
+            if (sl < 1) continue;
+            if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+            if (subj_class) *subj_class = SP[i].cls;
+            if (tense_out)  *tense_out  = TENSE_FUTURE;
+            return true;
+        }
         /* NARRATIVE: ka + stem + a (when SP is not "ka" itself) */
         if (kin_starts_with(inner, "ka") && ilen > 3 && inner[ilen-1]=='a'
             && strcmp(SP[i].pfx, "ka") != 0) {
@@ -856,6 +954,22 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 return true;
             }
         }
+        /* SUBJUNCTIVE + LOCATIVE: SP + stem + e(SUBJ FV) + ho/mo/yo           *
+         * e.g. habeho = ha(SP16) + b + e(SUBJ FV) + ho  → "let there be"  *
+         *      abeho  = a(SP1)   + b + e           + ho  → "that he be"    *
+         * Checked before plain SUBJUNCTIVE so the locative is not absorbed  *
+         * into the stem.  Requires inner length ≥ 4: stem(≥1) + e + ho.   */
+        if (ilen >= 4 &&
+            (kin_ends_with(inner, "eho") || kin_ends_with(inner, "emo") ||
+             kin_ends_with(inner, "eyo"))) {
+            size_t sl = ilen - 3;   /* strip e + ho/mo/yo  */
+            if (sl >= 1) {
+                if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_SUBJUNCTIVE_LOC;
+                return true;
+            }
+        }
         /* SUBJUNCTIVE: ends in e */
         if (ilen >= 2 && inner[ilen-1]=='e') {
             size_t sl = ilen - 1;
@@ -863,6 +977,170 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (subj_class) *subj_class = SP[i].cls;
             if (tense_out)  *tense_out  = TENSE_SUBJUNCTIVE;
             return true;
+        }
+        /* COPULA + LOCATIVE (inshinga nkene + umugereka w'ahantu):            *
+         * Pattern A — vowel-final SP + "ri" + loc (yariho, ariho, bariho):   *
+         *   SP + "riho" / "rimo" / "riyo"  (inner length exactly 4)          *
+         *   e.g. ya+riho, a+riho, ba+riho, tu+riho, na+riho, mu+riho         *
+         * Pattern B — consonant-final SP + "ari" + loc (byariho, cyariho):   *
+         *   SP + "ariho" / "arimo" / "ariyo"  (inner length exactly 5)       *
+         *   The 'a' between the consonant SP and 'ri' is the past-tense augment.
+         *   e.g. by+ariho (Nt.8 past), cy+ariho (Nt.7 past)                 *
+         * Pattern C — 1sg copula "ndi" + loc (ndiho, ndimo, ndiyo):          *
+         *   SP="ndi" already consumed; inner = "ho" / "mo" / "yo" (len 2)    *
+         *   e.g. ndiho = ndi+ho (I am there)                                 *
+         *                                                                      *
+         * Root: "b" (from kubaho = ku+b+a+ho, where -ho is post-final loc).  *
+         * The final vowel 'a' of kuba is retained before the consonant 'h':  *
+         *   kuba+ho → kubaho  (no vowel contact since h is a consonant).     *
+         *                                                                      *
+         * Tense determination:                                                 *
+         *   Past SPs (ya/wa/na/twa/mwa/rwa/bwa/kwa/za) → TENSE_COPULA_PAST  *
+         *   Pattern B (consonant SP + 'a'-augment before ri) → COPULA_PAST   *
+         *   All other SPs and Pattern C → TENSE_COPULA_PRES                  */
+        {
+            bool cop_loc   = false;
+            bool force_past = false;
+
+            /* Pattern C: SP is "ndi" (1sg copula) and inner is bare locative */
+            if (strcmp(SP[i].pfx, "ndi") == 0 && ilen == 2 &&
+                (strcmp(inner,"ho")==0 || strcmp(inner,"mo")==0 ||
+                 strcmp(inner,"yo")==0)) {
+                cop_loc = true;                         /* present: I am there */
+            }
+
+            /* Pattern D — PLAIN copula (no locative): SP + "ri"              *
+             * e.g. yari = ya(SP past) + ri → "was"                           *
+             *      ari  = a(SP Nt.1)   + ri → "is"                           *
+             *      bari = ba(SP Nt.2)  + ri → "are"                          *
+             *      wari = wa(SP 2sg)   + ri → "were / you are"               *
+             * Same past-SP logic as Pattern A applies.                        */
+            if (!cop_loc && ilen == 2 && inner[0]=='r' && inner[1]=='i') {
+                cop_loc = true;
+                const char *sp = SP[i].pfx;
+                if (strcmp(sp,"ya")==0 || strcmp(sp,"wa")==0 ||
+                    strcmp(sp,"na")==0 || strcmp(sp,"twa")==0 ||
+                    strcmp(sp,"mwa")==0 || strcmp(sp,"rwa")==0 ||
+                    strcmp(sp,"bwa")==0 || strcmp(sp,"kwa")==0 ||
+                    strcmp(sp,"za")==0  || strcmp(sp,"by")==0  ||
+                    strcmp(sp,"cy")==0  || strcmp(sp,"ry")==0  ||
+                    strcmp(sp,"zy")==0  || strcmp(sp,"bya")==0 ||
+                    strcmp(sp,"cya")==0 || strcmp(sp,"rya")==0 ||
+                    strcmp(sp,"zya")==0)
+                    force_past = true;
+            }
+
+            /* Pattern E — PLAIN copula, consonant-final SP + "ari":          *
+             * Consonant SPs (by, cy, ry, zy) + past augment 'a' + ri.       *
+             * e.g. byari = by(Nt.8 SP) + a(past augment) + ri → "they were" *
+             *      cyari = cy(Nt.7 SP) + a + ri → "it was"                  *
+             * Inner = "ari" exactly (ilen == 3); always COPULA_PAST.         */
+            if (!cop_loc && ilen == 3 &&
+                inner[0]=='a' && inner[1]=='r' && inner[2]=='i') {
+                cop_loc    = true;
+                force_past = true;   /* 'a'-augment always signals past tense */
+            }
+
+            /* Pattern A: vowel-final SP → inner = "riho" / "rimo" / "riyo" */
+            if (!cop_loc && ilen == 4 &&
+                inner[0]=='r' && inner[1]=='i' &&
+                (kin_ends_with(inner,"ho") || kin_ends_with(inner,"mo") ||
+                 kin_ends_with(inner,"yo"))) {
+                cop_loc = true;
+                /* Past SPs: ya wa na twa mwa rwa bwa kwa za bya cya rya zya */
+                const char *sp = SP[i].pfx;
+                if (strcmp(sp,"ya")==0 || strcmp(sp,"wa")==0 ||
+                    strcmp(sp,"na")==0 || strcmp(sp,"twa")==0 ||
+                    strcmp(sp,"mwa")==0 || strcmp(sp,"rwa")==0 ||
+                    strcmp(sp,"bwa")==0 || strcmp(sp,"kwa")==0 ||
+                    strcmp(sp,"za")==0  || strcmp(sp,"bya")==0 ||
+                    strcmp(sp,"cya")==0 || strcmp(sp,"rya")==0 ||
+                    strcmp(sp,"zya")==0)
+                    force_past = true;
+            }
+
+            /* Pattern B: consonant-final SP → inner = "ariho" / "arimo" / "ariyo" *
+             * The 'a' is always the past-tense augment in this structure.          */
+            if (!cop_loc && ilen == 5 &&
+                inner[0]=='a' && inner[1]=='r' && inner[2]=='i' &&
+                (kin_ends_with(inner,"ho") || kin_ends_with(inner,"mo") ||
+                 kin_ends_with(inner,"yo"))) {
+                cop_loc    = true;
+                force_past = true;   /* 'a'-augment signals past tense */
+            }
+
+            if (cop_loc) {
+                if (stem_buf) { stem_buf[0]='b'; stem_buf[1]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)
+                    *tense_out = force_past ? TENSE_COPULA_PAST : TENSE_COPULA_PRES;
+                return true;
+            }
+        }
+
+        /* NEGATIVE PARTICIPIAL (inshinga nkurikije y'ubunyagatifu):           *
+         * Pattern: SP + ta + STEM + FV                                       *
+         * The -ta- morpheme signals a negative participial / relative clause: *
+         *   itagira  = i(SP) + ta + gir + a  → "that which does not have"   *
+         *   utagira  = u(SP) + ta + gir + a  → "who does not have"          *
+         *   atagira  = a(SP) + ta + gir + a  → "he/she who does not have"   *
+         * Checked BEFORE PRESENT_NORA so that "tagir" is not extracted as a  *
+         * stem — the correct stem is "gir" (from kugira) after stripping ta. *
+         * Requires total inner length ≥ 5: ta(2) + stem(≥2) + FV(1).       */
+        if (kin_starts_with(inner, "ta") && ilen >= 5 && inner[ilen-1] == 'a') {
+            const char *s = inner + 2; size_t sl = ilen - 3;
+            if (sl >= 2) {
+                if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_NEG_RELATIVE;
+                return true;
+            }
+        }
+        /* CONDITIONAL (Inziganyo): past-SP + ku/gu (modal particle) + stem + a
+         *
+         * Structure: SP(+a fused) + ku/gu + stem + a
+         * The conditional TM 'a' is already absorbed into the past-form SP by
+         * vowel contact (tu+a→twa, ri+a→rya, etc.).  The distinguishing signal
+         * is the ku/gu modal particle that immediately follows the SP+a group.
+         *
+         * This pattern is detected here, BEFORE the plain PRESENT_NORA catch,
+         * so that "twakubaka" is tagged CONDITIONAL rather than PRESENT_NORA.
+         *
+         * Only fires for past-form SPs (twa/ya/wa/na/bya/cya/rya/zya/bwa/kwa/
+         * rwa/mwa/za) because those already incorporate the 'a' TM.  Present-
+         * form SPs (a/ba/ki/bi/ri/ru/ka/tu/…) do NOT use this pattern.
+         *
+         * Textbook examples (S4 SB §6.6):
+         *   twatsinda   = tu+a+Ø+tsind+a   (conditional simple — no ku particle)
+         *   twakubaka   = tu+a+ku+ubak+a   (conditional with ku particle)
+         *   ryakufasha  = ri+a+ku+fash+a
+         *   ntitwakubaka→ nti+tu+a+ku+ubak+a (negative conditional)
+         *
+         * Known limitation: indistinguishable from past-SP + OM(cls15=ku) + stem
+         * without broader discourse context. The conditional reading takes priority
+         * here; downstream code may refine if sentence context disambiguates.    */
+        {
+            static const char *PAST_SPS[] = {
+                "twa","ya","wa","na","bya","cya","rya","zya",
+                "bwa","kwa","rwa","mwa","za", NULL
+            };
+            bool is_past_sp = false;
+            for (int pi = 0; PAST_SPS[pi]; pi++) {
+                if (strcmp(SP[i].pfx, PAST_SPS[pi]) == 0) { is_past_sp = true; break; }
+            }
+            if (is_past_sp &&
+                (kin_starts_with(inner, "ku") || kin_starts_with(inner, "gu")) &&
+                ilen > 4 && inner[ilen-1] == 'a') {
+                /* Strip modal particle (ku/gu) and final vowel */
+                const char *s = inner + 2;
+                size_t sl = ilen - 3;   /* -2 for ku/gu, -1 for final 'a' */
+                if (sl >= 2) {
+                    if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_CONDITIONAL;
+                    return true;
+                }
+            }
         }
         /* PRESENT no-ra: ends in a or o */
         if (ilen >= 2 && (inner[ilen-1]=='a' || inner[ilen-1]=='o')) {
@@ -1015,6 +1293,46 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
                         if (neg_out)       *neg_out       = false;
                         return true;
                     }
+                }
+            }
+        }
+        /* ── LAYER 2c: Bare subjunctive fallback (Igihe cy'ubusabe) ────── *
+         * If no SP was recognized AND the word ends in 'e' AND the word    *
+         * (minus final 'e') is a known verb stem → bare subjunctive.       *
+         * e.g. "sanzure" (stem=sanzur+e), used as polite imperative or     *
+         * in subordinate clauses after "ngo" where SP is omitted.          *
+         * Negatives and very short words are excluded.                     */
+        if (!is_neg && plen >= 3 && parse_word[plen-1] == 'e') {
+            char subj[KIN_MAX_STEM];
+            strncpy(subj, parse_word, plen - 1);
+            subj[plen - 1] = '\0';
+            if (kin_is_known_verb_stem(subj)) {
+                if (stem_out)      { strncpy(stem_out, subj, KIN_MAX_STEM-1);
+                                     stem_out[KIN_MAX_STEM-1] = '\0'; }
+                if (subj_class)    *subj_class    = 0;
+                if (tense_out)     *tense_out     = TENSE_SUBJUNCTIVE;
+                if (obj_class_out) *obj_class_out = 0;
+                /* Mark reflexive stems: imbundo (i-) was elided.            *
+                 * e.g. sanzure ← kwi-sanzur-e: stem "sanzur" is reflexive  */
+                if (ext_out)       *ext_out       = kin_is_reflexive_verb_stem(subj)
+                                                        ? VEXT_REFLEXIVE : VEXT_NONE;
+                if (neg_out)       *neg_out       = false;
+                return true;
+            }
+            /* Also try stripping a verb extension before checking the stem *
+             * e.g. "sanzurire" = sanzur + ir + e (applicative subjunctive) */
+            char bare_subj[KIN_MAX_STEM];
+            VerbExtension subj_ext = VEXT_NONE;
+            if (ext_strip(subj, &subj_ext, bare_subj, sizeof(bare_subj))) {
+                if (kin_is_known_verb_stem(bare_subj)) {
+                    if (stem_out)      { strncpy(stem_out, bare_subj, KIN_MAX_STEM-1);
+                                         stem_out[KIN_MAX_STEM-1] = '\0'; }
+                    if (subj_class)    *subj_class    = 0;
+                    if (tense_out)     *tense_out     = TENSE_SUBJUNCTIVE;
+                    if (obj_class_out) *obj_class_out = 0;
+                    if (ext_out)       *ext_out       = subj_ext;
+                    if (neg_out)       *neg_out       = false;
+                    return true;
                 }
             }
         }

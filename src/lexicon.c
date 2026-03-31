@@ -594,34 +594,18 @@ static const InvEntry INVARIABLES[] = {
     { "ni",      POS_VERB_CONJ   }, /* copula / is (equative verb)         */
     { "si",      POS_VERB_CONJ   }, /* negative copula: is not             */
     /* Conjugated copula forms of kuba */
-    { "ari",     POS_VERB_CONJ   }, /* 3sg/pl cls1 present                 */
+    /* ── Copula (inshinga nkene) plain forms ─────────────────────────────  *
+     * Most SP+ri forms are now handled by verb_match_inner Pattern D/E,     *
+     * which correctly fills tense (COPULA_PAST/PRES), class and stem "b".  *
+     * Only forms that cannot be reached by verb_match_inner stay here:      *
+     *   ndi  – 1sg SP with no inner content (len==plen, no room for "ri")  *
+     *   tari / zwari – SPs not in the SP table; keep as fallback            *
+     *   atari / ntari – negative forms that interact with nt- negation      */
     { "ndi",     POS_VERB_CONJ   }, /* 1sg copula: I am                    */
-    { "uri",     POS_VERB_CONJ   }, /* 2sg copula: you are                 */
-    { "turi",    POS_VERB_CONJ   }, /* 1pl copula: we are                  */
-    { "bari",    POS_VERB_CONJ   }, /* 3pl copula: they are                */
-    { "kari",    POS_VERB_CONJ   }, /* nt.12 copula                        */
-    { "iri",     POS_VERB_CONJ   }, /* nt.5 copula: it is                  */
-    { "riri",    POS_VERB_CONJ   }, /* nt.5 copula (alternate)             */
-    { "biri",    POS_VERB_CONJ   }, /* nt.8 copula: they are               */
-    { "ziri",    POS_VERB_CONJ   }, /* nt.10 copula: they are              */
-    { "yari",    POS_VERB_CONJ   }, /* nt.1/6 past copula: was             */
-    { "wari",    POS_VERB_CONJ   }, /* 2sg past copula: you were           */
-    { "tari",    POS_VERB_CONJ   }, /* 1pl past copula: we were            */
-    { "mwari",   POS_VERB_CONJ   }, /* 2pl past copula: you were           */
-    { "bwari",   POS_VERB_CONJ   }, /* nt.14 past copula                   */
-    { "hari",    POS_VERB_CONJ   }, /* existential: there is/was (nt.16)   */
-    { "rwari",   POS_VERB_CONJ   }, /* nt.11 past copula: was              */
-    { "twari",   POS_VERB_CONJ   }, /* 1pl past copula: we were            */
-    { "byari",   POS_VERB_CONJ   }, /* nt.8  past copula: they were        */
-    { "cyari",   POS_VERB_CONJ   }, /* nt.7  past copula: it was           */
-    { "zwari",   POS_VERB_CONJ   }, /* nt.10 past copula: they were        */
+    { "tari",    POS_VERB_CONJ   }, /* 1pl? past copula (exceptional SP)   */
+    { "zwari",   POS_VERB_CONJ   }, /* nt.10 past copula (exceptional SP)  */
     { "atari",   POS_VERB_CONJ   }, /* nt.1  neg past copula: he was not   */
     { "ntari",   POS_VERB_CONJ   }, /* 1sg   neg past copula: I was not    */
-    { "nari",    POS_VERB_CONJ   }, /* 1sg   past copula: I was            */
-    { "zari",    POS_VERB_CONJ   }, /* nt.10 past copula: they were        */
-    { "kwari",   POS_VERB_CONJ   }, /* nt.15 past copula: it was           */
-    { "ruri",    POS_VERB_CONJ   }, /* nt.11 copula: it is (present)       */
-    { "kiri",    POS_VERB_CONJ   }, /* nt.12 copula: it is (present)       */
     { "amen",    POS_INTERJECTION}, /* Amen (Hebrew loanword, invariable)   */
     /* ── "kuzizi" (to know) conjugated forms ─────────────────────────────  */
     /* These end in -i (not standard -a/-e), caught here as special forms   */
@@ -917,6 +901,13 @@ static const InvEntry INVARIABLES[] = {
     { "turabaho",  POS_VERB_CONJ }, /* 1pl: we are there                     */
     { "murabaho",  POS_VERB_CONJ }, /* 2pl: you all are there                */
     { "barabaho",  POS_VERB_CONJ }, /* Nt.2: they (abantu) are there         */
+    /* No-ra present forms of kubaho (SP+b+a+ho without -ra- tense marker):   *
+     * These don't have -ri- copular marker so verb_match_inner can't detect   *
+     * them via the copula pattern; list here to prevent kubaha misparse.     */
+    { "kabaho",    POS_VERB_CONJ }, /* Nt.12: it (aka-class) is there        */
+    { "cyibaho",   POS_VERB_CONJ }, /* Nt.7: it (iki-class) is there (cy+ibaho)*/
+    { "ryibaho",   POS_VERB_CONJ }, /* Nt.5: it (iri-class) is there         */
+    { "yibaho",    POS_VERB_CONJ }, /* Nt.1/6: he/she/it is there (no-ra)   */
     /* kuba + -mo (in) */
     { "arabamo",   POS_VERB_CONJ }, /* Nt.1: he/she is in it                 */
     { "birabamo",  POS_VERB_CONJ }, /* Nt.8: they are in it                  */
@@ -1083,6 +1074,8 @@ static const char *VERB_STEMS[] = {
     "manuk",    /* gumanuka    – to go down / descend                      */
     "rem",      /* guremwa     – to be created / formed                   */
     "it",       /* kwita       – to call / name                           */
+    "wit",      /* kwita (surface w-form) – i(SP)+wit+a=iwita when root-initial
+                 * vowel 'i' is realised as epenthetic glide sequence iw+it  */
     "tandukany",/* gutandukanya – to separate / distinguish               */
     "tegur",    /* gutegura    – to prepare                               */
     "shyir",    /* gushyira    – to put / place                           */
@@ -1298,12 +1291,50 @@ static const char *VERB_STEMS[] = {
     "riber",    /* guribirira  – to wait for eagerly                      */
     "garagaz",  /* kugaragaza  – to show / demonstrate / reveal          */
     "hangayik", /* guhangayika – to worry / be anxious                   */
+    "b",        /* kuba        – to be / to exist (copula; kubaho/kubamo) */
+    /* ── Deverbative noun roots (verb stems underlying derived nouns) ─────── */
+    "cy",       /* gucya       – to shine / be bright  (→ umucyo = light)     */
+    "wijim",    /* kwijima     – to be/become dark      (→ umwijima = darkness)*/
+    "wambar",   /* kwambara    – to wear / dress        (→ umwambaro = clothing)*/
+    "sanzur",   /* gusanzura   – to spread/stretch out (sky, cloth);
+                   ALSO kwisanzura – to free oneself (→ ubwisanzure = freedom) */
     NULL
 };
 
 bool kin_is_known_verb_stem(const char *stem) {
     for (int i = 0; VERB_STEMS[i]; i++)
         if (strcmp(stem, VERB_STEMS[i]) == 0) return true;
+    return false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 5b. REFLEXIVE VERB STEMS (Inshinga z'imbundo ya kwikora)
+ *
+ * These stems have a primary reflexive form with prefix kwi- (imbundo ya
+ * kwikora).  When a bare subjunctive (no SP, no i-) is detected from one
+ * of these stems, the reflexive marker i- was elided — the form functions
+ * as an authorization/command to act upon oneself.
+ *
+ * Rule: kwi- + stem + a  →  bare subj without i-: stem + e
+ *   kwisanzura → sanzure  (be free! / you are authorized to be free)
+ *   kwimuka    → imuke    (get up! — note: i- kept here, listed separately)
+ *
+ * Only stems where the bare-e form is the primary attested reflexive usage
+ * are listed here.  Stems with obligatory i- retention are excluded.
+ * ══════════════════════════════════════════════════════════════════════════ */
+static const char *REFLEXIVE_VERB_STEMS[] = {
+    "sanzur",   /* kwisanzura  – to free oneself (→ sanzure: be free!)         */
+    "gir",      /* kwigira     – to do for oneself / to become (→ igire)        */
+    "ger",      /* kwigeraho   – to achieve/attain for oneself                  */
+    "menyekan", /* kwimenyekana – to make oneself known (→ imenyekane)          */
+    "beshw",    /* kwibeshwa   – to be mistaken (→ ibeshwe, if SP elided)       */
+    NULL
+};
+
+bool kin_is_reflexive_verb_stem(const char *stem) {
+    if (!stem) return false;
+    for (int i = 0; REFLEXIVE_VERB_STEMS[i]; i++)
+        if (strcmp(stem, REFLEXIVE_VERB_STEMS[i]) == 0) return true;
     return false;
 }
 
@@ -1792,6 +1823,13 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_OPTATIVE:     return "Inyifurizo (Optative: SP+ra+ka+stem+a)";
         case TENSE_IMPERATIVE:   return "Integeko (Imperative: bare stem+a)";
         case TENSE_CONDITIONAL:  return "Inziganyo (Conditional: SP+a+stem+a)";
+        /* Copula forms of kuba (to be/exist) with locative suffix -ho/-mo/-yo *
+         * Underlying morphology: ku-b-a-ho (INF+root+FV+post-final locative)  *
+         * The root is 'b'; final vowel 'a' is retained before consonant 'h'.  */
+        case TENSE_COPULA_PAST:  return "Impitagihe y'inshinga nkene (Past copula: yariho, wariho…)";
+        case TENSE_COPULA_PRES:  return "Indagihe y'inshinga nkene (Present copula: ariho, ndiho, iriho…)";
+        case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira…)";
+        case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
         default:                 return "";
     }
 }
@@ -1800,8 +1838,40 @@ const char *kin_verb_ext_name(VerbExtension e) {
     switch (e) {
         case VEXT_PASSIVE:     return "Imbundo (Passive: -w-)";
         case VEXT_CAUSATIVE:   return "Integeko (Causative: -ish-/-esh-)";
-        case VEXT_APPLICATIVE: return "Ikirango (Applicative: -ir-/-er-)";
+        case VEXT_APPLICATIVE: return "Ikirango (Applicative/Benefactive: -ir-/-er-)";
         case VEXT_RECIPROCAL:  return "Igisubizo (Reciprocal: -an-)";
+        case VEXT_REFLEXIVE:   return "Imbundo yo kwisanzura (Reflexive: i- elided in bare form)";
+        case VEXT_STATIVE:     return "Ngirika (Stative/Potential: -ik-)";
+        case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
         default:               return "";
+    }
+}
+
+const char *kin_gram_role_name(GramRole r) {
+    switch (r) {
+        case GRAM_ROLE_MAIN_VERB:   return "Inshinga nkuru (Main verb)";
+        case GRAM_ROLE_AUXILIARY:   return "Inshinga nkene (Auxiliary/Copula)";
+        case GRAM_ROLE_RELATIVE:    return "Inshinga nkurikije (Relative clause)";
+        case GRAM_ROLE_PARTICIPIAL: return "Inshinga nkurikije y'ubunyagatifu (Neg. participial)";
+        case GRAM_ROLE_COMPLEMENT:  return "Igisangizo (Complement clause: ngo/ko/nuko)";
+        case GRAM_ROLE_SEQUENTIAL:  return "Inkurikizo (Sequential narrative: ka)";
+        default:                    return "";
+    }
+}
+
+/* Returns the surface object-marker (OM) prefix string for a noun class.
+ * Based on OM_TABLE in morphology.c (book p.60).
+ * Returns "" for class 0 (unknown/personal) or out-of-range classes. */
+const char *kin_om_str(int cls) {
+    switch (cls) {
+        case  1: return "mu";   case  2: return "ba";
+        case  3: return "wu";   case  4: return "yi";
+        case  5: return "ri";   case  6: return "ya";
+        case  7: return "ki";   case  8: return "bi";
+        case  9: return "n";    case 10: return "zi";
+        case 11: return "ru";   case 12: return "ka";
+        case 13: return "tu";   case 14: return "bu";
+        case 15: return "ku";   case 16: return "ha";
+        default: return "";
     }
 }

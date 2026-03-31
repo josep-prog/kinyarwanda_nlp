@@ -94,6 +94,61 @@ static void analyse_line(const char *line, bool verbose) {
     kin_print_analysis(&sa, verbose);
 }
 
+/*
+ * analyse_text() — split 'text' on sentence boundaries and call analyse_line
+ * for each fragment.  This handles pasted multi-sentence input and prevents
+ * accidental concatenation when the last pasted line has no trailing newline.
+ *
+ * Boundary rule: a '.', '!' or '?' followed by a space, newline, or
+ * end-of-string ends the current sentence.  Commas never end a sentence
+ * so "Buragoroba buracya," is kept intact as one fragment.
+ */
+static void analyse_text(const char *text, bool verbose) {
+    if (!text || !text[0] || text[0] == '#') return;
+
+    char seg[MAX_LINE];
+    size_t si = 0;
+
+    for (size_t i = 0; ; i++) {
+        char c = text[i];
+
+        /* Accumulate character */
+        if (c != '\0' && si < sizeof(seg) - 1)
+            seg[si++] = c;
+
+        /* Check for sentence boundary or end of string */
+        bool end     = (c == '\0');
+        bool is_term = (si > 0 && (seg[si-1] == '.' || seg[si-1] == '!'
+                                   || seg[si-1] == '?'));
+        bool next_ok = end || text[i+1] == ' ' || text[i+1] == '\n'
+                           || text[i+1] == '\0';
+
+        if ((is_term && next_ok) || end) {
+            seg[si] = '\0';
+            kin_str_trim(seg);
+            if (seg[0]) {
+                analyse_line(seg, verbose);
+                putchar('\n');
+            }
+            si = 0;
+            /* Skip the whitespace separator between sentences */
+            while (text[i+1] == ' ' || text[i+1] == '\n') i++;
+        }
+
+        if (end) break;
+    }
+
+    /* Flush any remainder that had no terminating punctuation */
+    if (si > 0) {
+        seg[si] = '\0';
+        kin_str_trim(seg);
+        if (seg[0]) {
+            analyse_line(seg, verbose);
+            putchar('\n');
+        }
+    }
+}
+
 /* Analyse a stream line by line */
 static void analyse_stream(FILE *fp, bool verbose) {
     char line[MAX_LINE];
@@ -242,8 +297,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (l == 0) continue;
-        analyse_line(line, verbose);
-        putchar('\n');
+        analyse_text(line, verbose);
     }
     printf("Murakoze! / Thank you.\n");
     return 0;

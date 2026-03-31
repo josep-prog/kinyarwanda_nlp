@@ -131,7 +131,11 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             (next->pron_type == PRON_POSSESSIVE ||
              next->pron_type == PRON_REFLEXIVE) &&
             next->noun_class > 0) {
-            if (cur->noun_class != next->noun_class) {
+            /* Two classes may share the same connector (e.g. Nt.1 and Nt.3
+             * both use "wa").  Compare connector strings, not class numbers,
+             * to avoid false positives like "umunsi wa mbere".           */
+            if (strcmp(poss_connector[cur->noun_class],
+                       poss_connector[next->noun_class]) != 0) {
                 char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
                 const char *expected = poss_connector[cur->noun_class];
                 snprintf(msg, sizeof(msg),
@@ -188,8 +192,33 @@ void kin_check_syntax(SentenceAnalysis *sa) {
          * agreement errors when verb SP class is 6 and noun is Nt.1/3/9.  *
          * e.g.  "Imana yaremye ijuru" – Nt.9 noun + ya (Nt.1-past) verb.  */
         if (vc == 6 && (nc == 1 || nc == 3 || nc == 9)) continue;
+        /* Copula + locative forms (TENSE_COPULA_PAST/PRES) are existential   *
+         * constructions and do not follow strict subject-verb agreement.      *
+         * "yariho ubusa busa" = "there was emptiness" – yariho is impersonal.*
+         * "hari" (existential) similarly carries no agreement obligation.     *
+         * Skip agreement checking for all copula locative tenses.            */
+        if (verb->verb_tense == TENSE_COPULA_PAST ||
+            verb->verb_tense == TENSE_COPULA_PRES) continue;
 
         if (nc != vc) {
+            /* Before flagging, scan further back: if an earlier noun in the
+             * sentence has a class that matches the verb's SP (vc), then the
+             * immediate predecessor is an object, not the subject.  Suppress
+             * the error — the true subject is that earlier noun.
+             * Also treat Nt.4/9 as equivalent (same SP "i") when scanning. */
+            bool has_remote_subject = false;
+            for (int j = i - 1; j >= 0; j--) {
+                const Token *t = &sa->tokens[j];
+                if (t->pos != POS_NOUN || t->noun_class == 0) continue;
+                int tc = t->noun_class;
+                if (tc == vc) { has_remote_subject = true; break; }
+                if ((tc == 4 || tc == 9) && (vc == 4 || vc == 9))
+                    { has_remote_subject = true; break; }
+                if ((tc == 1 || tc == 3) && (vc == 1 || vc == 3))
+                    { has_remote_subject = true; break; }
+            }
+            if (has_remote_subject) continue;
+
             char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
             snprintf(msg, sizeof(msg),
                 "Inshinga '%s' ntishyikira izina '%s': "

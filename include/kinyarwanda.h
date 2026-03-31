@@ -77,22 +77,88 @@ typedef enum {
     TENSE_OPTATIVE,        /* Inyifurizo: SP+ra+ka+stem+a           urakabyara*/
     TENSE_IMPERATIVE,      /* Integeko: bare stem+a                 genda    */
     TENSE_CONDITIONAL,     /* Inziganyo: SP+a+Ø+stem+a              twatsinda*/
+    /* ── Copula forms of kuba (inshinga nkene) ───────────────────────────── *
+     * The verb kuba (to be/exist) has suppletive copula paradigm with -ri-   *
+     * as the copular marker.  Locative suffixes -ho/-mo/-yo attach directly  *
+     * after the copular element.                                              *
+     *   COPULA_PAST:  SP(past)+ri+loc  →  yariho, wariho, bariho            *
+     *                 consonant-SP+ari+loc → byariho, cyariho                *
+     *   COPULA_PRES:  SP(pres)+ri+loc  →  ariho, iriho, biriho, kariho      *
+     *                 ndi+loc           →  ndiho, ndimo, ndiyo               *
+     * Underlying form: ku-ba-ho (ku=INF, b=root, a=FV, ho=post-final loc).  *
+     * The final vowel 'a' of the root is retained before -ho/-mo/-yo since   *
+     * 'h' is a consonant and no vowel-contact rule fires: kuba+ho = kubaho.  */
+    TENSE_COPULA_PAST,     /* Impitagihe y'inshinga nkene: yariho, wari...   */
+    TENSE_COPULA_PRES,     /* Indagihe y'inshinga nkene: ariho, iriho, ndiho */
+    /* ── Negative participial / relative (inshinga nkurikije y'ubunyagatifu) *
+     * Pattern: SP + ta + stem + FV                                           *
+     * The -ta- marker produces a negative participial/relative reading:      *
+     *   itagira  = i(SP) + ta + gir + a  → "that which does not have"       *
+     *   utagira  = u(SP) + ta + gir + a  → "who does not have"              *
+     *   atagira  = a(SP) + ta + gir + a  → "he/she who does not have"       *
+     * In "Isi yari itagira ishusho": itagira is a negative participial verb  *
+     * serving attributively — "the earth was form-lacking" (without form).   *
+     * The -ta- is distinct from the nt- clausal negation (ntaragenda):      *
+     *   nt-: negates a main clause verb (he is NOT going)                   *
+     *   ta-: produces a participial / relative clause (who/that does not)   */
+    TENSE_NEG_RELATIVE,    /* Inshinga nkurikije y'ubunyagatifu: itagira...  */
+    /* ── Subjunctive + locative (Ikigombero + umugereka w'ahantu) ─────────── *
+     * Pattern: SP + stem + e(SUBJ FV) + ho/mo/yo                             *
+     *   habeho = ha(SP16) + b + e + ho  → "let there be (there)"            *
+     *   abeho  = a(SP1)   + b + e + ho  → "that he/she be there"            *
+     *   mubemo = mu(SP2)  + b + e + mo  → "let you all be inside"           */
+    TENSE_SUBJUNCTIVE_LOC, /* Ikigombero + ahantu: SP+stem+e+ho/mo/yo  habeho*/
 } VerbTense;
 
+/* ─── Grammatical sentence role (inshingwa y'ijambo mu nteruro) ──────────────
+ *
+ * Identifies the role a verb (or other word) plays within its sentence.
+ * Set by kin_tag_gram_roles() in analysis.c after POS tagging and morpheme
+ * analysis, since role detection requires sentence context.
+ *
+ *   MAIN_VERB    — the primary predicate of the main clause (inshinga nkuru)
+ *   AUXILIARY    — a support/copula verb (kuba, ngo…): inshinga nkene/nsangiza
+ *   RELATIVE     — verb in a relative clause (inshinga nkurikije)
+ *   PARTICIPIAL  — negative participial / -ta- form (inshinga nkurikije y'ubuneg.)
+ *   COMPLEMENT   — verb after ngo/ko/nuko (reporting / purpose clause)
+ *   SEQUENTIAL   — narrative sequential (SP+ka+root+a in inkurikizo)
+ */
+typedef enum {
+    GRAM_ROLE_NONE        = 0,
+    GRAM_ROLE_MAIN_VERB,      /* Inshinga nkuru: the sentence's main predicate  */
+    GRAM_ROLE_AUXILIARY,      /* Inshinga nkene / nsangiza: kuba, yari…         */
+    GRAM_ROLE_RELATIVE,       /* Inshinga nkurikije: in a relative sub-clause   */
+    GRAM_ROLE_PARTICIPIAL,    /* Inshinga nkurikije y'ubunyagatifu: -ta- form   */
+    GRAM_ROLE_COMPLEMENT,     /* After ngo/ko/nuko: reporting / purpose clause  */
+    GRAM_ROLE_SEQUENTIAL,     /* Inkurikizo: SP+ka+root+a narrative sequence    */
+} GramRole;
+
 /* ─── Verb derivational extensions (itondaguranshinga) ───────────────────────
- * REB Year-2 book, chapter 26:
- *   Imbundo  = Passive      stem + -w-          gukor-w-a
- *   Integeko = Causative    stem + -ish-/-esh-  gukor-ish-a
- *   Ikirango = Applicative  stem + -ir-/-er-    gukor-er-a
- * Plus the reciprocal (sociative):
- *   Igisubizo = Reciprocal  stem + -an-         gukor-an-a
+ * REB Year-2 book, chapter 26 + S4 textbook §4.2:
+ *   Imbundo   = Passive      stem + -w-            gukor-w-a
+ *   Integeko  = Causative    stem + -ish-/-esh-    gukor-ish-a
+ *   Ikirango  = Applicative  stem + -ir-/-er-      gukor-er-a
+ *   Igisubizo = Reciprocal   stem + -an-           gukor-an-a
+ *   Ngirika   = Stative      stem + -ik-           guhing-ik-a   (potential/reversible state)
+ *   Ngiruka   = Reversive    stem + -uk-/-ur-      gufung-ur-a   (reverse/undo action)
  */
 typedef enum {
     VEXT_NONE        = 0,
-    VEXT_PASSIVE,        /* Imbundo:   -w-    gukorwa, yakorwaga     */
-    VEXT_CAUSATIVE,      /* Integeko:  -ish-/-esh-  gukorisha        */
-    VEXT_APPLICATIVE,    /* Ikirango:  -ir-/-er-    gukorera         */
-    VEXT_RECIPROCAL,     /* Igisubizo: -an-         gukorana         */
+    VEXT_PASSIVE,        /* Imbundo:    -w-          gukorwa, yakorwaga       */
+    VEXT_CAUSATIVE,      /* Integeko:   -ish-/-esh-  gukorisha, kwigisha      */
+    VEXT_APPLICATIVE,    /* Ikirango:   -ir-/-er-    gukorera, guhingira      */
+    VEXT_RECIPROCAL,     /* Igisubizo:  -an-         gukorana, guhingana      */
+    VEXT_REFLEXIVE,      /* Imbundo yo kwisanzura (i-): reflexive marker      *
+                          * elided in bare subj/imper form.                   *
+                          * e.g. sanzure ← kwi-sanzur-e (i- dropped)         */
+    VEXT_STATIVE,        /* Ngirika:    -ik-         guhingika, gufatika      *
+                          * Marks potential/stative state; stem becomes        *
+                          * passive-capable: gufung-ik-a = "to be openable"  */
+    VEXT_REVERSIVE,      /* Ngiruka/Ngirura: -uk-/-ur- gufungura, guhinduka  *
+                          * Reverses the action of the base verb:             *
+                          * gufunga (close) → gufung-ur-a (open/unclose)     *
+                          * guhindura (change) from hind+ur; -uk- in         *
+                          * gufunguka (come open/become open)                 */
 } VerbExtension;
 
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */
@@ -145,6 +211,40 @@ typedef struct {
     char  msg[KIN_MAX_MSG];      /* bilingual explanation (Kinyarwanda / English)  */
 } OrthoViolation;
 
+/* ─── Morpheme breakdown (uturemajambo) ──────────────────────────────────────
+ *
+ * Filled by kin_morpheme_analyze() after POS tagging.
+ * Each word type has its own morpheme structure:
+ *
+ *   Noun  (izina mbonera):  D + RT + C
+ *   Adj   (ntera):          RS + C
+ *   V.conj (inshinga):      SP + (TM) + (OM) + root + (EXT) + FV
+ *   V.inf  (imbundo):       PREF + root + FV
+ *
+ * Each KinMorpheme records the underlying form, the surface form after
+ * orthographic rules, and the rule name (or "" when no change occurred).
+ *
+ * The 'verified' flag is set when kin_ortho_gen(underlying) reproduces
+ * the exact surface word, confirming the decomposition is correct.
+ */
+#define KIN_MAX_MORPHEMES   8
+#define KIN_MORPH_LABEL_LEN 12   /* "D","RT","C","SP","TM","OM","EXT","FV","RS","PREF" */
+#define KIN_MORPH_FORM_LEN  20   /* max length of a single morpheme surface/underlying */
+#define KIN_MORPH_RULE_LEN  96   /* rule citation, e.g. "u→w §1.1 (SP 'tu'+'a'→'tw')" */
+
+typedef struct {
+    char label   [KIN_MORPH_LABEL_LEN]; /* component name                   */
+    char form    [KIN_MORPH_FORM_LEN];  /* underlying (canonical) form      */
+    char surface [KIN_MORPH_FORM_LEN];  /* surface form (after ortho rules) */
+    char rule    [KIN_MORPH_RULE_LEN];  /* rule applied, or "" if none      */
+} KinMorpheme;
+
+typedef struct {
+    KinMorpheme m[KIN_MAX_MORPHEMES];
+    int         n;        /* number of morphemes stored                      */
+    bool        verified; /* kin_ortho_gen(underlying) == surface word       */
+} MorphBreakdown;
+
 /* ─── Error types ─────────────────────────────────────────────────────────── */
 typedef enum {
     ERR_NONE              = 0,
@@ -183,6 +283,13 @@ typedef struct {
     bool is_proper_noun;            /* Capitalised and not at start         */
     bool is_negative;               /* nt- negative prefix detected         */
     int  error_count;               /* Number of errors on this token       */
+    /* ── Deverbative noun (izina rivuye mu nshinga) ──────────────────────── */
+    bool is_deverbative;            /* Noun derived from a verb stem         */
+    char verb_root[KIN_MAX_STEM];   /* Verb root the noun was derived from   */
+    /* ── Grammatical sentence role (filled by kin_tag_gram_roles) ─────────── */
+    GramRole  gram_role;            /* Role in the sentence (main/aux/rel/…) */
+    /* ── Type-specific morpheme breakdown (filled by kin_morpheme_analyze) ─ */
+    MorphBreakdown morph;           /* Per-type D+RT+C / SP+TM+C+FV / RS+C  */
 } Token;
 
 /* ─── Sentence analysis result ───────────────────────────────────────────── */
@@ -209,6 +316,7 @@ bool kin_is_verb_infinitive(const char *word, char *stem_out);
 bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
                             VerbTense *tense_out, int *obj_class_out,
                             VerbExtension *ext_out, bool *neg_out);
+bool kin_is_valid_verb_stem_shape(const char *stem);
 bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
 
 /* ── Vowel & consonant phonology rules ─────────────────────────────────────
@@ -241,6 +349,7 @@ bool kin_has_invalid_cluster(const char *word);
 bool kin_is_invariable(const char *word, POS *pos_out);
 bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out);
 bool kin_is_adj_stem(const char *stem);
+bool kin_is_reflexive_verb_stem(const char *stem); /* kwi- reflexive forms */
 bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out);
 bool kin_is_known_verb_stem(const char *stem);
 bool kin_is_known_noun_stem(const char *stem, int *class_out);
@@ -251,10 +360,21 @@ const char *kin_class_name(int class_num);
 const char *kin_pron_type_name(PronounType t);
 const char *kin_verb_tense_name(VerbTense t);
 const char *kin_verb_ext_name(VerbExtension e);
+const char *kin_gram_role_name(GramRole r);
+const char *kin_om_str(int cls);           /* OM prefix string for class    */
 
 /* pos_tagger.c */
 void kin_tag_token(Token *tok);
 void kin_tag_sentence(SentenceAnalysis *sa);
+
+/* morph_dispatch.c
+ * Type-dispatch morpheme analysis: fills tok->morph based on tok->pos.
+ * Must be called after kin_tag_token/kin_tag_sentence.
+ * Noun  → D+RT+C  (with all 16 classes including Nt.9 nasal rules)
+ * Adj   → RS+C    (concordance prefix + stem)
+ * VConj → SP+TM+OM+root+EXT+FV
+ * VInf  → PREF+root+FV                                                    */
+void kin_morpheme_analyze(Token *tok);
 
 /* syntax.c */
 void kin_check_syntax(SentenceAnalysis *sa);
@@ -288,6 +408,10 @@ const char *kin_ortho_rule_name(OrthoViolationType t);
 /* analysis.c  (main pipeline) */
 SentenceAnalysis kin_analyze(const char *text);
 void kin_print_analysis(const SentenceAnalysis *sa, bool verbose);
+
+/* Assign GramRole to each token using sentence context.
+ * Must be called after kin_tag_sentence() and kin_morpheme_analyze(). */
+void kin_tag_gram_roles(SentenceAnalysis *sa);
 
 /* utils */
 void kin_strlower(const char *src, char *dst, size_t dstlen);
