@@ -580,7 +580,10 @@ static const InvEntry INVARIABLES[] = {
     { "nubwo",   POS_CONJUNCTION },  /* although / even though             */
     { "n'iyo",   POS_CONJUNCTION },  /* even if / although                 */
     { "niyo",    POS_CONJUNCTION },  /* even if / although                 */
-    { "kugira",  POS_CONJUNCTION },  /* in order to (kugira ngo)           */
+    /* NOTE: "kugira ngo" (in order to) is a conjunction phrase, but "kugira"
+     * alone is a verb infinitive (ku+gir+a = to have/do/be).  Removing it
+     * from the invariables table lets the POS tagger handle it as INF.      */
+    /* { "kugira",  POS_CONJUNCTION }, */ /* moved to phrase-level handling  */
     { "ngo",     POS_VERB_PARTICLE },/* that / in order to (ikegeranshinga)*/
     { "ko",      POS_VERB_PARTICLE },/* that (complementizer)              */
     { "no",      POS_CONJUNCTION  }, /* and also / plus (na + o fusion)    */

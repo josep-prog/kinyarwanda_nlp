@@ -86,10 +86,19 @@ void kin_tag_token(Token *tok) {
         tok->noun_class     = 15;   /* class 15 = infinitive class         */
         tok->is_kinyarwanda = true;
         strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
-        /* Record the prefix */
+        /* Record the prefix.
+         * Formula: pfxlen = wordlen - stemlen - 1 (for final 'a').
+         * Adjust for locative suffixes (-ho/-mo/-yo) which are 2 extra chars
+         * appended after the final 'a': guturaho = gu+tur+a+ho.
+         * Without adjustment: 8-3-1=4 → "gutu" (wrong); with: 8-3-3=2 → "gu". */
         size_t stemlen = strlen(stem);
         size_t wordlen = strlen(w);
         size_t pfxlen  = wordlen - stemlen - 1; /* -1 for final 'a'        */
+        if (wordlen > 5 && wordlen >= 3 && w[wordlen - 3] == 'a' &&
+            (kin_ends_with(w, "ho") || kin_ends_with(w, "mo") ||
+             kin_ends_with(w, "yo"))) {
+            pfxlen -= 2;   /* additional -2 for the 2-char locative suffix   */
+        }
         strncpy(tok->detected_prefix, w, pfxlen);
         tok->detected_prefix[pfxlen] = '\0';
         return;

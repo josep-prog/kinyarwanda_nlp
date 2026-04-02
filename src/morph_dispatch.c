@@ -592,6 +592,17 @@ static void analyse_vconj(Token *tok)
     const char *word = tok->lower;
     bool past = is_past_tense(tok->verb_tense);
 
+    /* eff_word: effective SP start, stripping negation prefix if present.
+     * neg_pfx:  the negation morpheme surface ("nt" or "si") or "".        */
+    const char *eff_word = word;
+    const char *neg_pfx  = "";
+    if (tok->is_negative) {
+        if (kin_starts_with(word, "nt") && strlen(word) > 2)
+            { eff_word = word + 2; neg_pfx = "nt"; }
+        else if (kin_starts_with(word, "si") && strlen(word) > 2)
+            { eff_word = word + 2; neg_pfx = "si"; }
+    }
+
     /* Underlying SP */
     const char *sp_under = (cls >= 1 && cls <= 16)
                            ? (past ? SP_PAST[cls] : SP_PRES[cls])
@@ -601,22 +612,38 @@ static void analyse_vconj(Token *tok)
         if (tok->verb_tense == TENSE_CONDITIONAL) {
             /* Conditional past-SP absorbs TM 'a' via vowel contact (§1.1):
              * tu+a→twa (u→w),  mu+a→mwa (u→w),  n+a→na,  u+a→wa (u→w)  */
-            if      (kin_starts_with(word, "twa")) sp_under = "tu";
-            else if (kin_starts_with(word, "mwa")) sp_under = "mu";
-            else if (kin_starts_with(word, "na"))  sp_under = "n";
-            else if (kin_starts_with(word, "wa"))  sp_under = "u";
+            if      (kin_starts_with(eff_word, "twa")) sp_under = "tu";
+            else if (kin_starts_with(eff_word, "mwa")) sp_under = "mu";
+            else if (kin_starts_with(eff_word, "na"))  sp_under = "n";
+            else if (kin_starts_with(eff_word, "wa"))  sp_under = "u";
             else sp_under = "?";
         } else {
-            /* Non-conditional: surface matches underlying */
-            if      (kin_starts_with(word, "n"))   sp_under = "n";
-            else if (kin_starts_with(word, "tu"))  sp_under = "tu";
-            else if (kin_starts_with(word, "u"))   sp_under = "u";
-            else if (kin_starts_with(word, "mu"))  sp_under = "mu";
+            /* Non-conditional: detect surface SP form from eff_word.
+             * For past tense the SP absorbs the past augment 'a', e.g.:
+             *   tu+a→twa, mu+a→mwa, n+a→na, u+a→wa (sp_under set below).
+             * "nda" = n(SP) + da(TM immediate present), handled separately.
+             * "twa"/"mwa" must be checked before "tu"/"mu" since u→w glide
+             * means these words never start with "tu" or "mu".               */
+            if      (kin_starts_with(eff_word, "nda"))  sp_under = "n";   /* TM="da" below */
+            else if (kin_starts_with(eff_word, "twa"))  sp_under = "tu";  /* 1pl past */
+            else if (kin_starts_with(eff_word, "mwa"))  sp_under = "mu";  /* 2pl past */
+            else if (kin_starts_with(eff_word, "n"))    sp_under = "n";
+            else if (kin_starts_with(eff_word, "tu"))   sp_under = "tu";
+            else if (kin_starts_with(eff_word, "u"))    sp_under = "u";
+            else if (kin_starts_with(eff_word, "mu"))   sp_under = "mu";
             else sp_under = "?";
         }
     }
 
     const char *tm  = tense_marker(tok->verb_tense);
+    /* Special: 1sg immediate present uses "da" as TM (nda = n+da).
+     * verb_match_inner stores tense=PRESENT_NORA for "nda" prefix, so
+     * tense_marker() returns "". Override tm to "da" for morpheme display. */
+    static char nda_tm_buf[4];
+    if (cls == 0 && tm[0] == '\0' && kin_starts_with(eff_word, "nda")) {
+        strncpy(nda_tm_buf, "da", 3);
+        tm = nda_tm_buf;
+    }
     const char *fv  = final_vowel(tok->verb_tense, word);
     const char *root = tok->stem[0] ? tok->stem : "?";
     /* u+u→u fusion: historically vowel-initial roots (e.g. twakubaka ← *twakwubaka).
@@ -676,6 +703,34 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Post-fix: past-tense SPs where u→w + past-augment 'a' are fused into SP.
+     * SP_PAST[] stores the canonical underlying ("ru","bu","tu","mu"), but the
+     * surface is the contracted form ("rwa","bwa","twa","mwa").
+     * We detect this by checking what eff_word actually starts with.          */
+    if (past && tok->verb_tense != TENSE_CONDITIONAL) {
+        /* u-final SPs (ru,bu,tu,mu,ku) contract with past augment 'a': u→w+a */
+        size_t slen = strlen(sp_under);
+        if (slen > 0 && sp_under[slen-1] == 'u') {
+            /* Build expected contracted surface: <sp_minus_u>wa */
+            char contracted[KIN_MORPH_FORM_LEN];
+            strncpy(contracted, sp_under, slen - 1);
+            contracted[slen - 1] = '\0';
+            strncat(contracted, "wa", sizeof(contracted) - slen);
+            if (kin_starts_with(eff_word, contracted)) {
+                strncpy(sp_surface, contracted, sizeof(sp_surface) - 1);
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "u→w §1.1 + a(past augment) → %s (%s past SP)",
+                         contracted, sp_under);
+            }
+        }
+        /* 1sg past: n + a(past augment) → na */
+        if (cls == 0 && strcmp(sp_under,"n")==0 && kin_starts_with(eff_word,"na")) {
+            strncpy(sp_surface, "na", sizeof(sp_surface)-1);
+            snprintf(sp_rule, sizeof(sp_rule), "n + a(past augment) → na (1sg past SP)");
+        }
+        /* 2sg past: u + a → wa (handled above via u-final rule for sp_under="u") */
+    }
+
     /* OM surface (same rule applies at OM-root boundary) */
     char om_surface[KIN_MORPH_FORM_LEN] = "";
     char om_rule[KIN_MORPH_RULE_LEN] = "";
@@ -690,7 +745,13 @@ static void analyse_vconj(Token *tok)
                          "u→w §1.1 (OM '%s'+'%c'→'%.*sw')", om, root[0],
                          (int)(olen-1), om);
             } else if (om_last == 'i') {
-                om_surface[olen-1] = 'y';
+                /* i→y §1.1: but "ki"+"y" → "cy" (ky→cy spelling rule in Kinyarwanda)
+                 * Similarly "ri"+"y" → "ry" (no change needed for ri).               */
+                if (olen == 2 && om[0] == 'k') {
+                    strncpy(om_surface, "cy", sizeof(om_surface) - 1); /* ki+V → cy */
+                } else {
+                    om_surface[olen-1] = 'y';
+                }
                 snprintf(om_rule, sizeof(om_rule),
                          "i→y §1.1 (OM '%s'+'%c'→'%s')", om, root[0], om_surface);
             }
@@ -759,24 +820,31 @@ static void analyse_vconj(Token *tok)
         }
     }
 
-    /* Build expected surface for verification */
+    /* Build expected surface for verification.
+     * Include negation prefix in built string so verification works for
+     * negative verbs (ntaragenda, sindagenda, etc.).                        */
     char built[KIN_MAX_WORD];
     if (tok->verb_tense == TENSE_CONDITIONAL) {
         /* When TM 'a' is elided (a+a→a), omit it from the built surface */
-        snprintf(built, sizeof(built), "%s%s%s%s%s%s",
+        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
+                 neg_pfx,
                  sp_surface, cond_tm_elided ? "" : tm,
                  cond_particle_surface[0] ? cond_particle_surface : "ku",
                  root, ext, fv);
     } else {
-        snprintf(built, sizeof(built), "%s%s%s%s%s%s",
+        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
+                 neg_pfx,
                  sp_surface, tm,
                  om[0] ? om_surface : "",
                  root, ext, fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
-    /* Store morphemes */
+    /* Store morphemes: prepend NEG morpheme for negative verbs */
     int n = 0;
+    if (neg_pfx[0])
+        set_morph(&mb->m[n++], "NEG", neg_pfx, neg_pfx,
+                  "Ubunyagatifu (Negation prefix)");
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
     if (tm[0])
         set_morph(&mb->m[n++], "TM", tm,
@@ -974,17 +1042,34 @@ static void analyse_vinf(Token *tok)
                  root, word, root);
     }
 
-    /* Final vowel from surface */
-    const char *fv = "a";
+    /* Detect locative suffix (-ho/-mo/-yo) appended after final 'a'.
+     * e.g. guturaho = gu+tur+a+ho, kwigeraho = kw+iger+a+ho.
+     * If detected, strip it for FV and reconstruction, then add as LOC morpheme. */
     size_t wlen = strlen(word);
-    if (wlen >= 3 && word[wlen-3]=='t' && word[wlen-2]=='s' && word[wlen-1]=='e')
+    const char *loc = "";   /* locative suffix string, or "" */
+    char work_word[KIN_MAX_WORD];
+    strncpy(work_word, word, sizeof(work_word) - 1);
+    work_word[sizeof(work_word) - 1] = '\0';
+    size_t work_wlen = wlen;
+    if (wlen > 5 && wlen >= 3 && word[wlen - 3] == 'a' &&
+        (kin_ends_with(word, "ho") || kin_ends_with(word, "mo") ||
+         kin_ends_with(word, "yo"))) {
+        loc = word + wlen - 2;   /* points to "ho", "mo", or "yo" in word[] */
+        work_wlen = wlen - 2;    /* length without locative */
+        work_word[work_wlen] = '\0';
+    }
+
+    /* Final vowel from surface (use work_word which has locative stripped) */
+    const char *fv = "a";
+    if (work_wlen >= 3 && work_word[work_wlen-3]=='t' && work_word[work_wlen-2]=='s'
+        && work_word[work_wlen-1]=='e')
         fv = "tse";
-    else if (wlen >= 2 && word[wlen-2]=='y' && word[wlen-1]=='e')
+    else if (work_wlen >= 2 && work_word[work_wlen-2]=='y' && work_word[work_wlen-1]=='e')
         fv = "ye";
-    else if (wlen >= 2 && word[wlen-2]=='w' && word[wlen-1]=='e')
+    else if (work_wlen >= 2 && work_word[work_wlen-2]=='w' && work_word[work_wlen-1]=='e')
         fv = "we";
-    else if (wlen >= 1 && word[wlen-1]=='e'
-             && (wlen < 2 || (word[wlen-2]!='y' && word[wlen-2]!='w')))
+    else if (work_wlen >= 1 && work_word[work_wlen-1]=='e'
+             && (work_wlen < 2 || (work_word[work_wlen-2]!='y' && work_word[work_wlen-2]!='w')))
         fv = "e";
 
     /* Try to detect a derivational extension within the stem.
@@ -999,15 +1084,16 @@ static void analyse_vinf(Token *tok)
         inf_ext = detect_ext_in_stem(root, bare_root, ext_str, sizeof(ext_str));
     }
 
-    /* Verify against the surface word.
+    /* Verify against the surface word (including locative if present).
      * For u+u→u fused verbs: drop the prefix's final 'u' before concatenating
      * (ku + ubak + a → k+ubak+a = kubaka).                                     */
     char built[KIN_MAX_WORD];
     if (uu_fused) {
         size_t plen = strlen(pref);
-        snprintf(built, sizeof(built), "%.*s%s%s", (int)(plen - 1), pref, root, fv);
+        snprintf(built, sizeof(built), "%.*s%s%s%s",
+                 (int)(plen - 1), pref, root, fv, loc);
     } else {
-        snprintf(built, sizeof(built), "%s%s%s", pref, root, fv);
+        snprintf(built, sizeof(built), "%s%s%s%s", pref, root, fv, loc);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -1035,6 +1121,8 @@ static void analyse_vinf(Token *tok)
     }
 
     set_morph(&mb->m[n++], "FV", fv, fv, "");
+    if (loc[0])
+        set_morph(&mb->m[n++], "LOC", loc, loc, "Umugereka w'ahantu (Locative suffix)");
     mb->n = n;
 }
 

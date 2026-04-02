@@ -526,64 +526,59 @@ static void print_inf_morphemes(const Token *t) {
 
     const MorphBreakdown *mb = &t->morph;
 
-    /* Use structured breakdown when available */
+    /* Use structured breakdown when available.
+     * Find morphemes by label to handle optional EXT and LOC morphemes.      */
     if (mb->n >= 3) {
-        const KinMorpheme *pref_m = &mb->m[0];
-        const KinMorpheme *root_m = &mb->m[1];
-        bool has_ext = (mb->n == 4);
-        const KinMorpheme *ext_m  = has_ext ? &mb->m[2] : NULL;
-        const KinMorpheme *fv_m   = &mb->m[mb->n - 1];
-
-        /* Morpheme line — use underlying form (never surface kw/gw; rule is in Itegeko) */
-        if (has_ext) {
-            printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
-                   "%s(INF.PREF) + %s(root) + %s(EXT) + %s(FV)\n",
-                   pref_m->form, root_m->form, ext_m->form, fv_m->form);
-        } else {
-            printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
-                   "%s(INF.PREF) + %s(root) + %s(FV)\n",
-                   pref_m->form, root_m->form, fv_m->form);
+        const KinMorpheme *pref_m = NULL, *root_m = NULL,
+                          *ext_m  = NULL, *fv_m   = NULL, *loc_m = NULL;
+        for (int i = 0; i < mb->n; i++) {
+            const char *lbl = mb->m[i].label;
+            if (strcmp(lbl, "PREF") == 0) pref_m = &mb->m[i];
+            else if (strcmp(lbl, "root") == 0) root_m = &mb->m[i];
+            else if (strcmp(lbl, "EXT")  == 0) ext_m  = &mb->m[i];
+            else if (strcmp(lbl, "FV")   == 0) fv_m   = &mb->m[i];
+            else if (strcmp(lbl, "LOC")  == 0) loc_m  = &mb->m[i];
         }
+        if (!pref_m || !root_m || !fv_m) goto inf_fallback;
+
+        /* Morpheme line (Uturemajambo) */
+        printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s(INF.PREF) + %s(root)",
+               pref_m->form, root_m->form);
+        if (ext_m)  printf(" + %s(EXT)", ext_m->form);
+        printf(" + %s(FV)", fv_m->form);
+        if (loc_m)  printf(" + %s(LOC)", loc_m->form);
+        printf("\n");
 
         /* Reconstruction */
         printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
+        /* Build Ingingo line (underlying labels) */
+        printf("       Ingingo:  [PREF]%s + [root]%s", pref_m->form, root_m->form);
+        if (ext_m)  printf(" + [EXT]%s", ext_m->form);
+        printf(" + [FV]%s", fv_m->form);
+        if (loc_m)  printf(" + [LOC]%s", loc_m->form);
+
         if (pref_m->rule[0]) {
-            /* Prefix phonological rule fired (u\342\206\222w) */
-            if (has_ext) {
-                printf("       Ingingo:  [PREF]%s + [root]%s + [EXT]%s + [FV]%s\n",
-                       pref_m->form, root_m->form, ext_m->form, fv_m->form);
-                printf("       Itegeko:  %s\n", pref_m->rule);
-                printf("       Guhuza:   %s%s%s%s  \342\206\222  %s%s\n",
-                       pref_m->surface, root_m->form, ext_m->form, fv_m->form,
-                       lword, mb->verified ? "  \342\234\223" : "");
-            } else {
-                printf("       Ingingo:  [PREF]%s + [root]%s + [FV]%s\n",
-                       pref_m->form, root_m->form, fv_m->form);
-                printf("       Itegeko:  %s\n", pref_m->rule);
-                printf("       Guhuza:   %s%s%s  \342\206\222  %s%s\n",
-                       pref_m->surface, root_m->form, fv_m->form,
-                       lword, mb->verified ? "  \342\234\223" : "");
-            }
+            /* Prefix phonological rule fired: show Itegeko + Guhuza lines */
+            printf("\n       Itegeko:  %s\n", pref_m->rule);
+            printf("       Guhuza:   %s%s", pref_m->surface, root_m->form);
+            if (ext_m)  printf("%s", ext_m->form);
+            printf("%s", fv_m->form);
+            if (loc_m)  printf("%s", loc_m->form);
+            printf("  \342\206\222  %s%s\n", lword, mb->verified ? "  \342\234\223" : "");
         } else {
-            /* No prefix rule fired — surface == form, but show form for consistency */
-            if (has_ext) {
-                printf("       Ingingo:  [PREF]%s + [root]%s + [EXT]%s + [FV]%s"
-                       "  \342\206\222  %s%s%s%s%s\n",
-                       pref_m->form, root_m->form, ext_m->form, fv_m->form,
-                       pref_m->surface, root_m->form, ext_m->form, fv_m->form,
-                       mb->verified ? "  \342\234\223" : "");
-                if (ext_m->rule[0])
-                    printf("       Itegeko:  EXT: %s\n", ext_m->rule);
-            } else {
-                printf("       Ingingo:  [PREF]%s + [root]%s + [FV]%s"
-                       "  \342\206\222  %s%s%s%s\n",
-                       pref_m->form, root_m->form, fv_m->form,
-                       pref_m->surface, root_m->form, fv_m->form,
-                       mb->verified ? "  \342\234\223" : "");
-            }
+            /* No prefix rule: inline reconstruction on same line */
+            printf("  \342\206\222  %s%s", pref_m->surface, root_m->form);
+            if (ext_m)  printf("%s", ext_m->form);
+            printf("%s", fv_m->form);
+            if (loc_m)  printf("%s", loc_m->form);
+            printf("%s\n", mb->verified ? "  \342\234\223" : "");
+            if (ext_m && ext_m->rule[0])
+                printf("       Itegeko:  EXT: %s\n", ext_m->rule);
         }
         return;
     }
+
+    inf_fallback:;
 
     /* Fallback: morph breakdown not available */
     const char *pref = t->detected_prefix[0] ? t->detected_prefix : "ku";
