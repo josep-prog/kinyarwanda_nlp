@@ -1,21 +1,188 @@
 /*
- * kinyarwanda.h
- * Rule-based Kinyarwanda NLP engine
- * Based on: "Ikinyarwanda Amashuri Nderabarezi (TTC)" - REB 2020
+ * kinyarwanda.h  —  Rule-based Kinyarwanda NLP engine
+ * Sources: REB textbooks S2–S6 (Drakkar Ltd / REB, 2017–2024)
+ *          RALC official orthographic rules (Minisitiri 001/2014)
  *
- * Grammar terms used throughout (from the book):
- *   Izina mbonera   = Common noun      (D + RT + C structure)
- *   Ntera           = Adjective        (RS + C structure)
- *   Izina ntera     = Relative noun    (noun used as qualifier)
- *   Igisantera      = Compound adj     (noun pair acting as adjective)
- *   Inshinga        = Verb
- *   Ikinyazina      = Pronoun          (many subtypes)
- *   Amagambo adahinduka = Invariable words (prepositions, conjunctions, etc.)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * GRAMMAR TREE MAP  (Indanganyandiko y'ubwoko bw'amagambo)
+ *
+ * Each word type ("tree") has its own morpheme formula, concordance rules,
+ * and set of phonological/orthographic rules that govern it.
+ * The trees below list: NAME → formula → where implemented → status.
+ *
+ * ── TREE 1: IZINA MBONERA (Common Noun) ────────────────────────────────
+ *   Formula:  D + RT + C
+ *     D  = Indomo     (initial vowel: i / u / a; can be zero)
+ *     RT = Indanganteko (class marker, determines all agreement)
+ *     C  = Igicumbi   (stem; never changes; carries core meaning)
+ *   16 inteko (noun classes); see NOUN_CLASSES[] in lexicon.c
+ *   Phonological rules at D-RT boundary and RT-C boundary.
+ *   → Detection:     morphology.c  kin_detect_noun_class() / kin_strip_noun_prefix()
+ *   → Morpheme fill: morph_dispatch.c  analyse_noun()
+ *   → Display:       analysis.c  print_noun_morphemes() / print_noun_reconstruction()
+ *   Status: ✓ complete for all 16 classes
+ *
+ *   Sub-types and TRANSITIONS from izina mbonera:
+ *     • → izina ntera (POS_RELATIVE_NOUN): noun shifts to adjective role when
+ *         it follows an ikinyazina ngenera agreeing with another noun.
+ *         e.g. "igitabo cy'Ikinyarwanda" — Ikinyarwanda is izina ntera.
+ *         → pos_tagger.c context pass  Status: ✓ implemented
+ *     • → Proper name: indomo dropped (umugabo → Mugabo). Heuristic: capitalised.
+ *         → pos_tagger.c step 5  Status: ✓ heuristic
+ *     • → Izina rivuye mu nshinga (Deverbative noun): noun derived from verb stem.
+ *         e.g. umucyo ← igicumbi "cyo" ← kugcya (to shine).
+ *         → pos_tagger.c check_deverbative()  Status: ✓ implemented
+ *     • → Class shift (gupfobya/gutubya): umugabo(Nt.1) → akagabo(Nt.12),
+ *         utugabo(Nt.13), ubugabo(Nt.14 abstract), ikigabo(Nt.7 augmentative).
+ *         → Not yet tracked explicitly.  Status: ✗ planned
+ *     • → Amazina y'urusobe (Compound nouns): two or more nouns fused.
+ *         e.g. Iterambere (gutera + imbere), Nyiricyubahiro.
+ *         → Not yet implemented.  Status: ✗ planned
+ *
+ * ── TREE 2: NTERA (Adjective) ──────────────────────────────────────────
+ *   Formula:  RS + C
+ *     RS = Indangasano (concordance prefix; equals the noun's RT)
+ *     C  = Igicumbi   (adjective stem; from a small closed set, ~27 stems)
+ *   Rule: RS MUST agree with the noun class it modifies (indangasano).
+ *   Reduplication: RS + C + RS + C (e.g. mu+re+mu+re = muremure, very tall).
+ *   → Detection:     morphology.c  kin_strip_adj_prefix()
+ *   → Stem table:    lexicon.c     ADJ_STEMS[]
+ *   → Reduplicated:  lexicon.c     kin_is_adj_reduplicated()
+ *   → Morpheme fill: morph_dispatch.c  analyse_adj()
+ *   Status: ✓ complete for 27 stems + reduplication
+ *
+ *   Sub-types and TRANSITIONS from ntera:
+ *     • izina ntera (POS_RELATIVE_NOUN): a noun playing adjective role.
+ *         Different from ntera: izina ntera has a full noun structure (D+RT+C)
+ *         but is used in the RS+C position. Linked via ikinyazina ngenera.
+ *         → pos_tagger.c context pass  Status: ✓ implemented
+ *     • igisantera (POS_COMPOUND_ADJ): two nouns together acting as adjective.
+ *         e.g. "inka inzovu" (elephant-cow = very large cow).
+ *         Formed by juxtaposing two nouns in agreement with a head noun.
+ *         → pos_tagger.c  Status: ✗ planned (tag exists, never assigned)
+ *
+ * ── TREE 3: INSHINGA (Verb) ────────────────────────────────────────────
+ *   Two main forms:
+ *
+ *   3a. IMBUNDO (Infinitive / citation form):
+ *       Formula: PREF + C + FV
+ *         PREF = ku-/gu-/kw-/gw-  (Indanganshinga; marks Nt.15 infinitive class)
+ *         C    = Igicumbi / Umuzi (verb stem; invariant)
+ *         FV   = -a               (final vowel; -e/-ye/-we in relative/complement)
+ *       → Detection:     morphology.c  kin_is_verb_infinitive()
+ *       → Morpheme fill: morph_dispatch.c  analyse_vinf()
+ *       Status: ✓ complete including locative suffixes, extended FVs
+ *
+ *   3b. INSHINGA ITONDAGUYE (Conjugated verb):
+ *       Formula: SP + (TM) + (OM) + C + (EXT) + FV
+ *         SP  = Indanganshinga itondaguye (subject prefix; varies by class+person)
+ *         TM  = Indangagihe (tense marker; ra/za/ka/raka/ta/a or ∅)
+ *         OM  = Indangakinyazina (object marker; optional)
+ *         C   = Igicumbi (verb stem)
+ *         EXT = Ingereka / Utumamo (derivational extension; optional):
+ *                 -w-    Imbundo    (passive)
+ *                 -ish-  Integeko   (causative)
+ *                 -ir-   Ikirango   (applicative/benefactive)
+ *                 -an-   Igisubizo  (reciprocal)
+ *                 -ik-   Ngirika    (stative/potential)
+ *                 -uk/-ur Ngiruka/Ngirura (reversive)
+ *         FV  = Umusozo (final vowel: -a / -e / -aga / -ye / -tse)
+ *       → Detection:     morphology.c  kin_is_verb_conjugated()
+ *       → SP table:      morphology.c  SP_TABLE[]
+ *       → OM table:      morphology.c  OM_TABLE[]
+ *       → EXT strip:     morphology.c  ext_strip()
+ *       → Morpheme fill: morph_dispatch.c  analyse_vconj()
+ *       Status: ✓ complete
+ *
+ *   VERB MODES (Uburyo bw'inshinga) — all detected via TM+FV patterns:
+ *     Ikirango    (Indicative):  all tenses below
+ *     Inyifurizo  (Optative):    SP + ra + ka + C + a    TENSE_OPTATIVE
+ *     Integeko    (Imperative):  bare C + a               TENSE_IMPERATIVE
+ *     Inkurikizo  (Sequential):  SP + ka + C + a          TENSE_NARRATIVE
+ *     Ikigombero  (Subjunctive): SP + C + e               TENSE_SUBJUNCTIVE
+ *     Inziganyo   (Conditional): SP + a + [ku] + C + a   TENSE_CONDITIONAL
+ *
+ *   VERB TENSES (Ibihe) — fully implemented in VerbTense enum:
+ *     Indagihe y'ako kanya  (Present immediate):  SP + ra + C + a
+ *     Indagihe y'ubusanzwe  (Habitual present):   SP + C + a      (no TM)
+ *     Impitakare  (Recent past):   SP + C + ye/tse
+ *     Impitakera  (Remote past):   SP + C + aga
+ *     Inzagihe    (Future):        SP + za + C + a
+ *     + copula past/present, neg-relative, subjunctive+locative
+ *     Status: ✓ all tenses implemented
+ *
+ *   TRANSITIONS from inshinga:
+ *     • → Izina rivuye mu nshinga (Deverbative noun): verb root nominalised.
+ *         e.g. umucyo ← kugcya, ubukozi ← gukora.
+ *         → check_deverbative() in pos_tagger.c  Status: ✓ implemented
+ *     • → Inshinga nkene (Copula kuba): suppletive paradigm with -ri-.
+ *         yariho, ariho, ndiho, byariho, nzabaho etc.
+ *         → TENSE_COPULA_PAST / TENSE_COPULA_PRES  Status: ✓ implemented
+ *     • → Ingirwanshinga (-ti quotative): suppletive forms ati/iti/bati/etc.
+ *         → lexicon.c INVARIABLES[]  Status: ✓ full 16-class paradigm
+ *
+ * ── TREE 4: IKINYAZINA (Pronoun) ───────────────────────────────────────
+ *   Nine sub-types (PronounType enum) — each has full 16-class paradigm:
+ *     PRON_DEMONSTRATIVE  Ikinyazina nyereka      uyu/uwo/uno...
+ *     PRON_PERSONAL       Ikinyazina ngenga       nge/we/bo...
+ *     PRON_POSSESSIVE     Ikinyazina ngenera      wa/ya/cya...
+ *     PRON_REFLEXIVE      Ikinyazina ngenera ngenga  wange/wacu/wawe/wabo...
+ *     PRON_RELATIVE       Ikinyazina mbanziriza   uwo/abo/icyo...
+ *     PRON_INTERROGATIVE  Ikinyazina kibaza       nde/iki/iyihe...
+ *     PRON_INDEFINITE     Ikinyazina ndafutura    umwe/bamwe/undi...
+ *     PRON_CONCORDANCE    Ikinyazina mboneranteko
+ *     PRON_NUMERICAL      Ikinyazina nyamubaro    umwe/babiri/batatu...1-7
+ *     PRON_VOCATIVE       Ikinyazina mpamagazi    wa (O person!)
+ *   → Table:      lexicon.c  PRONOUNS[]
+ *   → Detection:  lexicon.c  kin_is_pronoun()
+ *   Status: ✓ complete for all sub-types
+ *   Gaps: demonstrative proximity 3/4/5/6 forms partially missing
+ *         numerical >7 (icumi/ijana) are special (Nt.3/6 nouns, not true numerals)
+ *
+ * ── TREE 5: AMAGAMBO ADAHINDUKA (Invariable Words) ─────────────────────
+ *   These words never change form, regardless of context.
+ *   Sub-categories (POS values assigned):
+ *     POS_PREPOSITION    Umugereka / Ingera        ku / mu / i / kuri / nka
+ *     POS_CONJUNCTION    Icyungo                   na / kandi / ariko / rero
+ *     POS_ADVERB         Akamamo                   cyane / neza / gato
+ *     POS_LOCATIVE       Indangahantu              hasi / hano / hejuru
+ *     POS_INTERJECTION   Irangamutima              yee / ahaa / asyi
+ *     POS_VERB_PARTICLE  Ikegeranshinga            ngo / ko / dore
+ *   → Table:      lexicon.c  INVARIABLES[]
+ *   → Detection:  lexicon.c  kin_is_invariable()
+ *   Status: ✓ comprehensive; checked at POS priority step 1
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CODE ARCHITECTURE  (which file handles which tree)
+ *
+ *   morphology.c   — phonological rules + Tree 1-3 detection functions
+ *   lexicon.c      — all word tables: Trees 1-5 (nouns, adj, pronouns, invariables)
+ *   pos_tagger.c   — 9-step priority tagger: assigns trees to tokens
+ *   morph_dispatch.c — type-dispatch morpheme analysis per tree
+ *   analysis.c     — pipeline (tokenize→tag→morph→syntax) + display per tree
+ *   syntax.c       — cross-tree agreement checks (noun-verb, noun-adj, poss)
+ *   corrector.c    — spelling correction (within and across trees)
+ *   ortho.c        — RALC 2017 orthographic rule engine (all trees)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Grammar terms used throughout:
+ *   Izina mbonera   = Common noun      (D + RT + C)
+ *   Ntera           = Adjective        (RS + C)
+ *   Izina ntera     = Relative noun    (noun used as qualifier, POS_RELATIVE_NOUN)
+ *   Igisantera      = Compound adj     (noun pair as adjective, POS_COMPOUND_ADJ)
+ *   Inshinga        = Verb             (Tree 3)
+ *   Ikinyazina      = Pronoun          (Tree 4, many subtypes)
+ *   Amagambo adahinduka = Invariable   (Tree 5)
  *   Inteko          = Noun class (1-16)
  *   Indanganteko    = Class marker (RT)
  *   Indomo (D)      = Prefix vowel
  *   Igicumbi (C)    = Stem/root
  *   Indangasano(RS) = Concordance prefix (for adjectives)
+ *   Indanganshinga  = Verb subject prefix (SP)
+ *   Indangagihe     = Tense marker (TM)
+ *   Indangakinyazina= Object marker (OM)
+ *   Umusozo / FV   = Final vowel
+ *   Utumamo        = Verb extensions (ingereka)
  */
 
 #ifndef KINYARWANDA_H
@@ -131,6 +298,9 @@ typedef enum {
     GRAM_ROLE_PARTICIPIAL,    /* Inshinga nkurikije y'ubunyagatifu: -ta- form   */
     GRAM_ROLE_COMPLEMENT,     /* After ngo/ko/nuko: reporting / purpose clause  */
     GRAM_ROLE_SEQUENTIAL,     /* Inkurikizo: SP+ka+root+a narrative sequence    */
+    GRAM_ROLE_VERBAL_NOUN,    /* Izina ryaturutse ku nshinga: verb form acting  *
+                               * as a noun in context (e.g. ibimera = crops).  *
+                               * Morphologically a verb; syntactically a noun. */
 } GramRole;
 
 /* ─── Verb derivational extensions (itondaguranshinga) ───────────────────────
@@ -159,6 +329,11 @@ typedef enum {
                           * gufunga (close) → gufung-ur-a (open/unclose)     *
                           * guhindura (change) from hind+ur; -uk- in         *
                           * gufunguka (come open/become open)                 */
+    VEXT_CAUSATIVE_Y,    /* Ngiza (Causative -y-) with r+y→z phonological rule:*
+                          * Rule: stem-final r + causative-y → surface z       *
+                          * e.g. kumera (to grow) + -y- → kumeza (to bring forth)*
+                          *      mer + y → mez   (r+y→z, textbook §1.3)        *
+                          * Citation root keeps 'r'; surface form shows 'z'.  */
 } VerbExtension;
 
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */
@@ -354,6 +529,24 @@ bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out);
 bool kin_is_known_verb_stem(const char *stem);
 bool kin_is_known_noun_stem(const char *stem, int *class_out);
 bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out);
+
+/* NounPluralPair – links singular ↔ plural forms and stores the shared
+ * igicumbi (C).  Derived by the plurality method: the longest common
+ * suffix of singular and plural is C.  When plural == NULL the word is
+ * invariant (Nt.9/10 same-form nouns; singular class = sg_class,
+ * plural class = pl_class may differ for agreement purposes).         */
+typedef struct {
+    const char *singular;  /* full surface singular form              */
+    const char *plural;    /* full surface plural form (NULL=same)    */
+    const char *igicumbi;  /* underlying C – shared stem              */
+    int sg_class;          /* noun class of singular                  */
+    int pl_class;          /* noun class of plural                    */
+} NounPluralPair;
+
+/* Look up a word (singular OR plural) in the NounPluralPair table.
+ * Returns true and fills igicumbi_out (max KIN_MAX_STEM) and class_out
+ * (class of the form that was matched) when found.                    */
+bool kin_lookup_igicumbi(const char *word, char *igicumbi_out, int *class_out);
 const NounClass *kin_get_noun_class(int num);
 const char *kin_pos_name(POS pos);
 const char *kin_class_name(int class_num);

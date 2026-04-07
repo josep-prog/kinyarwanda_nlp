@@ -1,17 +1,43 @@
 /*
- * morphology.c
- * Morphological analysis for Kinyarwanda words.
+ * morphology.c  —  Morphological analysis for Kinyarwanda.
  *
- * Implements the grammar rules from the textbook:
- *   Noun structure:  D + RT + C  (Indomo + Indanganteko + Igicumbi)  p.61-63
- *   Adj  structure:  RS + C      (Indangasano + Igicumbi)            p.65-67
- *   Verb infinitive: ku/gu/kw/gw + stem + a                         p.88+
- *   Phonological rules (igenamajwi):
- *     u → w before vowel               (Umwana: u+mu+ana, u→w)      p.62
- *     i → y before vowel               (Icyatsi: i+ki+atsi, i→y)    p.62
- *     a → Ø before vowel (elision)     (Abana:  a+ba+ana, a→Ø/-J)   p.62
- *     n → m before bilabials (mb, mp, mf, mv)                        p.7-8
- *     k → g before voiced consonants                                 p.7-8
+ * This file implements the DETECTION functions for Trees 1, 2 and 3.
+ * The dispatch and morpheme FILLING is in morph_dispatch.c.
+ *
+ * File layout (sequential by tree):
+ *
+ *   § 0  UTILITIES        kin_strlower, kin_starts_with, kin_ends_with, kin_str_trim
+ *
+ *   § 1  PHONOLOGICAL RULES (Amategeko y'igenamajwi)
+ *        kin_has_vowel_hiatus()    — Iranya ry'impanvu (VV contact check)
+ *        kin_has_invalid_cluster() — Iteganyo ry'inzarara z'inkongi
+ *
+ *   § 2  TREE 1 — IZINA MBONERA (Noun)     Formula: D + RT + C
+ *        kin_detect_noun_class()    — identify inteko (class 1-16) from prefix
+ *        kin_strip_noun_prefix()    — split word into prefix (D+RT) and igicumbi
+ *
+ *   § 3  TREE 2 — NTERA (Adjective)        Formula: RS + C
+ *        kin_strip_adj_prefix()    — split word into RS (concordance) and stem
+ *        [adj stems listed in lexicon.c ADJ_STEMS[]]
+ *
+ *   § 4  TREE 3 — INSHINGA (Verb)
+ *        § 4a  IMBUNDO (Infinitive)        Formula: PREF + C + FV
+ *              kin_is_valid_verb_stem_shape()
+ *              kin_is_verb_infinitive()
+ *        § 4b  ITONDAGUYE (Conjugated)     Formula: SP + (TM) + (OM) + C + (EXT) + FV
+ *              SP_TABLE[]           — subject prefix table (all classes + persons)
+ *              OM_TABLE[]           — object marker table (indangakinyazina)
+ *              ext_strip()          — detect and strip utumamo (verb extensions)
+ *              kin_is_verb_conjugated()
+ *
+ * Phonological rules cited throughout (RALC 2017 / REB S3-S4):
+ *   §1.1  u → w / _V    (mu+ana → mwana; ku+iga → kwiga)
+ *   §1.1  i → y / _V    (ki+atsi → cyatsi; mi+uko → myuko)
+ *   §1.1  a → ∅ / _V    (ba+ana → bana)
+ *   §3.3  n → m / _bilabial  (n+baga → mbaga; n+vura → mvura)
+ *   §3.5  r → d / n_    (n+ruru → nduru)
+ *   §3.7  k → g / _voiced   (ki+haza → gihaza)
+ *   §2.4  n + y → nz    (n+yoga → nzoga; Nt.9/10 only)
  */
 
 #include <string.h>
@@ -19,7 +45,9 @@
 #include <stdio.h>
 #include "../include/kinyarwanda.h"
 
-/* ── Utility: string helpers ─────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+ * § 0  UTILITIES
+ * ══════════════════════════════════════════════════════════════════════════ */
 
 /* kin_strlower: lower-case src into dst, also normalising UTF-8 macron vowels
  * (ā/Ā→a  ē/Ē→e  ī/Ī→i  ō/Ō→o  ū/Ū→u) that appear in some Bible PDFs.
@@ -60,7 +88,13 @@ void kin_str_trim(char *s) {
         s[--l] = '\0';
 }
 
-/* ── Vowel check ─────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+ * § 1  PHONOLOGICAL RULES  (Amategeko y'igenamajwi)
+ *      These rules apply across ALL trees.  Every morpheme boundary is
+ *      subject to these rules before any surface form is produced.
+ *      Rule set source: RALC 2017 + REB S3/S4 textbooks.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
 static bool is_vowel(char c) {
     return c=='a'||c=='e'||c=='i'||c=='o'||c=='u';
 }
@@ -137,6 +171,37 @@ bool kin_has_invalid_cluster(const char *word) {
     return false;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * § 2  TREE 1 — IZINA MBONERA (Common Noun)
+ *
+ *  Formula:   D  +  RT  +  C
+ *             │     │      └─ Igicumbi (stem; invariant; carries meaning)
+ *             │     └──────── Indanganteko (class marker; drives all agreement)
+ *             └────────────── Indomo (initial vowel: i / u / a; may be Ø)
+ *
+ *  The 16 inteko (noun classes) and their D+RT forms:
+ *   Nt.1  umu-  (human sg)       Nt.2  aba-  (human pl)
+ *   Nt.3  umu-  (thing sg)       Nt.4  imi-  (thing pl)
+ *   Nt.5  i/iri- (sing)          Nt.6  ama-  (pl/mass)
+ *   Nt.7  iki-  (thing sg)       Nt.8  ibi-  (thing pl)
+ *   Nt.9  in/im- (animal/thing)  Nt.10 in/im- (animal/thing pl)
+ *   Nt.11 uru-  (long/thin sg)   Nt.12 aka-  (diminutive sg)
+ *   Nt.13 utu-  (diminutive pl)  Nt.14 ubu-  (abstract)
+ *   Nt.15 uku-  (infinitive)     Nt.16 aha-  (locative)
+ *
+ *  Tree transitions from izina mbonera:
+ *   → izina ntera (POS_RELATIVE_NOUN): noun qualifying another, via ngenera connector
+ *   → proper name: indomo dropped (umugabo → Mugabo); detected by capitalisation
+ *   → deverbative noun: igicumbi derived from verb root; check_deverbative() in pos_tagger.c
+ *   → class shift: umugabo(Nt.1) → akagabo(Nt.12) → utugabo(Nt.13) → ubugabo(Nt.14)
+ *     [class shifts not yet explicitly tracked — planned]
+ *
+ *  Disambiguation from verbs:
+ *   Noun-class prefixes (umu/aba/iki/ibi/uru/aka/utu/ubu) overlap with verb SP.
+ *   Guard: prefer verb when tense marker is unambiguous AND stem is valid.
+ *   Handled in pos_tagger.c step 6 (noun) vs step 8 (verb) priority.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
 /*
  * kin_detect_noun_class()
  *
@@ -160,6 +225,7 @@ int kin_detect_noun_class(const char *w) {
     if (kin_starts_with(w, "aba") && wlen > 4) return 2;  /* Nt.2        */
     if (kin_starts_with(w, "imi") && wlen > 4) return 4;  /* Nt.4        */
     if (kin_starts_with(w, "ama") && wlen > 4) return 6;  /* Nt.6        */
+    if (kin_starts_with(w, "am") && wlen > 4 && is_vowel(w[2])) return 6; /* Nt.6 a→∅/V */
     if (kin_starts_with(w, "iki") && wlen > 4) return 7;  /* Nt.7        */
     if (kin_starts_with(w, "igi") && wlen > 4) return 7;  /* Nt.7 k→g   */
     if (kin_starts_with(w, "ibi") && wlen > 4) return 8;  /* Nt.8        */
@@ -384,9 +450,9 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
     /* Strip the surface prefix (D+RT combined) */
     switch (cls) {
         case 1: case 3:
-            if (kin_starts_with(word, "umw"))      stem_start = word + 2; /* u+mu+V → umw+V */
+            if (kin_starts_with(word, "umw"))      stem_start = word + 3; /* u + mu→mw/V: skip umw */
             else if (kin_starts_with(word, "umu")) stem_start = word + 3;
-            else if (kin_starts_with(word, "mw"))  stem_start = word + 1; /* short form mw+V*/
+            else if (kin_starts_with(word, "mw"))  stem_start = word + 2; /* dropped D: mu→mw/V, skip mw */
             else if (kin_starts_with(word, "wu"))  stem_start = word + 1; /* w'+u-noun: wumuntu */
             else if (kin_starts_with(word, "mu"))  stem_start = word + 2; /* dropped D 'u'  */
             break;
@@ -411,6 +477,8 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             break;
         case 6:
             if (kin_starts_with(word,"ama"))       stem_start = word + 3; /* ama */
+            else if (kin_starts_with(word,"am") && is_vowel((unsigned char)word[2]))
+                                                   stem_start = word + 2; /* a+m+V: a→∅ §1.1 */
             else if (kin_starts_with(word,"ma"))   stem_start = word + 2; /* dropped D */
             break;
         case 7:
@@ -431,8 +499,8 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             stem_start = word + 1; /* skip 'i', keep n/m as part of stem  */
             break;
         case 11:
-            if (kin_starts_with(word, "urw"))  stem_start = word + 2; /* u→w (urwanda) */
-            else if (kin_starts_with(word,"rw")) stem_start = word + 2; /* dropped D, u→w */
+            if (kin_starts_with(word, "urw"))  stem_start = word + 3; /* u + ru→rw/V: skip urw */
+            else if (kin_starts_with(word,"rw")) stem_start = word + 2; /* dropped D: ru→rw/V, skip rw */
             else if (kin_starts_with(word,"uru")) stem_start = word + 3; /* full form */
             else if (kin_starts_with(word,"ru"))  stem_start = word + 2; /* dropped D 'u' */
             else                               stem_start = word + 3; /* fallback */
@@ -448,13 +516,13 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             else                             stem_start = word + 3; /* utu */
             break;
         case 14:
-            if (kin_starts_with(word, "ubw"))  stem_start = word + 2; /* u→w */
+            if (kin_starts_with(word, "ubw"))  stem_start = word + 3; /* u + bu→bw/V: skip ubw */
             else if (kin_starts_with(word, "ubu")) stem_start = word + 3; /* ubu */
-            else if (kin_starts_with(word, "bw"))  stem_start = word + 1; /* dropped D u+bw */
+            else if (kin_starts_with(word, "bw"))  stem_start = word + 2; /* dropped D: bu→bw/V, skip bw */
             else if (kin_starts_with(word, "bu"))  stem_start = word + 2; /* dropped D 'u' */
             break;
         case 15:
-            if (kin_starts_with(word, "ukw"))  stem_start = word + 2; /* u→w */
+            if (kin_starts_with(word, "ukw"))  stem_start = word + 3; /* u + ku→kw/V: skip ukw */
             else                               stem_start = word + 3; /* uku */
             break;
         case 16:
@@ -468,6 +536,38 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
     stem_out[KIN_MAX_STEM - 1] = '\0';
     return true;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * § 4  TREE 3 — INSHINGA (Verb)
+ *
+ *  The verb tree has two main branches detected here:
+ *    § 4a  IMBUNDO (Infinitive / citation form)   → kin_is_verb_infinitive()
+ *    § 4b  ITONDAGUYE (Conjugated verb)           → kin_is_verb_conjugated()
+ *
+ *  Verb extensions (utumamo) are a sub-tree of the conjugated branch:
+ *    -w-      Imbundo    (passive)          gukorwa, gukozwa
+ *    -ish-    Integeko   (causative)        gukoresha, kwigisha
+ *    -ir-     Ikirango   (applicative)      gukorera, guhingira
+ *    -an-     Igisubizo  (reciprocal)       gukorana, kwigana
+ *    -ik-     Ngirika    (stative/potent.)  gufatika, guhingika
+ *    -uk-/-ur-Ngiruka/ra (reversive)        gufunguka, gufungura
+ *
+ *  Verb modes (uburyo) are distinguished by their TM+FV combination:
+ *    Ikirango   (indicative)  — all tenses, TM varies
+ *    Inyifurizo (optative)    — SP+ra+ka+C+a
+ *    Integeko   (imperative)  — bare C+a (no SP)
+ *    Inkurikizo (sequential)  — SP+ka+C+a
+ *    Ikigombero (subjunctive) — SP+C+e
+ *    Inziganyo  (conditional) — SP+a+[ku]+C+a
+ *
+ *  Tree transitions from inshinga:
+ *   → izina rivuye mu nshinga (deverbative noun): verb root → POS_NOUN
+ *     check_deverbative() in pos_tagger.c detects this after noun tagging
+ *   → Inshinga nkene (copula kuba): TENSE_COPULA_PAST / TENSE_COPULA_PRES
+ *   → Ingirwanshinga (-ti quotative): frozen suppletive forms in INVARIABLES
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── § 4a  IMBUNDO (Verb Infinitive) ─────────────────────────────────────── */
 
 /*
  * kin_is_verb_infinitive()
@@ -759,6 +859,20 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
             return true;
         }
     }
+    /* Causative-y (Ngiza): stem ends in 'z' where z ← r+y (r+y→z rule, §1.3).
+     * Replace final 'z' with 'r'; if the result is a known verb stem, this is
+     * the -y- causative form of that r-final base verb.
+     * e.g. "mez" → "mer" (kumera → kumeza); bare_out = "mer" (citation root).
+     * Checked last because z is a valid base-stem consonant; we only strip when
+     * the r-form is a confirmed known stem. */
+    if (slen >= 3 && stem[slen-1] == 'z') {
+        strncpy(tmp, stem, slen - 1); tmp[slen-1] = 'r'; tmp[slen] = '\0';
+        if (kin_is_known_verb_stem(tmp)) {
+            if (ext_out)  *ext_out = VEXT_CAUSATIVE_Y;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
     return false;
 }
 
@@ -931,6 +1045,25 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (subj_class) *subj_class = SP[i].cls;
             if (tense_out)  *tense_out  = TENSE_PAST_IMPF;
             return true;
+        }
+        /* PAST PERFECT with epenthetic 'i' (-iye FV):                         *
+         * Rule: consonant-final root + iye → e.g. zi+kwir+iye = zikwiriye    *
+         * Epenthesis of 'i' occurs before 'ye' when root ends in consonant.  *
+         * Must gate on kin_is_known_verb_stem to avoid false positives        *
+         * (otherwise "biye", "tiye" etc. would all fire here).               *
+         * Only applies when ortho rule 3.9.3 would give wrong result (r+ye). */
+        if (ilen > 4 && kin_ends_with(inner, "iye")) {
+            size_t sl = ilen - 3;
+            char cand[KIN_MAX_STEM];
+            strncpy(cand, inner, sl); cand[sl] = '\0';
+            if (sl >= 2 && !is_vowel((unsigned char)cand[sl-1])
+                        && kin_is_known_verb_stem(cand)) {
+                if (stem_buf) { strncpy(stem_buf, cand, KIN_MAX_STEM-1);
+                                stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                return true;
+            }
         }
         /* PAST PERFECT: ends in ye */
         if (ilen > 3 && kin_ends_with(inner, "ye")) {
@@ -1153,6 +1286,8 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
     }
     return false;
 }
+
+/* ── § 4b  ITONDAGUYE (Conjugated Verb) ──────────────────────────────────── */
 
 /*
  * kin_is_verb_conjugated()
@@ -1387,6 +1522,36 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     return true;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * § 3  TREE 2 — NTERA (Adjective)
+ *
+ *  Formula:   RS  +  C
+ *             │      └─ Igicumbi (adjective stem; closed set of ~27 stems)
+ *             └──────── Indangasano (concordance prefix = noun's indanganteko)
+ *
+ *  Rule: RS MUST equal the indanganteko of the noun it modifies.
+ *  If RS ≠ noun's RT → ERR_ADJ_AGREEMENT (detected in syntax.c).
+ *
+ *  Adjective stems (in lexicon.c ADJ_STEMS[]):
+ *   -nini (big)    -to (small)    -re (long)     -gufi (short)
+ *   -ke (few)      -shya (new)    -bi (bad)       -za (good)
+ *   -zima (whole)  -kuru (old)    -bisi (raw)     -sa (like)
+ *   -tindi (other) -gari (wide)   -inshi (many)   -eru (white)
+ *   -nzima (heavy) -ogo (deep)    -tagatifu (holy) -hire (fast)
+ *   -taraga (old/aged)            + augmentative variants (-nzinya etc.)
+ *
+ *  Reduplication (indorerezi): RS + C + RS + C for emphasis.
+ *   e.g. mu+re+mu+re = muremure (very tall/long, Nt.1)
+ *        ba+re+ba+re = barebare (Nt.2)
+ *
+ *  Tree transitions from ntera:
+ *   → izina ntera (POS_RELATIVE_NOUN): when a noun plays the RS+C role.
+ *     The noun connects via ikinyazina ngenera (possessive connector).
+ *     e.g. "igitabo cy'Ikinyarwanda" — Ikinyarwanda is POS_RELATIVE_NOUN.
+ *   → igisantera (POS_COMPOUND_ADJ): two noun-pair acting as single adjective.
+ *     [planned — tag exists in header, detection not yet implemented]
+ * ══════════════════════════════════════════════════════════════════════════ */
+
 /*
  * kin_strip_adj_prefix()
  *
@@ -1417,10 +1582,24 @@ bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out) {
         { "by",  8  }, /* bi + vowel-initial stem (i→y)                   */
         { "cy",  7  }, /* ki + vowel-initial stem (i→y, ky→cy)            */
         { "my",  4  }, /* mi + vowel-initial stem (i→y)                   */
-        { "ny",  9  }, /* n  + vowel-initial stem (n→ny before some V)    */
         { "ry",  5  }, /* ri + vowel-initial stem (i→y): ryiza, ryinshi   */
-        /* a+i→e fusion: prefix ending in 'a' + i-initial stem → 'e'+stem */
-        /* (Amategeko y'igenamajwi p.7-8: a+i contraction)                */
+        /* ── Class 9 (RS=n) nasal surface variants ─────────────────────────
+         * The underlying RS is always 'n'.  The surface form changes based
+         * on the initial consonant of C (igicumbi):
+         *   n + bilabial (b,p,v,f,h)  → m   §3.3   (n→m assimilation)
+         *   n + r                     → nd  §3.5   (r→d after nasal)
+         *   n + vowel or y            → nz  §2.4   (epenthetic z)
+         *   n + n                     → n   (geminate simplification)
+         *   n + other consonant       → n   (unchanged)
+         * Note: "ny" as a prefix is WRONG — the digraph 'ny' is a phoneme,
+         * so n(RS) + nyoni(C) surfaces as "nyoni" with RS stripped.        */
+        { "m",   9  }, /* n→m §3.3: mbisi, mbi (n before bilabial)        */
+        { "nd",  9  }, /* n+r→nd §3.5: ndere, nderenire (n before r-stem) */
+        { "nz",  9  }, /* n+V epenthetic z §2.4: nziza, nzinshi           */
+        /* ── Class 12 (RS=ka) voicing before voiced consonant ───────────── */
+        { "ga",  12 }, /* k→g §3.7 (ka before voiced-initial C stem)      */
+        /* ── a+i→e fusion: prefix ending in 'a' + i-initial stem ──────────
+         * Amategeko y'igenamajwi p.7-8: a+i contraction                   */
         { "be",  2  }, /* ba + inshi/iza → benshi/beza                    */
         { "me",  6  }, /* ma + inshi/iza → menshi/meza                    */
         { "ye",  4  }, /* ya + i-stem (Nt.4)                              */
@@ -1447,6 +1626,41 @@ bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out) {
             if (stem_out)  strncpy(stem_out, sfx, KIN_MAX_STEM - 1);
             if (class_out) *class_out = ADJ_PREFIXES[i].cls;
             return true;
+        }
+
+        /* ── Class 9 special: n+n→n geminate simplification ──────────────
+         * n(RS) + nini(C) → surface "nini" (nn simplified to n).
+         * After stripping "n", sfx = "ini" which is not a stem.
+         * Reconstruct by prepending 'n' to sfx and recheck.             */
+        if (ADJ_PREFIXES[i].cls == 9 &&
+            ADJ_PREFIXES[i].pfx[0] == 'n' && ADJ_PREFIXES[i].pfx[1] == '\0') {
+            char restored[KIN_MAX_STEM];
+            restored[0] = 'n';
+            strncpy(restored + 1, sfx, KIN_MAX_STEM - 2);
+            restored[KIN_MAX_STEM - 1] = '\0';
+            if (kin_is_adj_stem(restored)) {
+                if (stem_out)  strncpy(stem_out, restored, KIN_MAX_STEM - 1);
+                if (class_out) *class_out = 9;
+                return true;
+            }
+        }
+
+        /* ── Class 9 special: n+r→nd (§3.5) ─────────────────────────────
+         * n(RS) + re(C) → surface "nde" (r→d after n).
+         * After stripping "nd", sfx = "e" but underlying C = "re".
+         * Reconstruct by prepending 'r' to sfx and recheck.             */
+        if (ADJ_PREFIXES[i].cls == 9 &&
+            ADJ_PREFIXES[i].pfx[0] == 'n' && ADJ_PREFIXES[i].pfx[1] == 'd' &&
+            ADJ_PREFIXES[i].pfx[2] == '\0') {
+            char restored[KIN_MAX_STEM];
+            restored[0] = 'r';
+            strncpy(restored + 1, sfx, KIN_MAX_STEM - 2);
+            restored[KIN_MAX_STEM - 1] = '\0';
+            if (kin_is_adj_stem(restored)) {
+                if (stem_out)  strncpy(stem_out, restored, KIN_MAX_STEM - 1);
+                if (class_out) *class_out = 9;
+                return true;
+            }
         }
 
         /* Reduplication check: RS + stem + RS + stem

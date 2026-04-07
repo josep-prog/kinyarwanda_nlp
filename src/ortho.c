@@ -49,10 +49,11 @@
 
 static bool ov(char c)  { return c=='a'||c=='e'||c=='i'||c=='o'||c=='u'; }
 
-/* A consonant is "voiced" for the k→g/t→d voicing rule (§3.7).
- * Vowels count as voiced (roots starting with a vowel trigger voicing). */
+/* Ingombajwi z'indagi (GR) — voiced consonants in Kinyarwanda.
+ * 'h' is the voiced glottal fricative [ɦ] in Kinyarwanda (ki+haza→gihaza).
+ * Vowels count as voiced.  Used for validation; §3.7 itself is unconditional. */
 static bool voiced(char c) {
-    return c=='b'||c=='d'||c=='g'||c=='j'||c=='l'||c=='m'||c=='n'||
+    return c=='b'||c=='d'||c=='g'||c=='h'||c=='j'||c=='l'||c=='m'||c=='n'||
            c=='r'||c=='v'||c=='w'||c=='y'||c=='z'||ov(c);
 }
 
@@ -339,19 +340,20 @@ static bool apply_nasal_elision(char *buf, int bpos, int *len) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * P7 – §3.7  Consonant voicing   (Itanisha ry'ingombajwi)
- *   3.7.1  k → g / _ voiced-initial root
- *   3.7.2  t → d / _ voiced-initial root
+ *   3.7.1  k → g  (prefix RT 'ki'/'ka'/'ku' → 'gi'/'ga'/'gu')
+ *   3.7.2  t → d  (prefix RT 'tu' → 'du')
  *
- * "Voiced" here means the first consonant/vowel of the following morpheme
- * triggers voicing of the prefix-final k or t.
+ * This is a MORPHOPHONOLOGICAL rule on 2-char noun/verb prefixes, not a
+ * strictly phonological voicing assimilation.  It applies unconditionally
+ * when the preceding morpheme is exactly 2 chars and ends in 'k' or 't'.
+ * Evidence: "igitabo" (igi+tabo) has gi before voiceless 't'.
+ *
+ * GR (ingombajwi z'indagi) notation in rule descriptions marks the output
+ * class; the voiced() helper is used elsewhere for phonological validation.
  * ═══════════════════════════════════════════════════════════════════════════ */
 static bool apply_voicing(char *buf, int bpos, int *len) {
-    /* §3.7.1/3.7.2: k→g, t→d for short class-marker/infinitive prefixes.
-     *
-     * The book shows k→g in: ku→gu (infinitive), ka→ga (Nt.12), ki→gi (Nt.7).
-     * This is unconditional for these 2-char prefixes regardless of what follows.
-     * We apply it to the PRECEDING morpheme when it is exactly 2 chars long
-     * and starts with 'k' or 't'.  Longer morphemes are roots and are not voiced.
+    /* §3.7.1/3.7.2: k→g, t→d for short class-marker prefixes.
+     * Applied unconditionally to any 2-char prefix ending in k or t.
      *
      * Algorithm: walk back from bpos to find the start of the preceding morpheme.
      * If (bpos - prec_start) == 2 and buf[prec_start] is 'k' or 't', voice it.
@@ -685,8 +687,11 @@ void kin_ortho_gen(const char *morphemes, bool noun_class_9,
         if (!any) break;
     }
 
-    /* P4: b→m before n */
-    pass_b_to_m(buf, &len);
+    /* P4: b→m before n (§3.4.1)
+     * Skipped when noun_class_9=true: for Nt.9/10 nouns, the boundary is
+     * prefix-n + stem, so n→m (§3.3.3) applies, NOT b→m (§3.4.1).
+     * §3.3.3 fires in P5 below and correctly gives imbabazi not imabazi. */
+    if (!noun_class_9) pass_b_to_m(buf, &len);
 
     /* P5: nasal assimilation (multiple passes for cascades) */
     for (int iter = 0; iter < 4; iter++) {
@@ -1068,32 +1073,55 @@ void kin_ortho_nt9_stem(const char *after_i, char *stem_out, size_t size) {
 
     const char *st = after_i;
 
-    /* Surface "nz": came from n + y-initial stem (§2.4.1) or n + V (epenthetic z) */
-    if (wlen >= 2 && st[0]=='n' && st[1]=='z') {
-        st += 2;
-    }
-    /* Surface "ny": came from n + ny-initial stem (§3.1.3: n elided before ny) */
-    else if (wlen >= 2 && st[0]=='n' && st[1]=='y') {
-        st += 2;
-    }
-    /* Surface "nsh": came from n + c-initial stem (§3.6.2: nc→nsh) */
-    else if (wlen >= 3 && st[0]=='n' && st[1]=='s' && st[2]=='h') {
+    /* Surface "nsh": came from n + c-initial stem (§3.6.2: nc→nsh).
+     * Check this BEFORE the "n" catch-all.                                  */
+    if (wlen >= 3 && st[0]=='n' && st[1]=='s' && st[2]=='h') {
         /* Restore the underlying 'c': */
         strncpy(stem_out, "c", size-1);
         strncat(stem_out, st+3, size-1-strlen(stem_out));
         stem_out[size-1] = '\0';
         return;
     }
-    /* Surface "m" + bilabial: n→m (§3.3.1-3.3.5) then n→ø (§3.1.1) */
-    else if (wlen >= 2 && st[0]=='m') {
-        /* The 'm' is the surface of the original 'n' prefix.
-         * The stem starts at st+1 (the bilabial consonant is the stem start). */
-        st += 1;
+    /* Surface "nz": n+y→nz (§2.4.1).  All Nt.9/10 "nz" words have a
+     * y-initial underlying stem (inzira←i-n-yira, inzoga←i-n-yoga, …).
+     * Restore the underlying 'y': strip "nz", prepend 'y'.
+     * Example: "nzira" → C="yira";  "nzoga" → C="yoga".                    */
+    else if (wlen >= 2 && st[0]=='n' && st[1]=='z') {
+        stem_out[0] = 'y';
+        strncpy(stem_out + 1, st + 2, size - 2);
+        stem_out[size-1] = '\0';
+        return;
     }
-    /* Surface "nd": n→d? No: actually r→d / _n (§3.5) applies in verb contexts,
-     * not in noun class 9.  For class 9, "nd" comes from n + d-initial stems. */
+    /* Surface "ny": n before a genuine 'ny' phoneme (palatal nasal).
+     * 'ny' is a distinct Kinyarwanda phoneme (not n+y glide); the RT 'n'
+     * merges into the palatal 'ny' of C (n+ny→ny simplification).
+     * C = full after_i; RT 'n' has zero surface representation.
+     * Example: inyoni = i + n + nyoni → inyoni (n absorbed into ny).  */
+    else if (wlen >= 2 && st[0]=='n' && st[1]=='y') {
+        /* Do NOT strip: C retains the initial 'ny' phoneme intact. */
+        /* st unchanged */
+    }
+    /* Surface "m": n→m assimilation (§3.3) before bilabial consonant.
+     * Two sub-cases must be distinguished:
+     *   a) after_i[1] is a consonant  → 'm' is the surface RT (n→m), C starts
+     *      at after_i[1].  Example: "mvura" → C="vura", "mbeba" → C="beba".
+     *   b) after_i[1] is a vowel      → the 'm' belongs to C (the underlying
+     *      RT 'n' merged into the initial 'm' of C via geminate simplification
+     *      nn→n after n→m).  Example: "mana" → C="mana" (not "ana").
+     *      The RT 'n' has zero surface representation in this case.          */
+    else if (wlen >= 2 && st[0]=='m') {
+        char c1 = st[1];
+        bool next_is_vowel = (c1=='a'||c1=='e'||c1=='i'||c1=='o'||c1=='u');
+        if (next_is_vowel) {
+            /* Case (b): m belongs to C; RT 'n' fully absorbed — do NOT strip */
+            /* st unchanged → C = full after_i string (e.g. "mana") */
+        } else {
+            /* Case (a): m is surface of RT 'n'; C starts after the 'm' */
+            st += 1;
+        }
+    }
+    /* Plain 'n' prefix before consonant-initial stem (no transformation). */
     else if (wlen >= 2 && st[0]=='n') {
-        /* plain n prefix before consonant-initial stem (no transformation needed) */
         st += 1;
     }
 

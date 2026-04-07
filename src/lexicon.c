@@ -16,14 +16,20 @@
 #include "../include/kinyarwanda.h"
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 1. NOUN CLASSES (Inteko) – 16 classes, p.61-62
+ * TREE 1 — IZINA MBONERA (Common Noun)
+ * Section 1: INTEKO (Noun Classes) – 16 classes   Source: REB S4 p.61-62
  *
- * Columns:
- *  num  | prefix (D+RT) | RT    | adj concordance | poss connector | subj prefix | description
+ * Each class entry stores:
+ *   num           – class number 1-16
+ *   prefix (D+RT) – combined surface prefix (e.g. "umu" = u+mu)
+ *   rt            – indanganteko alone (e.g. "mu")
+ *   concordance_adj  – indangasano for ntera (adjective agreement)
+ *   concordance_poss – possessive connector (ikinyazina ngenera)
+ *   subj_prefix   – verb subject agreement prefix (SP)
+ *   description   – label in English
  *
- * Note: classes 1/3 and 2/4 share prefixes but differ in semantics:
- *   Nt.1/Nt.2 = human nouns  (umuntu / abantu)
- *   Nt.3/Nt.4 = tree/thing nouns (umuti / imiti)
+ * Nt.1/Nt.2 = human nouns  (umuntu / abantu)
+ * Nt.3/Nt.4 = tree/thing nouns (umuti / imiti)  — SAME prefix as Nt.1/2
  * ══════════════════════════════════════════════════════════════════════════ */
 static const NounClass NOUN_CLASSES[] = {
     /* num  prefix   rt    adj-RS  poss-conn  subj  description */
@@ -52,10 +58,20 @@ const NounClass *kin_get_noun_class(int num) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 2. ADJECTIVE STEMS (Ibicumbi by'intera) – p.66-67
+ * TREE 2 — NTERA (Adjective)   Formula: RS + C
+ * Section 2: IBICUMBI BY'INTERA (Adjective stems)   Source: REB S4 p.66-67
  *
- * These 19+ stems are the complete list from the book (section 3.4.3).
- * Any word built as: concordance_prefix + one of these stems = adjective.
+ * These stems form the CLOSED SET of adjective roots in Kinyarwanda.
+ * Any word built as:  concordance_prefix (RS) + one of these stems = ntera.
+ * RS must agree with the noun class it modifies (indangasano rule).
+ *
+ * Transition → izina ntera (POS_RELATIVE_NOUN): when a noun plays the
+ *   qualifier role for another noun via an ikinyazina ngenera connector.
+ *   e.g. "igitabo cy'Ikinyarwanda" — the noun Ikinyarwanda is izina ntera.
+ *   Detected in pos_tagger.c Context Pass B.
+ *
+ * Planned → igisantera (POS_COMPOUND_ADJ): noun pair as compound adjective.
+ *   Not yet implemented. Tag POS_COMPOUND_ADJ exists in the header.
  * ══════════════════════════════════════════════════════════════════════════ */
 static const char *ADJ_STEMS[] = {
     "nini",         /* 1.  large / adult                          */
@@ -88,6 +104,13 @@ static const char *ADJ_STEMS[] = {
     /* 19. big / many (augmentative forms): */
     "nzinya", "nzunyu", "nuya", "niniya", "nzuzunya",
     "nunuya", "niniriya", "nziginya", "nzugurunyu",
+    /* Stems from REB textbooks and Bible corpus not in the original list */
+    "nzima",        /* 20. heavy / difficult / sick (munzima, binzima)   */
+    "ogo",          /* 21. deep / wide / immense   (rugo=long, bugo=...)  */
+    "eru",          /* 22. white / clean / pure    (mweru, byeru, keru)   */
+    "rimbwa",       /* 23. lovable / beloved       (murimbwa, birimbwa)   */
+    "nkuru",        /* 24. great / senior / big (variant of -kuru)        */
+    "meze",         /* 25. resembling / having the condition of (from kumera, RS+meze = bumeze/numeze) */
     NULL
 };
 
@@ -128,10 +151,24 @@ bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 3. PRONOUNS (Ibinyazina) – p.89-97
+ * TREE 4 — IKINYAZINA (Pronoun)   Nine sub-types
+ * Section 3: PRONOUNS table   Source: REB S4/S5/S6 p.89-121
  *
  * Each entry: { surface form, PronounType, noun_class }
- * class 0 = applies to multiple / not class-specific
+ *   class 0 = applies to multiple classes or is class-independent
+ *
+ * Sub-type order in this table (matching PronounType enum):
+ *   PRON_PERSONAL       Ikinyazina ngenga        (nge, we, bo...)
+ *   PRON_DEMONSTRATIVE  Ikinyazina nyereka       (uyu, uwo, uno... × 3 proximities)
+ *   PRON_POSSESSIVE     Ikinyazina ngenera       (wa, ya, cya... × 16 classes)
+ *   PRON_REFLEXIVE      Ikinyazina ngenera ngenga (wange, wacu, wawe, wabo...)
+ *   PRON_RELATIVE       Ikinyazina mbanziriza    (uwo, abo, icyo... with -ô tone)
+ *   PRON_INTERROGATIVE  Ikinyazina kibaza        (nde, iki, iyihe... + -he/-ngahe)
+ *   PRON_INDEFINITE     Ikinyazina ndafutura     (umwe, bamwe, undi, bandi...)
+ *   PRON_NUMERICAL      Ikinyazina nyamubaro     (umwe...-rindwi per class)
+ *   PRON_VOCATIVE       Ikinyazina mpamagazi     (wa — O! address)
+ *
+ * Gap: demonstrative proximities 3-6 (further from speaker) partially missing.
  * ══════════════════════════════════════════════════════════════════════════ */
 typedef struct { const char *word; PronounType type; int class; } PronounEntry;
 
@@ -250,6 +287,16 @@ static const PronounEntry PRONOUNS[] = {
     { "rwabo",  PRON_REFLEXIVE, 11 }, { "kabo",   PRON_REFLEXIVE, 12 },
     { "twabo",  PRON_REFLEXIVE, 13 }, { "bwabo",  PRON_REFLEXIVE, 14 },
     { "kwabo",  PRON_REFLEXIVE, 15 }, { "habo",   PRON_REFLEXIVE, 16 },
+    /* Nt.8 class-referent possessives (-byo): connector + byo             *
+     * e.g. "twabyo" = twa(Nt.13 conn.) + byo(Nt.8 ref.) = their Nt.8   *
+     *      "yabyo"  = ya(Nt.6 conn.)   + byo(Nt.8 ref.) = their Nt.8   */
+    { "wabyo",  PRON_REFLEXIVE,  1 }, { "babyo",  PRON_REFLEXIVE,  2 },
+    { "yabyo",  PRON_REFLEXIVE,  4 }, { "ryabyo", PRON_REFLEXIVE,  5 },
+    { "yabyo",  PRON_REFLEXIVE,  6 }, { "cyabyo", PRON_REFLEXIVE,  7 },
+    { "byabyo", PRON_REFLEXIVE,  8 }, { "zabyo",  PRON_REFLEXIVE, 10 },
+    { "rwabyo", PRON_REFLEXIVE, 11 }, { "kabyo",  PRON_REFLEXIVE, 12 },
+    { "twabyo", PRON_REFLEXIVE, 13 }, { "bwabyo", PRON_REFLEXIVE, 14 },
+    { "kwabyo", PRON_REFLEXIVE, 15 }, { "habyo",  PRON_REFLEXIVE, 16 },
     /* 3rd singular (-e): we, be, rye, ye, cye, bye, ze, rwe, ke, twe, bwe...
      * connector + ye → fusion: rya+ye → rye, cya+ye → cye, etc.         */
     { "we",    PRON_REFLEXIVE,  1 },  /* his/her/its (Nt.1)                */
@@ -531,9 +578,23 @@ bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 4. INVARIABLE WORDS (Amagambo adahinduka) – p.89
- *    Umugereka (ingera), Icyungo, Irangamutima, Akamamo, Indangahantu,
- *    Ikegeranshinga
+ * TREE 5 — AMAGAMBO ADAHINDUKA (Invariable Words)
+ * Section 4: INVARIABLES table   Source: REB S4 p.89 + corpus extension
+ *
+ * These words never change form regardless of context.
+ * Checked at POS priority Step 1 — BEFORE all morphological analysis.
+ *
+ * Sub-categories (POS values in this table):
+ *   POS_PREPOSITION    Umugereka / Ingera      ku, mu, i, kuri, nka, kwa...
+ *   POS_CONJUNCTION    Icyungo                 na, kandi, ariko, rero, nuko...
+ *   POS_ADVERB         Akamamo                 cyane, neza, gato, kenshi...
+ *   POS_LOCATIVE       Indangahantu            hasi, hano, hejuru, hanze...
+ *   POS_INTERJECTION   Irangamutima            yee, ahaa, asyi, wee...
+ *   POS_VERB_PARTICLE  Ikegeranshinga          ngo, ko, dore, ngwino...
+ *   POS_VERB_CONJ      Frozen/suppletive forms ni, si, ndi, ati, bati...
+ *
+ * Note: Elided possessive connectors (cy, ry, bw...) are in PRONOUNS table
+ * but also duplicated here to catch apostrophe-stripped forms early.
  * ══════════════════════════════════════════════════════════════════════════ */
 typedef struct { const char *word; POS pos; } InvEntry;
 
@@ -991,11 +1052,19 @@ bool kin_is_invariable(const char *word, POS *pos_out) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 5. KNOWN VERB STEMS
+ * TREE 3 — INSHINGA (Verb)   Formula: PREF+C+FV (imbundo) | SP+(TM)+(OM)+C+(EXT)+FV (itondaguye)
+ *
+ * 5. KNOWN VERB STEMS (Imizi y'inshinga izwi)
  *    Sources:
  *      – "Ikinyarwanda Amashuri Nderabarezi TTC" (REB 2020)
  *      – Bibiliya Yera 2001 corpus (top-frequency infinitives/conjugations)
  *    Format: bare stem (what follows ku/gu/kw/gw prefix before final -a)
+ *
+ *    Transitions (Tree 3 → other trees):
+ *      Inshinga → Izina mbonera:  verb root becomes noun via derivation
+ *        e.g. gucya (to shine) → umucyo (light); kwijima → umwijima (darkness)
+ *      Inshinga → Ntera:          verb root used as adjective stem
+ *        e.g. gusaza (to grow old) → usaza (one who grows old / old)
  * ══════════════════════════════════════════════════════════════════════════ */
 static const char *VERB_STEMS[] = {
     /* ── From REB textbook ────────────────────────────────────────────── */
@@ -1112,7 +1181,7 @@ static const char *VERB_STEMS[] = {
     "tah",      /* kutaha      – to go home                              */
     "tum",      /* gutuma      – to send / cause                         */
     "tor",      /* gutora      – to choose / vote                        */
-    "mer",      /* gumera      – to grow / sprout                        */
+    "mer",      /* kumera      – to grow / sprout; causative kumeza via r+y→z rule */
     "ban",      /* kubana      – to live together / cohabit              */
     "bar",      /* kubara      – to count                                */
     "imb",      /* kwimba      – to dig                                  */
@@ -1123,6 +1192,7 @@ static const char *VERB_STEMS[] = {
     "pang",     /* gupanga     – to plan / arrange                       */
     "kang",     /* gukanguka   – to wake up / be vigilant               */
     "ish",      /* kwisha      – to finish / end                         */
+    "va",       /* kuva        – to come from / leave from / depart      */
     "van",      /* guvana      – to part from / separate                 */
     "nyur",     /* kunyura     – to pass through / traverse              */
     "zam",      /* kuzamura    – to lift / raise up                      */
@@ -1235,7 +1305,7 @@ static const char *VERB_STEMS[] = {
     "b",        /* kuba        – to be / exist (copular: araba, rurabaho)*/
     "rakar",    /* gurakarira  – to be angry / furious                   */
     "rakaz",    /* gurakariza  – to make angry / enrage                  */
-    "mer",      /* gumera      – to grow / thrive (already "mer" added?) */
+    "mer",      /* kumera      – to grow / thrive (already "mer" added?) */
     "nyag",     /* gunyaga     – to steal / plunder (already present)    */
     "nywer",    /* kunywereza  – to water / make drink (causative base)  */
     "vaner",    /* kuvana      – to separate / split from (also: van)    */
@@ -1301,6 +1371,7 @@ static const char *VERB_STEMS[] = {
     "wambar",   /* kwambara    – to wear / dress        (→ umwambaro = clothing)*/
     "sanzur",   /* gusanzura   – to spread/stretch out (sky, cloth);
                    ALSO kwisanzura – to free oneself (→ ubwisanzure = freedom) */
+    "kwir",     /* gukwira     – to fit / be appropriate / suitable (zikwiriye) */
     NULL
 };
 
@@ -1311,6 +1382,7 @@ bool kin_is_known_verb_stem(const char *stem) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * TREE 3 — INSHINGA (continued)
  * 5b. REFLEXIVE VERB STEMS (Inshinga z'imbundo ya kwikora)
  *
  * These stems have a primary reflexive form with prefix kwi- (imbundo ya
@@ -1342,8 +1414,8 @@ bool kin_is_reflexive_verb_stem(const char *stem) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 6. KNOWN NOUN STEMS – with their primary noun class
- *    These are used as a fallback when morphological analysis is ambiguous
+ * TREE 1 — IZINA MBONERA (continued)
+ * 6. KNOWN NOUN STEMS (Imizi y'amazina izwi) — fallback for ambiguous morphology
  * ══════════════════════════════════════════════════════════════════════════ */
 typedef struct { const char *stem; int class; } NounStem;
 
@@ -1376,7 +1448,7 @@ static const NounStem NOUN_STEMS[] = {
     { "go",      11 }, /* urugo – home (nt.11)              */  /* duplicate 'go' handled by class check */
     { "zi",      14 }, /* uburezi – education (nt.14)       */
     { "mero",    14 }, /* ubumero – number (nt.14)          */
-    { "wenge",   14 }, /* ubwenge – wisdom (nt.14)          */
+    { "enge",    14 }, /* ubwenge – wisdom (nt.14)          */
     { "ntu",     16 }, /* ahantu – place (nt.16)            */
     /* ── Common nouns from Bibiliya Yera 2001 corpus ──────────────── */
     { "juru",     5 }, /* ijuru – sky / heaven (Nt.5)       */
@@ -1388,7 +1460,7 @@ static const NounStem NOUN_STEMS[] = {
     { "sanzure",  5 }, /* isanzure – expanse/sky (Nt.5)    */
     { "nyanja",   9 }, /* inyanja – sea / lake (Nt.9)      */
     { "butaka",  14 }, /* ubutaka – ground / land (Nt.14)  */
-    { "watsi",   14 }, /* ubwatsi – grass / vegetation (Nt.14) */
+    { "atsi",    14 }, /* ubwatsi – grass / vegetation (Nt.14) */
     { "miro",     4 }, /* imirimo – works / tasks (Nt.4)   */
     { "ko",      12 }, /* amoko – kinds / types (Nt.6)     */
     { "gibo",    14 }, /* ubugibo – blessing                */
@@ -1407,6 +1479,7 @@ bool kin_is_known_noun_stem(const char *stem, int *class_out) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * TREE 1 — IZINA MBONERA (continued)
  * 6b. FULL KNOWN WORDS – irregular nouns/words whose class prefix is elided
  *     or whose morphology doesn't match standard patterns.
  *     Sourced primarily from Bibiliya Yera 2001 corpus.
@@ -1450,8 +1523,8 @@ static const KnownWord KNOWN_WORDS[] = {
     /* Common Nt.14 abstract nouns */
     { "ubugingo", 14, "gingo"  },  /* life / soul / breath                */
     { "ubuzima",  14, "zima"   },  /* health / life                       */
-    { "ubwami",   14, "wami"   },  /* kingdom / reign                     */
-    { "ubwoba",   14, "woba"   },  /* fear / fright                       */
+    { "ubwami",   14, "ami"    },  /* kingdom / reign                     */
+    { "ubwoba",   14, "oba"    },  /* fear / fright                       */
     /* Common Nt.6 body/nature nouns */
     { "amaraso",  6,  "raso"   },  /* blood                               */
     { "amaboko",  6,  "boko"   },  /* arms / hands                        */
@@ -1462,8 +1535,14 @@ static const KnownWord KNOWN_WORDS[] = {
     { "icyaha",   7,  "yaha"   },  /* sin / fault / guilt                 */
     { "igihe",    7,  "gihe"   },  /* time / moment / period              */
     { "igihugu",  7,  "hugu"   },  /* country / nation                    */
-    /* Common Nt.9 nouns */
+    /* Common Nt.9 nouns with n+y→nz (§2.4.1) prefix rule */
+    { "inzira",   9,  "nzira"  },  /* path / road                         */
+    { "inzara",   9,  "nzara"  },  /* hunger / famine                     */
     { "inzoga",   9,  "nzoga"  },  /* beer / alcohol                      */
+    { "inzoka",   9,  "nzoka"  },  /* snake                               */
+    { "inzuzi",   9,  "nzuzi"  },  /* flies (insects)                     */
+    { "inzuki",   9,  "nzuki"  },  /* bees                                */
+    { "inzobe",   9,  "nzobe"  },  /* inzobe (plant/food)                 */
     /* Nt.1/3 nouns whose D vowel 'u' is dropped in informal writing       */
     { "musomyi",  1,  "somyi"  },  /* reader / student (= umusomyi)        */
     { "muntu",    1,  "ntu"    },  /* person (= umuntu)                    */
@@ -1495,7 +1574,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "majwi",    6,  "jwi"    },  /* = amajwi (voices / sounds)          */
     { "masomo",   6,  "somo"   },  /* = amasomo (lessons)                 */
     { "mateka",   6,  "teka"   },  /* = amateka (history)                 */
-    { "moko",     6,  "ko"     },  /* = amoko (types / species)           */
+    { "moko",     6,  "oko"    },  /* = amoko dropped-D: m+oko (C=-oko-)  */
+    { "amoko",    6,  "oko"    },  /* amoko: a+m+oko (a→∅ §1.1 before 'o')*/
     /* Dropped D-vowel: Nt.9 words where prefix 'i' is elided             */
     { "nzu",      9,  "nzu"    },  /* = inzu (house)                      */
     { "nzira",    9,  "nzira"  },  /* = inzira (path / road)              */
@@ -1509,8 +1589,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "nyina",    1,  "nyina"  },  /* mother / her mother                 */
     { "shebuja",  1,  "shebuja"},  /* master / lord (title)               */
     /* Common Nt.14 nouns */
-    { "bwenge",  14,  "wenge"  },  /* = ubwenge (wisdom / intelligence)   */
-    { "bwami",   14,  "wami"   },  /* = ubwami (kingdom — alternate form) */
+    { "bwenge",  14,  "enge"   },  /* = ubwenge (wisdom / intelligence)   */
+    { "bwami",   14,  "ami"    },  /* = ubwami (kingdom — alternate form) */
     /* Common Nt.9 nouns from Bible corpus */
     { "nteko",    9,  "nteko"  },  /* = inteko (class / group / council)  */
     { "nyota",    9,  "nyota"  },  /* = inyota (thirst)                   */
@@ -1716,12 +1796,13 @@ static const KnownWord KNOWN_WORDS[] = {
     { "ubwiza",    14, "wiza"   }, /* beauty / goodness / grace (Nt.14)      */
     { "ubutegetsi",14, "tegetsi"}, /* power / authority / government (Nt.14) */
     { "ubuhamya",  14, "hamya"  }, /* testimony / witness (Nt.14)            */
+    { "itegeko",    5, "tegeko"  }, /* law / commandment (Nt.5)               */
     { "iterambere", 5, "terambere"},/* progress / development (Nt.5)         */
     { "amasezerano",6, "sezerano"},/* covenants / agreements (Nt.6 pl)       */
     { "ubukiro",   14, "kiro"   }, /* salvation / redemption (Nt.14)         */
     { "inzoga",    9,  "nzoga"  }, /* beer / alcoholic drink (Nt.9, dup ok)  */
     { "inyumba",   9,  "nyumba" }, /* room / apartment (Nt.9)                */
-    { "urwego",   11,  "wego"   }, /* level / rank / tier (Nt.11)            */
+    { "urwego",   11,  "ego"    }, /* level / rank / tier (Nt.11)            */
     { "uruhande",  11, "hande"  }, /* side / direction (Nt.11)               */
     { "akazi",    12,  "zi"     }, /* work / job / task (Nt.12)              */
     { "agaciro",  12,  "ciro"   }, /* value / dignity / worth (Nt.12)        */
@@ -1739,6 +1820,9 @@ static const KnownWord KNOWN_WORDS[] = {
     { "umucyo",    3,  "cyo"    }, /* light / beam of light (Nt.3)            */
     { "icyizero",  7,  "izero"  }, /* hope / expectation (Nt.7)               */
     { "ibihimba",  8,  "himba"  }, /* body members / created things (Nt.8)    */
+    /* "ubutaka": u(SP·Nt.3)+bu(OM·Nt.14)+tak(gutaka=shout)+a → misread as verb.
+     * Correct reading: D=u + RT=bu (Nt.14) + C=taka → land / soil / earth.  */
+    { "ubutaka",  14,  "taka"   }, /* land / soil / earth (Nt.14 abstract)    */
 
     /* ── Time-expression nouns ──────────────────────────────────────────────── */
     { "saa",       9,  "saa"    }, /* hour / o'clock (Swahili loanword, Nt.9)  */
@@ -1771,7 +1855,176 @@ bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * 7. String helpers for display
+ * TREE 1 — IZINA MBONERA (continued)
+ * 7. NOUN PLURAL PAIRS (Uturemajambo tw'amazina – igicumbi method)
+ *
+ * Each entry stores a singular/plural pair and the shared igicumbi (C)
+ * derived by the plurality method taught in REB textbooks:
+ *
+ *   Step 1: D = first vowel of the word
+ *   Step 2: C = the suffix shared between singular AND plural
+ *   Step 3: RT = the part between D and C  (RT = RS on corresponding ntera)
+ *
+ * When plural == NULL the word is invariant (class 9/10 same-form nouns,
+ * or words with no grammatical plural).  In those cases C is confirmed by
+ * passing the word through all inteko or by inspecting ntera agreement.
+ *
+ * Rule: RT ≡ RS  (the noun's indanganteko equals the adjective's indangasano)
+ * ══════════════════════════════════════════════════════════════════════════ */
+static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
+    /* singular           plural             C           sg  pl */
+    /* ── Class 1 ↔ 2 (human singular / human plural) ─────────────────────── */
+    { "umuntu",        "abantu",          "ntu",        1,  2  },
+    { "umugabo",       "abagabo",         "gabo",       1,  2  },
+    { "umugore",       "abagore",         "gore",       1,  2  },
+    { "umwana",        "abana",           "ana",        1,  2  },  /* u→w (§1.1), a→∅ (§1.1) */
+    { "umuhungu",      "abahungu",        "hungu",      1,  2  },
+    { "umukobwa",      "abakobwa",        "kobwa",      1,  2  },
+    { "umunyeshuri",   "abanyeshuri",     "nyeshuri",   1,  2  },
+    { "umurimyi",      "abarimyi",        "rimyi",      1,  2  },
+    { "umubyeyi",      "ababyeyi",        "byeyi",      1,  2  },
+    { "umutegetsi",    "abategetsi",      "tegetsi",    1,  2  },
+    { "umugenzi",      "abagenzi",        "genzi",      1,  2  },
+    { "umukuru",       "abakuru",         "kuru",       1,  2  },
+    { "umusaza",       "abasaza",         "saza",       1,  2  },
+    { "umugaragu",     "abagaragu",       "garagu",     1,  2  },
+    { "umwami",        "abami",           "mi",         1,  2  },  /* u→w (§1.1); abami=a+ba+mi */
+    { "umunyamuryango","abanyamuryango",  "nyamuryango",1,  2  },
+    { "umwigisha",     "abigisha",        "igisha",     1,  2  },  /* u→w, a→∅ */
+    { "umusomyi",      "abasomyi",        "somyi",      1,  2  },
+    /* ── Class 3 ↔ 4 (tree/thing singular / plural) ────────────────────────── */
+    { "umuti",         "imiti",           "ti",         3,  4  },
+    { "umugezi",       "imigezi",         "gezi",       3,  4  },
+    { "umugozi",       "imigozi",         "gozi",       3,  4  },  /* user's textbook example */
+    { "umuriro",       "imiriro",         "riro",       3,  4  },
+    { "umunsi",        "iminsi",          "nsi",        3,  4  },
+    { "umuryango",     "imiryango",       "ryango",     3,  4  },
+    { "umuhana",       "imihana",         "hana",       3,  4  },
+    { "umusozi",       "imisozi",         "sozi",       3,  4  },
+    { "umudugudu",     "imidugudu",       "dugudu",     3,  4  },
+    { "umugisha",      "imigisha",        "gisha",      3,  4  },
+    { "umurimo",       "imirimo",         "rimo",       3,  4  },
+    { "umubiri",       "imibiri",         "biri",       3,  4  },
+    { "umubare",       "imibare",         "bare",       3,  4  },
+    { "umugabane",     "imigabane",       "gabane",     3,  4  },
+    { "umutima",       "imitima",         "tima",       3,  4  },
+    { "umurongo",      "imirongo",        "rongo",      3,  4  },
+    { "umutsima",      "imutsima",        "tsima",      3,  4  },
+    /* ── Class 5 ↔ 6 (singular / mass-plural) ──────────────────────────────── */
+    { "itegeko",       "amategeko",       "tegeko",     5,  6  },  /* user's main example */
+    { "izina",         "amazina",         "zina",       5,  6  },
+    { "itara",         "amatara",         "tara",       5,  6  },
+    { "ibuye",         "amabuye",         "buye",       5,  6  },
+    { "isoko",         "amasoko",         "soko",       5,  6  },
+    { "isomo",         "amasomo",         "somo",       5,  6  },
+    { "irembo",        "amarembo",        "rembo",      5,  6  },
+    { "irari",         "amarari",         "rari",       5,  6  },
+    { "isezerano",     "amasezerano",     "sezerano",   5,  6  },
+    { "ifarasi",       "amafarasi",       "farasi",     5,  6  },
+    { "itabu",         "amatabu",         "tabu",       5,  6  },
+    { "igitabo",       "ibitabo",         "tabo",       7,  8  },  /* alias via 7/8 */
+    { "iterambere",    "amaterambere",    "terambere",  5,  6  },
+    { "ifunguro",      "amafunguro",      "funguro",    5,  6  },
+    /* ── Class 7 ↔ 8 (thing singular / plural) ─────────────────────────────── */
+    { "ikitabo",       "ibitabo",         "tabo",       7,  8  },
+    { "ikigo",         "ibigo",           "go",         7,  8  },
+    { "ikintu",        "ibintu",          "ntu",        7,  8  },
+    { "igihe",         "ibihe",           "he",         7,  8  },  /* k→g§3.7: ki+he→gi+he */
+    { "igihugu",       "ibihugu",         "hugu",       7,  8  },
+    { "igicaniro",     "ibicaniro",       "caniro",     7,  8  },
+    { "ikigaba",       "ibigaba",         "gaba",       7,  8  },
+    { "ikigero",       "ibigero",         "gero",       7,  8  },
+    { "ikigomba",      "ibigomba",        "gomba",      7,  8  },
+    { "ikibondo",      "ibibondo",        "bondo",      7,  8  },
+    { "ikirenge",      "ibirenge",        "renge",      7,  8  },
+    { "ikiremwa",      "ibiremwa",        "remwa",      7,  8  },
+    /* ── Class 9 ↔ 10 (invariant-form nouns; RT confirmed via ntera) ────────── */
+    /* plural == NULL means singular=plural surface; class 9 sg / 10 pl        */
+    { "inka",          NULL,              "ka",         9,  10 },
+    { "inkoko",        NULL,              "koko",       9,  10 },
+    { "inzu",          NULL,              "zu",         9,  10 },  /* D=i,RT=n,C=zu */
+    { "imvura",        NULL,              "vura",       9,  10 },  /* n→m §3.3 */
+    { "imana",         NULL,              "mana",       9,  10 },  /* n+m→m geminate; C=mana */
+    { "inyoni",        NULL,              "nyoni",      9,  10 },  /* ny phoneme; C=nyoni */
+    { "inyama",        NULL,              "nyama",      9,  10 },
+    { "inzira",        NULL,              "yira",       9,  10 },  /* n+y→nz §2.4.1: C=yira */
+    { "inzara",        NULL,              "yara",       9,  10 },  /* n+y→nz §2.4.1: C=yara (hunger) */
+    { "inzoga",        NULL,              "yoga",       9,  10 },  /* n+y→nz §2.4.1: C=yoga (beer) */
+    { "inzoka",        NULL,              "yoka",       9,  10 },  /* n+y→nz §2.4.1: C=yoka (snake) */
+    { "inzuzi",        NULL,              "yuzi",       9,  10 },  /* n+y→nz §2.4.1: C=yuzi (flies) */
+    { "inzuki",        NULL,              "yuki",       9,  10 },  /* n+y→nz §2.4.1: C=yuki (bees) */
+    { "inzobe",        NULL,              "yobe",       9,  10 },  /* n+y→nz §2.4.1: C=yobe */
+    { "imbabazi",      NULL,              "babazi",     9,  10 },  /* n→m§3.3 before b */
+    { "impamvu",       NULL,              "pamvu",      9,  10 },  /* n→m§3.3 before p */
+    { "ingabo",        NULL,              "gabo",       9,  10 },
+    { "inkumi",        NULL,              "kumi",       9,  10 },
+    { "intumwa",       NULL,              "ntumwa",     9,  10 },  /* C=ntumwa: n+nt cluster */
+    { "inyumba",       NULL,              "nyumba",     9,  10 },
+    /* ── Class 11 (uru- singular; no standard plural for most) ─────────────── */
+    { "urugo",         NULL,              "go",        11,  0  },
+    { "urukundo",      NULL,              "kundo",     11,  0  },
+    { "urugendo",      NULL,              "gendo",     11,  0  },
+    { "uruzi",         NULL,              "zi",        11,  0  },
+    { "urupfu",        NULL,              "pfu",       11,  0  },
+    { "uruhande",      NULL,              "hande",     11,  0  },
+    { "urugwi",        NULL,              "gwi",       11,  0  },
+    { "urwego",        NULL,              "ego",       11,  0  },  /* u→w§1.1 */
+    /* ── Class 12 ↔ 13 (diminutive singular / diminutive plural) ───────────── */
+    { "akabaho",       "utubaho",         "baho",      12, 13  },
+    { "akagabo",       "utugabo",         "gabo",      12, 13  },
+    { "akarima",       "uturima",         "rima",      12, 13  },
+    { "akabari",       "utubari",         "bari",      12, 13  },
+    { "akabati",       "utubati",         "bati",      12, 13  },
+    { "akazi",         "uduzi",           "zi",        12, 13  },
+    /* ── Class 14 (abstract; no plural) ────────────────────────────────────── */
+    { "ubutaka",       NULL,              "taka",      14,  0  },
+    { "ubuzima",       NULL,              "zima",      14,  0  },
+    { "ubwenge",       NULL,              "enge",      14,  0  },  /* u→w§1.1 */
+    { "ubwami",        NULL,              "ami",       14,  0  },
+    { "ubugingo",      NULL,              "gingo",     14,  0  },
+    { "uburezi",       NULL,              "rezi",      14,  0  },
+    { "ubwoba",        NULL,              "oba",       14,  0  },
+    { "ubwatsi",       NULL,              "atsi",      14,  0  },  /* u→w§1.1 */
+    { "ubwoko",        "amoko",           "oko",       14,  6  },  /* u→w§1.1 (bu+oko→bw), a→∅§1.1 (ma+oko→m) */
+    { "ubutayu",       NULL,              "tayu",      14,  0  },
+    { "ubuhemu",       NULL,              "hemu",      14,  0  },
+    { "ubusabe",       NULL,              "sabe",      14,  0  },
+    { "uburenganzira", NULL,              "renganzira",14,  0  },
+    { "ubuhanga",      NULL,              "hanga",     14,  0  },
+    { "ubwiza",        NULL,              "iza",       14,  0  },  /* u→w§1.1 */
+    { "ubutegetsi",    NULL,              "tegetsi",   14,  0  },
+    { "ubuhamya",      NULL,              "hamya",     14,  0  },
+    /* ── Class 15 (verbal noun / infinitive; no plural) ────────────────────── */
+    { "ukwezi",        NULL,              "wezi",      15,  0  },  /* u→w§1.1 */
+    /* ── Class 16 (locative; no plural) ────────────────────────────────────── */
+    { "ahantu",        NULL,              "ntu",       16,  0  },
+    { NULL, NULL, NULL, 0, 0 }
+};
+
+bool kin_lookup_igicumbi(const char *word, char *igicumbi_out, int *class_out) {
+    if (!word || !word[0]) return false;
+    for (int i = 0; NOUN_PLURAL_PAIRS[i].singular; i++) {
+        /* Match against singular form */
+        if (strcmp(word, NOUN_PLURAL_PAIRS[i].singular) == 0) {
+            if (igicumbi_out)
+                strncpy(igicumbi_out, NOUN_PLURAL_PAIRS[i].igicumbi, KIN_MAX_STEM - 1);
+            if (class_out) *class_out = NOUN_PLURAL_PAIRS[i].sg_class;
+            return true;
+        }
+        /* Match against plural form (when distinct) */
+        if (NOUN_PLURAL_PAIRS[i].plural &&
+            strcmp(word, NOUN_PLURAL_PAIRS[i].plural) == 0) {
+            if (igicumbi_out)
+                strncpy(igicumbi_out, NOUN_PLURAL_PAIRS[i].igicumbi, KIN_MAX_STEM - 1);
+            if (class_out) *class_out = NOUN_PLURAL_PAIRS[i].pl_class;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 8. String helpers for display
  * ══════════════════════════════════════════════════════════════════════════ */
 const char *kin_pos_name(POS pos) {
     switch (pos) {
@@ -1846,6 +2099,7 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_REFLEXIVE:   return "Imbundo yo kwisanzura (Reflexive: i- elided in bare form)";
         case VEXT_STATIVE:     return "Ngirika (Stative/Potential: -ik-)";
         case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
+        case VEXT_CAUSATIVE_Y: return "Ngiza (Causative-y: r+y→z, §1.3)";
         default:               return "";
     }
 }
@@ -1858,6 +2112,7 @@ const char *kin_gram_role_name(GramRole r) {
         case GRAM_ROLE_PARTICIPIAL: return "Inshinga nkurikije y'ubunyagatifu (Neg. participial)";
         case GRAM_ROLE_COMPLEMENT:  return "Igisangizo (Complement clause: ngo/ko/nuko)";
         case GRAM_ROLE_SEQUENTIAL:  return "Inkurikizo (Sequential narrative: ka)";
+        case GRAM_ROLE_VERBAL_NOUN: return "Izina ryaturutse ku nshinga (Verbal noun)";
         default:                    return "";
     }
 }

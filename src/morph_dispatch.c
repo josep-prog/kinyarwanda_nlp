@@ -1,6 +1,20 @@
 /*
- * morph_dispatch.c
- * Type-dispatch morphological analysis for Kinyarwanda.
+ * morph_dispatch.c  —  Type-dispatch morpheme analysis for Kinyarwanda.
+ *
+ * ROLE: After pos_tagger.c assigns each token to its tree (word type),
+ * this module fills Token.morph with the correct morpheme breakdown.
+ * Each tree has its own formula and phonological rules.
+ *
+ * Dispatch table (kin_morpheme_analyze, bottom of file):
+ *   POS_NOUN / POS_RELATIVE_NOUN / POS_COMPOUND_ADJ
+ *             → analyse_noun()   → Tree 1: D + RT + C
+ *   POS_ADJECTIVE
+ *             → analyse_adj()    → Tree 2: RS + C
+ *   POS_VERB_CONJ
+ *             → analyse_vconj()  → Tree 3b: SP + (TM) + (OM) + C + (EXT) + FV
+ *   POS_VERB_INF
+ *             → analyse_vinf()   → Tree 3a: PREF + C + (EXT) + FV
+ *   All others (pronouns, invariables, foreign): no morpheme breakdown.
  *
  * After POS tagging has identified the word type, this module performs a
  * second, TYPE-SPECIFIC pass that fills Token.morph with the correct
@@ -91,6 +105,10 @@ static const char *NOUN_RT[17] = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * TREE 1 — IZINA MBONERA (Noun)   D + RT + C
+ * Also handles: POS_RELATIVE_NOUN (izina ntera) and POS_COMPOUND_ADJ (igisantera)
+ * because both share the same D+RT+C morpheme structure.
+ *
  * analyse_noun()
  *
  * Decomposes an izina mbonera into D + RT + C following REB S4 p.480-501.
@@ -127,43 +145,88 @@ static void analyse_noun(Token *tok)
         char c_underlying[KIN_MAX_STEM];
         kin_ortho_nt9_stem(after_i, c_underlying, sizeof(c_underlying));
 
+        /* Surface C and rule for C morpheme.  For most Nt.9 words, surface C
+         * equals underlying C.  Exception: nz case (n+y→nz §2.4.1) where
+         * underlying C starts with 'y' but surface C starts with 'z'.       */
+        char c_surface[KIN_MAX_STEM];
+        strncpy(c_surface, c_underlying, sizeof(c_surface)-1);
+        c_surface[sizeof(c_surface)-1] = '\0';
+        char c_rule[KIN_MORPH_RULE_LEN] = "";
+
         /* Determine surface RT and rule applied */
         char rt_surface[8] = "n";
         char rule[KIN_MORPH_RULE_LEN] = "";
 
         if (after_i[0] == 'm') {
-            /* n→m assimilation before bilabial (§3.3) */
-            strncpy(rt_surface, "m", sizeof(rt_surface)-1);
-            char bilabial[4] = {after_i[1], '\0'};
-            snprintf(rule, sizeof(rule), "n→m §3.3 (before bilabial '%s')", bilabial);
+            /* n→m assimilation (§3.3) — two sub-cases:
+             *
+             *   (a) after_i[1] is consonant: "mvura", "mbeba"
+             *       'm' is the surface of RT 'n'.  C starts at after_i[1].
+             *       RT surface = "m".
+             *
+             *   (b) after_i[1] is vowel: "mana"
+             *       Underlying: n(RT) + mana(C).  n→m before bilabial 'm',
+             *       then geminate mm→m.  The resulting 'm' belongs to C.
+             *       RT 'n' has zero surface representation.
+             *       RT surface = "∅",  C = full after_i.                    */
+            if (mv(after_i[1])) {
+                /* Case (b): n→∅ /_m — RT 'n' elides before geminate m.
+                 * §3.3 (n→m before bilabial) + §3.1 geminate elision (mm→m).
+                 * Net effect: RT 'n' has zero surface representation.         */
+                strncpy(rt_surface, "\xe2\x88\x85", sizeof(rt_surface)-1); /* UTF-8 ∅ */
+                snprintf(rule, sizeof(rule),
+                         "n→∅ /_m §3.3+§3.1 (n→m→mm→m; RT 'n' elided before geminate)");
+                /* c_underlying is the full after_i — set by kin_ortho_nt9_stem */
+            } else {
+                /* Case (a): n→m §3.3 (bilabial assimilation); RT surfaces as 'm' */
+                strncpy(rt_surface, "m", sizeof(rt_surface)-1);
+                snprintf(rule, sizeof(rule),
+                         "n→m §3.3 (before bilabial '%c')", after_i[1]);
+            }
+        } else if (after_i[0]=='n' && after_i[1]=='y') {
+            /* n→∅ /_ny — RT 'n' elides before the palatal phoneme 'ny'.
+             * §3.1 nasal elision: n+ny→ny (geminate simplification).
+             * 'ny' is a distinct phoneme; RT 'n' has zero surface form.      */
+            strncpy(rt_surface, "\xe2\x88\x85", sizeof(rt_surface)-1); /* UTF-8 ∅ */
+            snprintf(rule, sizeof(rule),
+                     "n→∅ /_ny §3.1 (RT 'n' elided before palatal phoneme ny)");
         } else if (after_i[0]=='n' && after_i[1]=='z') {
-            /* n+y→nz (§2.4) or n+V epenthetic z */
-            strncpy(rt_surface, "nz", sizeof(rt_surface)-1);
-            if (c_underlying[0] && mv(c_underlying[0]))
-                snprintf(rule, sizeof(rule), "n+V→nz §2.4 (epenthetic z before vowel)");
-            else
-                snprintf(rule, sizeof(rule), "n+y→nz §2.4 (before y-initial stem)");
+            /* n+y→nz §2.4.1: underlying C starts with 'y'; kin_ortho_nt9_stem
+             * has already restored it.  Build surface C by replacing 'y'→'z'. */
+            strncpy(rt_surface, "n", sizeof(rt_surface)-1);
+            snprintf(rule, sizeof(rule), "n+y→nz §2.4.1 (underlying C starts with 'y')");
+            c_surface[0] = 'z';
+            strncpy(c_surface + 1, c_underlying + 1, sizeof(c_surface) - 2);
+            c_surface[sizeof(c_surface)-1] = '\0';
+            strncpy(c_rule, "y→z §2.4.1 (n+y→nz before nasal n)", sizeof(c_rule)-1);
         } else if (after_i[0]=='n' && after_i[1]=='s' && after_i[2]=='h') {
-            /* nc→nsh (§3.6.2) */
+            /* c→sh /_n §3.6.2: underlying c becomes sh after nasal n */
             strncpy(rt_surface, "nsh", sizeof(rt_surface)-1);
-            snprintf(rule, sizeof(rule), "n+c→nsh §3.6.2");
+            snprintf(rule, sizeof(rule),
+                     "c→sh /_n §3.6.2 (n+c→nsh)");
         } else if (after_i[0]=='n' && after_i[1]=='d') {
-            /* r→d after n (§3.5): n+ruru → nduru */
+            /* r→d /_n §3.5: underlying r becomes d after nasal n */
             strncpy(rt_surface, "nd", sizeof(rt_surface)-1);
-            snprintf(rule, sizeof(rule), "n+r→nd §3.5 (r→d after nasal)");
+            snprintf(rule, sizeof(rule),
+                     "r→d /_n §3.5 (n+r→nd)");
         } else if (after_i[0]=='n') {
             strncpy(rt_surface, "n", sizeof(rt_surface)-1);
-            /* no change to nasal */
+            /* plain nasal n: no rule applied */
         }
 
-        /* Verify: build expected surface from D + rt_surface + c_underlying */
-        char expected[KIN_MAX_WORD];
-        snprintf(expected, sizeof(expected), "i%s%s", rt_surface, c_underlying);
-        mb->verified = (strcmp(expected, word) == 0);
+        /* Dynamic verification: apply kin_ortho_gen to the underlying morpheme
+         * string "i|n|{C_underlying}" with noun_class_9=true.
+         * This exercises all §2.4 / §3.x rules through the same engine used
+         * for all other noun classes — consistent with classes 1-8, 11-16.   */
+        char morph_str[KIN_MAX_WORD];
+        snprintf(morph_str, sizeof(morph_str), "i|n|%s", c_underlying);
+        char reconstructed_nt9[KIN_MAX_WORD];
+        kin_ortho_gen(morph_str, true, reconstructed_nt9, sizeof(reconstructed_nt9));
+        mb->verified = (strcmp(reconstructed_nt9, word) == 0);
 
         set_morph(&mb->m[0], "D",  "i",          "i",         "");
         set_morph(&mb->m[1], "RT", "n",           rt_surface,  rule);
-        set_morph(&mb->m[2], "C",  c_underlying,  c_underlying,"");
+        set_morph(&mb->m[2], "C",  c_underlying,  c_surface,   c_rule);
         mb->n = 3;
         return;
     }
@@ -262,6 +325,13 @@ static void analyse_noun(Token *tok)
             if (kin_starts_with(word, "ama")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "ma", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "am") && mv(word[2])) {
+                /* a→∅ §1.1 before vowel-initial stem: ma+'o'→m              *
+                 * e.g. amoko = a + m + oko  (ubwoko/amoko pair, C=-oko-)    */
+                c_start = word + 2;
+                strncpy(rt_surface, "m", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "a\342\206\222\342\210\205 \302\2471.1 (ma+'%c' vowel \342\206\222 m)", word[2]);
             } else {
                 strncpy(rt_surface, "ma", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -279,7 +349,7 @@ static void analyse_noun(Token *tok)
                 c_start = word + 3;
                 strncpy(rt_surface, "gi", sizeof(rt_surface)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
-                         "k→g §3.7 (ki before voiced '%c'→gi)", word[3]);
+                         "k→g §3.7 (RT 'ki'→'gi'; Itanisha GR)");
             } else if (kin_starts_with(word, "iki")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "ki", sizeof(rt_surface)-1);
@@ -327,7 +397,7 @@ static void analyse_noun(Token *tok)
                 c_start = word + 3;
                 strncpy(rt_surface, "ga", sizeof(rt_surface)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
-                         "k→g §3.7 (ka before voiced '%c'→ga)", word[3]);
+                         "k→g §3.7 (RT 'ka'→'ga'; Itanisha GR)");
             } else if (kin_starts_with(word, "aka")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "ka", sizeof(rt_surface)-1);
@@ -400,25 +470,46 @@ static void analyse_noun(Token *tok)
             return;
     }
 
-    /* Determine C: either from surface-word pointer or from stored tok->stem */
+    /* Determine C: primary method = plurality table lookup (kin_lookup_igicumbi).
+     * This implements the user's stated method: C is the shared suffix between
+     * singular and plural forms, not simply "whatever remains after stripping D+RT".
+     * Fall back to the surface-word pointer, then to tok->stem.              */
     char c_form[KIN_MAX_STEM];
-    if (c_start && c_start[0]) {
-        strncpy(c_form, c_start, sizeof(c_form) - 1);
-        c_form[sizeof(c_form) - 1] = '\0';
-    } else if (tok->stem[0]) {
-        strncpy(c_form, tok->stem, sizeof(c_form) - 1);
-        c_form[sizeof(c_form) - 1] = '\0';
-    } else {
-        return;  /* cannot determine C */
+    {
+        char plural_c[KIN_MAX_STEM];
+        int  plural_cls = 0;
+        if (kin_lookup_igicumbi(word, plural_c, &plural_cls) && plural_c[0]) {
+            strncpy(c_form, plural_c, sizeof(c_form) - 1);
+            c_form[sizeof(c_form) - 1] = '\0';
+        } else if (c_start && c_start[0]) {
+            strncpy(c_form, c_start, sizeof(c_form) - 1);
+            c_form[sizeof(c_form) - 1] = '\0';
+        } else if (tok->stem[0]) {
+            strncpy(c_form, tok->stem, sizeof(c_form) - 1);
+            c_form[sizeof(c_form) - 1] = '\0';
+        } else {
+            return;  /* cannot determine C */
+        }
     }
 
     if (!c_form[0]) return;
 
-    /* Build underlying string and verify via kin_ortho_gen */
-    char underlying[128];
-    snprintf(underlying, sizeof(underlying), "%s|%s|%s", d_under, rt_under, c_form);
+    /* Verify the reconstruction matches the surface word.
+     * When a phonological rule already fired at the RT boundary (rule_rt set),
+     * verify directly via surface-piece concatenation — kin_ortho_gen would
+     * re-apply an incorrect rule to the underlying form (e.g. for Nt.6 "a→∅"
+     * the generator wrongly turns "ma|o" into "myo" instead of "mo").
+     * For no-rule cases, use kin_ortho_gen which handles nasal assimilation etc. */
     char reconstructed[KIN_MAX_WORD];
-    kin_ortho_gen(underlying, (cls == 9 || cls == 10), reconstructed, sizeof(reconstructed));
+    if (rule_rt[0]) {
+        /* Surface: d_under + rt_surface + c_form — direct check */
+        snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
+                 d_under, rt_surface, c_form);
+    } else {
+        char underlying[128];
+        snprintf(underlying, sizeof(underlying), "%s|%s|%s", d_under, rt_under, c_form);
+        kin_ortho_gen(underlying, (cls == 9 || cls == 10), reconstructed, sizeof(reconstructed));
+    }
     mb->verified = (strcmp(reconstructed, word) == 0);
 
     /* Store morphemes */
@@ -429,11 +520,14 @@ static void analyse_noun(Token *tok)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * TREE 2 — NTERA (Adjective)   RS + C
+ *
  * analyse_adj()
  *
  * Adjective (ntera) structure: RS + C
  * RS (Indangasano) matches the noun class it modifies.
  * Concordance prefixes follow the same phonological rules as RT for nouns.
+ * Note: POS_COMPOUND_ADJ (igisantera) uses analyse_noun() — it has D+RT+C.
  * ══════════════════════════════════════════════════════════════════════════ */
 static void analyse_adj(Token *tok)
 {
@@ -457,8 +551,62 @@ static void analyse_adj(Token *tok)
     strncpy(rs_surface, rs_under, sizeof(rs_surface)-1);
     rs_surface[sizeof(rs_surface)-1] = '\0';
 
-    /* Check for phonological changes at RS-C boundary */
-    if (c[0] && mv(c[0])) {
+    /* ── RS surface rules ─────────────────────────────────────────────────────
+     *
+     * Class 9 (RS=n): nasal assimilation rules mirror those for Nt.9 nouns.
+     *   The underlying RS is always 'n'; surface changes based on C's first consonant:
+     *   n + bilabial (b,p,v,f,h) → m      §3.3   e.g. n+bi → mbi
+     *   n + r                    → nd     §3.5   e.g. n+re → ndere
+     *   n + vowel / y            → nz     §2.4   e.g. n+iza → nziza
+     *   n + n (C starts with n)  → n      (geminate mm→n: n+nini → nini, RS stays n)
+     *   n + other consonant      → n      (unchanged)
+     *
+     * Class 12 (RS=ka): k→g before voiced consonant-initial C (§3.7).
+     *
+     * All other classes: standard vowel-contact rules (u→w, i→y, a+i→e).  */
+
+    if (cls == 9) {
+        /* Nasal assimilation: determine surface RS from C's initial consonant */
+        if (c[0] != '\0') {
+            static const char BILABIALS[] = "bpvfh";
+            bool is_bilabial = false;
+            for (int b = 0; BILABIALS[b]; b++)
+                if (c[0] == BILABIALS[b]) { is_bilabial = true; break; }
+
+            if (is_bilabial) {
+                strncpy(rs_surface, "m", sizeof(rs_surface)-1);
+                snprintf(rule_rs, sizeof(rule_rs),
+                         "n→m §3.3 (RS 'n' before bilabial '%c')", c[0]);
+            } else if (c[0] == 'r') {
+                strncpy(rs_surface, "nd", sizeof(rs_surface)-1);
+                snprintf(rule_rs, sizeof(rule_rs),
+                         "r→d /_n §3.5 (n+r→nd; RS 'n'+r)");
+            } else if (mv(c[0]) || c[0] == 'y') {
+                strncpy(rs_surface, "nz", sizeof(rs_surface)-1);
+                snprintf(rule_rs, sizeof(rule_rs),
+                         "n→nz /_V §2.4 (epenthetic z; RS 'n' before vowel/y)");
+            } else if (c[0] == 'n') {
+                /* n→∅ /_n (geminate simplification nn→n): RS 'n' elides */
+                strncpy(rs_surface, "n", sizeof(rs_surface)-1);
+                snprintf(rule_rs, sizeof(rule_rs),
+                         "n→∅ /_n §3.1 (geminate nn→n; RS 'n' elided)");
+            }
+            /* else: RS stays "n" unchanged (before k, g, z, j, t, s, sh, etc.) */
+        }
+    } else if (cls == 12 && c[0] != '\0') {
+        /* Class 12 RS=ka: k→g before ingombajwi z'indagi GR (§3.7).
+         * 'h' included: voiced glottal fricative [ɦ] in Kinyarwanda.          */
+        static const char VOICED[] = "bdghjmnrvwyz";
+        for (int v = 0; VOICED[v]; v++) {
+            if (c[0] == VOICED[v]) {
+                strncpy(rs_surface, "ga", sizeof(rs_surface)-1);
+                snprintf(rule_rs, sizeof(rule_rs),
+                         "k→g §3.7 (GR: RS 'ka'→'ga' before '%c')", c[0]);
+                break;
+            }
+        }
+    } else if (c[0] && mv(c[0])) {
+        /* Standard vowel-contact rules for all other classes */
         size_t rlen = strlen(rs_under);
         char last = rs_under[rlen - 1];
         if (last == 'u') {
@@ -484,9 +632,8 @@ static void analyse_adj(Token *tok)
             snprintf(rule_rs, sizeof(rule_rs),
                      "i→y §1.1 (%s+'%c' vowel → %s)", rs_under, c[0], rs_surface);
         } else if (last == 'a') {
-            /* a+i→e fusion (§1.1) or a→∅ elision */
+            /* a+i→e fusion (§1.1) */
             if (c[0] == 'i') {
-                /* a+i→e */
                 char tmp[8];
                 strncpy(tmp, rs_under, sizeof(tmp)-1);
                 tmp[rlen-1] = 'e';
@@ -553,6 +700,10 @@ static const char *final_vowel(VerbTense t, const char *word) {
     size_t wlen = word ? strlen(word) : 0;
     switch (t) {
         case TENSE_PAST_PERF:
+            /* Epenthetic 'i' before 'ye' (consonant-final root + past perf):
+             * -ir + ye → -iriye (e.g. zikwiriye = zi+kwir+iye)              */
+            if (wlen >= 4 && word[wlen-3]=='i' && word[wlen-2]=='y' && word[wlen-1]=='e')
+                return "iye";
             return (wlen >= 3 && word[wlen-3]=='t' && word[wlen-2]=='s' && word[wlen-1]=='e')
                    ? "tse" : "ye";
         case TENSE_PAST_IMPF:     return "aga";
@@ -577,10 +728,24 @@ static const char *ext_suffix(VerbExtension e) {
         case VEXT_STATIVE:     return "ik";
         case VEXT_REVERSIVE:   return "ur";   /* -ur- is the canonical form;
                                                   -uk- variant also maps here */
+        case VEXT_CAUSATIVE_Y: return "y";    /* surface: r+y→z; citation: -y- */
         default:               return "";
     }
 }
 
+/* Forward declaration: detect_ext_in_stem is defined after analyse_vconj
+ * but is also needed inside it for conjugated verbs whose stem contains
+ * an applicative or other extension (e.g. bivire → stem="vir" = va+ir).  */
+static VerbExtension detect_ext_in_stem(const char *stem,
+                                         char *bare_root,
+                                         char *ext_str, size_t ext_sz);
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * TREE 3b — INSHINGA ITONDAGUYE (Conjugated Verb)
+ *   Formula:  SP + (TM) + (OM) + C + (EXT) + FV
+ *
+ * analyse_vconj()
+ * ══════════════════════════════════════════════════════════════════════════ */
 static void analyse_vconj(Token *tok)
 {
     MorphBreakdown *mb = &tok->morph;
@@ -607,6 +772,15 @@ static void analyse_vconj(Token *tok)
     const char *sp_under = (cls >= 1 && cls <= 16)
                            ? (past ? SP_PAST[cls] : SP_PRES[cls])
                            : "?";
+    /* For past tense, verify the word actually starts with the past SP form.
+     * Past perfect with ∅ TM keeps the present-form SP (e.g. "zikwiriye":
+     * SP_PAST[10]="zya" but word starts with "zi" = SP_PRES[10]).
+     * Fallback ensures we display the SP that is really on the surface.    */
+    if (past && cls >= 1 && cls <= 16
+            && !kin_starts_with(eff_word, SP_PAST[cls])
+            && kin_starts_with(eff_word, SP_PRES[cls])) {
+        sp_under = SP_PRES[cls];
+    }
     /* For 1sg/2sg/1pl/2pl (class 0) */
     if (cls == 0) {
         if (tok->verb_tense == TENSE_CONDITIONAL) {
@@ -854,6 +1028,11 @@ static void analyse_vconj(Token *tok)
                          ? "a+a\342\206\222a \302\2471.1 (TM 'a' elided after SP ending in 'a')"
                          : "Inziganyo TM (conditional marker; fused into SP by \302\2471.1)")
                       : "");
+    else if (tok->verb_tense != TENSE_NONE && tok->verb_tense != TENSE_IMPERATIVE)
+        /* Zero tense marker: explicit ∅ in Ingingo/Guhuza display.
+         * surface="" (empty) keeps the built verification string correct;
+         * form="∅" is used by the printer wherever surface is absent.    */
+        set_morph(&mb->m[n++], "TM", "\342\210\205", "", "");
     /* Conditional particle (ku/gu) replaces OM slot for CONDITIONAL tense */
     if (tok->verb_tense == TENSE_CONDITIONAL && cond_particle[0]) {
         set_morph(&mb->m[n++], "COND", cond_particle,
@@ -863,10 +1042,80 @@ static void analyse_vconj(Token *tok)
     } else if (om[0]) {
         set_morph(&mb->m[n++], "OM", om, om_surface[0] ? om_surface : om, om_rule);
     }
-    set_morph(&mb->m[n++], "root", root, root, "");
-    if (ext[0])
-        set_morph(&mb->m[n++], "EXT", ext, ext, "");
-    set_morph(&mb->m[n++], "FV", fv, fv, "");
+    if (tok->verb_ext == VEXT_CAUSATIVE_Y) {
+        /* r+y→z (§1.3): citation root ends in 'r'; -y- causative fuses it to 'z'.
+         * Surface root = root[0..n-2]+'z'; EXT is absorbed (surface="").
+         * e.g. mer + y → mez  (citation: mer, surface: mez)               */
+        size_t rlen = strlen(root);
+        char root_surface[KIN_MAX_STEM];
+        if (rlen >= 1) {
+            strncpy(root_surface, root, rlen - 1);
+            root_surface[rlen - 1] = 'z';
+            root_surface[rlen]     = '\0';
+        } else {
+            strncpy(root_surface, root, KIN_MAX_STEM - 1);
+            root_surface[KIN_MAX_STEM - 1] = '\0';
+        }
+        set_morph(&mb->m[n++], "root", root, root_surface,
+                  "r+y\342\206\222z \302\2471.3 (causative-y fuses stem-final r: mer+y\342\206\222mez)");
+        set_morph(&mb->m[n++], "EXT", "y", "", "");   /* ext absorbed into root surface */
+    } else {
+        /* When the POS tagger found no extension (VEXT_NONE), try detecting
+         * one inside the stem now.  Handles cases like bivire (stem="vir")
+         * where the root "va" had its final vowel elided before "-ir-".      */
+        if (tok->verb_ext == VEXT_NONE && !ext[0] && root[0]) {
+            char det_root[KIN_MAX_STEM] = "";
+            char det_ext[8] = "";
+            VerbExtension det_vext =
+                detect_ext_in_stem(root, det_root, det_ext, sizeof(det_ext));
+            if (det_vext != VEXT_NONE && det_root[0] && det_ext[0]) {
+                /* Elision check: same logic as analyse_vinf */
+                size_t brlen = strlen(det_root);
+                char root_surf[KIN_MAX_STEM];
+                char root_rule[KIN_MORPH_RULE_LEN] = "";
+                char elided_v = '\0';
+                if (brlen >= 2 && mv(det_ext[0])) {
+                    char last = det_root[brlen - 1];
+                    if (last=='a'||last=='u'||last=='i'||last=='e'||last=='o')
+                        elided_v = last;
+                }
+                if (elided_v) {
+                    strncpy(root_surf, det_root, brlen - 1);
+                    root_surf[brlen - 1] = '\0';
+                    snprintf(root_rule, sizeof(root_rule),
+                             "%c\342\206\222\342\210\205 \302\2471.1 (root-final '%c' elides"
+                             " before vowel-initial extension '-%s-')",
+                             elided_v, elided_v, det_ext);
+                } else {
+                    strncpy(root_surf, det_root, KIN_MAX_STEM - 1);
+                    root_surf[KIN_MAX_STEM - 1] = '\0';
+                }
+                set_morph(&mb->m[n++], "root", det_root, root_surf, root_rule);
+                set_morph(&mb->m[n++], "EXT",  det_ext,  det_ext,
+                          kin_verb_ext_name(det_vext));
+            } else {
+                set_morph(&mb->m[n++], "root", root, root, "");
+            }
+        } else {
+            set_morph(&mb->m[n++], "root", root, root, "");
+            if (ext[0])
+                set_morph(&mb->m[n++], "EXT", ext, ext, "");
+        }
+    }
+    /* TENSE_SUBJUNCTIVE_LOC: fv = "eho"/"emo"/"eyo" — split into FV + LOC.
+     * The subjunctive final vowel is 'e'; the locative suffix (ho/mo/yo)
+     * is a separate morpheme (ahantu).  This mirrors the infinitive treatment
+     * in analyse_vinf() where LOC is always a distinct slot.
+     * e.g. habeho = ha + ∅ + b + e(FV·subj) + ho(LOC)                      */
+    if (tok->verb_tense == TENSE_SUBJUNCTIVE_LOC && strlen(fv) > 1) {
+        set_morph(&mb->m[n++], "FV", "e", "e", "");
+        /* No phonological rule for the locative suffix — it is appended
+         * directly without consonant mutation.  Empty rule prevents it
+         * from appearing in the Itegeko (phonological-rule) display.    */
+        set_morph(&mb->m[n++], "LOC", fv + 1, fv + 1, "");
+    } else {
+        set_morph(&mb->m[n++], "FV", fv, fv, "");
+    }
     mb->n = n;
 }
 
@@ -918,6 +1167,30 @@ static VerbExtension detect_ext_in_stem(const char *stem,
                 strncpy(bare_root, stem, rlen); bare_root[rlen] = '\0';
                 strncpy(ext_str,   s,    ext_sz - 1); ext_str[ext_sz-1] = '\0';
                 return VEXT_APPLICATIVE;
+            }
+            /* Single-consonant bare root: the stem's root ends in 'a' which
+             * was elided before the vowel-initial extension (a→∅ §1.1).
+             * e.g. stem="vir": bare="v" → restored root="va" (kuva exists)
+             *      stem="rir": bare="r" → restored root="ra" (kura exists)
+             * Restore the 'a' and verify the result is a known verb stem.   */
+            if (rlen == 1) {
+                /* Try restoring the elided root-final vowel.
+                 * Common vowels: 'a' (most roots), 'u' (e.g. vu from kuva),
+                 * 'i' (rare).  The elided vowel assimilates before the
+                 * vowel-initial extension (V→∅ §1.1).                       */
+                char restored[KIN_MAX_STEM];
+                static const char try_vowels[] = {'a', 'u', 'i', 'e', 'o'};
+                for (int vi = 0; vi < (int)(sizeof try_vowels); vi++) {
+                    restored[0] = stem[0];
+                    restored[1] = try_vowels[vi];
+                    restored[2] = '\0';
+                    if (kin_is_known_verb_stem(restored)) {
+                        strncpy(bare_root, restored, KIN_MAX_STEM - 1);
+                        bare_root[KIN_MAX_STEM - 1] = '\0';
+                        strncpy(ext_str, s, ext_sz - 1); ext_str[ext_sz-1] = '\0';
+                        return VEXT_APPLICATIVE;
+                    }
+                }
             }
         }
     }
@@ -985,10 +1258,27 @@ static VerbExtension detect_ext_in_stem(const char *stem,
         }
     }
 
+    /* Causative-y (Ngiza): stem ends in 'z' ← r+y→z rule (§1.3).
+     * Replace final 'z' with 'r'; if result is a known stem it was the -y- causative.
+     * e.g. "mez" → "mer" (kumera→kumeza); bare_root = "mer" (citation form). */
+    if (len >= 3 && stem[len-1] == 'z') {
+        char try_r[KIN_MAX_STEM];
+        strncpy(try_r, stem, len - 1); try_r[len-1] = 'r'; try_r[len] = '\0';
+        if (kin_is_known_verb_stem(try_r)) {
+            strncpy(bare_root, try_r, KIN_MAX_STEM - 1); bare_root[KIN_MAX_STEM-1] = '\0';
+            ext_str[0] = 'z'; ext_str[1] = '\0';   /* surface consonant */
+            return VEXT_CAUSATIVE_Y;
+        }
+    }
+
     return VEXT_NONE;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * TREE 3a — INSHINGA IMBUNDO (Verb Infinitive)
+ *   Formula:  PREF + root + (EXT) + FV
+ *   PREF = Indanganshinga (ku/gu/kw/gw — marks Nt.15 infinitive class)
+ *
  * analyse_vinf()
  *
  * Verb infinitive (imbundo): PREF + root + (EXT) + FV
@@ -1113,8 +1403,36 @@ static void analyse_vinf(Token *tok)
     set_morph(&mb->m[n++], "PREF", pref_under, pref_surf, pref_rule);
 
     if (inf_ext != VEXT_NONE) {
-        /* Split: bare_root + extension */
-        set_morph(&mb->m[n++], "root", bare_root, bare_root, "");
+        /* Split: bare_root + extension.
+         *
+         * Elision check: if bare_root ends in 'a' and ext_str is vowel-initial
+         * (e.g. bare_root="va", ext_str="ir"), the root-final 'a' was elided
+         * before the extension (a→∅ §1.1).  The surface root is bare_root minus
+         * its final 'a'; we store the underlying form and set a phonological rule.
+         * e.g. kuvira: bare_root="va", ext_str="ir"
+         *      surface root = "v", rule = "a→∅ §1.1 (root-final 'a' elides…)"  */
+        size_t brlen = strlen(bare_root);
+        char root_surface[KIN_MAX_STEM];
+        char root_elision_rule[KIN_MORPH_RULE_LEN] = "";
+        char elided_vowel = '\0';
+        if (brlen >= 2 && ext_str[0] != '\0' && mv(ext_str[0])) {
+            char last = bare_root[brlen - 1];
+            if (last == 'a' || last == 'u' || last == 'i' || last == 'e' || last == 'o')
+                elided_vowel = last;
+        }
+        bool elided = (elided_vowel != '\0');
+        if (elided) {
+            strncpy(root_surface, bare_root, brlen - 1);
+            root_surface[brlen - 1] = '\0';
+            snprintf(root_elision_rule, sizeof(root_elision_rule),
+                     "%c\342\206\222\342\210\205 \302\2471.1 (root-final '%c' elides"
+                     " before vowel-initial extension '-%s-')",
+                     elided_vowel, elided_vowel, ext_str);
+        } else {
+            strncpy(root_surface, bare_root, KIN_MAX_STEM - 1);
+            root_surface[KIN_MAX_STEM - 1] = '\0';
+        }
+        set_morph(&mb->m[n++], "root", bare_root, root_surface, root_elision_rule);
         set_morph(&mb->m[n++], "EXT",  ext_str,   ext_str,   kin_verb_ext_name(inf_ext));
     } else {
         set_morph(&mb->m[n++], "root", root, root, "");

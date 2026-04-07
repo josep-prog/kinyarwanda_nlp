@@ -1,17 +1,33 @@
 /*
- * pos_tagger.c
- * Part-of-speech tagging for Kinyarwanda.
+ * pos_tagger.c  —  Part-of-speech tagging for Kinyarwanda.
  *
- * Priority order (from most specific to most general):
- *  1. Invariable words  → checked against the complete invariable table
- *  2. Pronouns          → checked against full pronoun table
- *  3. Known full word   → exact-match override for irregular/bare-prefix nouns
- *  4. Verb infinitive   → pattern ku/gu/kw/gw + stem + -a
- *  5. Proper noun       → capital letter mid-sentence (heuristic)
- *  6. Noun              → D+RT prefix detection
- *  7. Adjective         → concordance prefix + known adjective stem
- *  8. Conjugated verb   → subject prefix + stem + -a pattern
- *  9. Foreign/Unknown
+ * This file assigns each token to its word-type "tree":
+ *   Tree 5 → POS_PREPOSITION / POS_CONJUNCTION / POS_ADVERB / POS_LOCATIVE
+ *             POS_INTERJECTION / POS_VERB_PARTICLE   (amagambo adahinduka)
+ *   Tree 4 → POS_PRONOUN   (ikinyazina, any sub-type)
+ *   Tree 1 → POS_NOUN      (izina mbonera, D+RT+C)
+ *          → POS_RELATIVE_NOUN (izina ntera: noun as qualifier, detected in context pass)
+ *   Tree 2 → POS_ADJECTIVE (ntera, RS+C)
+ *          → POS_COMPOUND_ADJ (igisantera: compound adj — planned)
+ *   Tree 3 → POS_VERB_INF  (inshinga imbundo, PREF+C+FV)
+ *          → POS_VERB_CONJ (inshinga itondaguye, SP+TM+C+FV)
+ *   ——     → POS_FOREIGN / POS_UNKNOWN  (not matched by any tree)
+ *
+ * Single-token priority (kin_tag_token, most-specific first):
+ *  Step 1. Invariable words    → Tree 5 (amagambo adahinduka)
+ *  Step 2. Pronouns            → Tree 4 (ikinyazina)
+ *  Step 3. Known full word     → Tree 1 override (lexicon exact-match)
+ *  Step 4. Verb infinitive     → Tree 3a (imbundo)
+ *  Step 5. Proper noun         → Tree 1 heuristic (capitalised mid-sentence)
+ *  Step 6. Noun (D+RT prefix)  → Tree 1, with verb/adj guard before committing
+ *  Step 7. Adjective (RS+C)    → Tree 2 (ntera)
+ *  Step 8. Conjugated verb     → Tree 3b (itondaguye)
+ *  Step 9. Foreign/Unknown
+ *
+ * Sentence context passes (kin_tag_sentence, after single-token pass):
+ *  Pass A. Indomo elision recovery: noun after demonstrative/relative (Tree 1)
+ *  Pass B. Izina ntera (POS_RELATIVE_NOUN): noun after possessive connector
+ *           that agrees with a preceding head noun → Tree 1→relative_noun
  *
  * NOTE: Known full word (step 3) is checked early so that specific lexicon
  * entries (like "mvura" = rain) override the general verb heuristics.
@@ -45,7 +61,7 @@ static void check_deverbative(Token *tok) {
 void kin_tag_token(Token *tok) {
     const char *w = tok->lower;
 
-    /* 1. Invariable word? */
+    /* Step 1 → Tree 5 (amagambo adahinduka): invariable word? */
     POS inv_pos;
     if (kin_is_invariable(w, &inv_pos)) {
         tok->pos           = inv_pos;
@@ -53,7 +69,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 2. Pronoun? */
+    /* Step 2 → Tree 4 (ikinyazina): pronoun? */
     PronounType ptype; int pcls;
     if (kin_is_pronoun(w, &ptype, &pcls)) {
         tok->pos            = POS_PRONOUN;
@@ -63,7 +79,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 3. Known full word (exact-match lexicon override)
+    /* Step 3 → Tree 1 override: known full word (exact-match lexicon).
      * Checked before verb heuristics so that specific nouns like "mvura"
      * (rain) are not misanalysed as conjugated verbs (mv SP + ur stem).   */
     {
@@ -79,7 +95,7 @@ void kin_tag_token(Token *tok) {
         }
     }
 
-    /* 4. Verb infinitive (ku/gu/kw/gw + stem + a)? */
+    /* Step 4 → Tree 3a (inshinga imbundo): verb infinitive (ku/gu/kw/gw + C + a)? */
     char stem[KIN_MAX_STEM];
     if (kin_is_verb_infinitive(w, stem)) {
         tok->pos            = POS_VERB_INF;
@@ -104,7 +120,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 5. Proper noun (capitalised mid-sentence)?
+    /* Step 5 → Tree 1 heuristic: proper noun (capitalised mid-sentence)?
      * Try verb analysis first — capitalised verb forms occur at the start of
      * quoted speech (e.g. "Habeho" = ha(SP16)+b+e+ho, SUBJUNCTIVE+LOC).
      * Only accept the verb reading for distinctive tense markers; PRESENT_NORA
@@ -147,7 +163,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 6. Noun? — detect D+RT prefix
+    /* Step 6 → Tree 1 (izina mbonera): noun via D+RT prefix detection.
      *
      * Disambiguation guard: in Kinyarwanda the noun-class prefix (D+RT) is
      * identical to the verb subject prefix for many classes (ru=Nt.11/SP11,
@@ -185,6 +201,35 @@ void kin_tag_token(Token *tok) {
             (w[0]=='r' && w[1]=='y') ||   /* ry = ri + vowel-initial stem */
             (w[0]=='z' && w[1]=='y')      /* zy = zi + vowel-initial stem */
         );
+
+        /* Amategeko y'igenamajwi priority: bare-phon-SP words (by/cy/ry/zy)
+         * arise from two distinct patterns:
+         *   (a) INSHINGA: SP 'bi' + vowel-initial root  (bi+izer→byizera)
+         *   (b) NTERA:    RS 'bi' + vowel-initial adj.stem (bi+iza→byiza)
+         *
+         * Rule: compound consonants in non-root positions are surface
+         * artefacts only.  When the suffix after the RS is a KNOWN
+         * adjective stem, the adjective (ntera) interpretation MUST win
+         * over the verb interpretation.
+         * Example: byiza = bi(RS·Nt.8) + iza(adj.stem) → POS_ADJECTIVE
+         *          byizera = bi(SP·Nt.8) + izer(verb root) + a → POS_VERB_CONJ  */
+        if (is_bare_phon_sp) {
+            char adj_stem_buf[KIN_MAX_STEM] = "";
+            int  adj_cls_buf  = 0;
+            if (kin_strip_adj_prefix(w, adj_stem_buf, &adj_cls_buf)) {
+                tok->pos            = POS_ADJECTIVE;
+                tok->noun_class     = adj_cls_buf;
+                tok->is_kinyarwanda = true;
+                strncpy(tok->stem, adj_stem_buf, KIN_MAX_STEM - 1);
+                tok->stem[KIN_MAX_STEM - 1] = '\0';
+                size_t astemlen = strlen(adj_stem_buf);
+                size_t awordlen = strlen(w);
+                size_t apfxlen  = (awordlen > astemlen) ? awordlen - astemlen : 0;
+                strncpy(tok->detected_prefix, w, apfxlen);
+                tok->detected_prefix[apfxlen] = '\0';
+                return;
+            }
+        }
 
         if (kin_is_verb_conjugated(w, v_stem, &v_cls, &v_tense,
                                    &v_obj, &v_ext, &v_neg)
@@ -258,7 +303,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 7. Adjective? — RS prefix + known stem */
+    /* Step 7 → Tree 2 (ntera): adjective via RS (concordance) prefix + known stem. */
     int acls = 0;
     if (kin_strip_adj_prefix(w, stem, &acls)) {
         tok->pos            = POS_ADJECTIVE;
@@ -273,7 +318,7 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
-    /* 8. Conjugated verb heuristic */
+    /* Step 8 → Tree 3b (inshinga itondaguye): conjugated verb heuristic. */
     int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
     VerbExtension vext = VEXT_NONE;
@@ -326,7 +371,7 @@ void kin_tag_token(Token *tok) {
         }
     }
 
-    /* 9. Unknown / foreign */
+    /* Step 9 → No tree matched: foreign or unknown word. */
     tok->pos            = POS_FOREIGN;
     tok->is_kinyarwanda = false;
 }
@@ -341,7 +386,7 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
             sa->has_verb = true;
     }
 
-    /* ── Context pass: indomo (initial vowel) elision recovery ─────────── *
+    /* ── Context Pass A: Indomo elision recovery (Tree 1) ───────────────── *
      * In Kinyarwanda, the initial vowel (indomo) of a noun is elided when   *
      * the noun follows a demonstrative or relative pronoun that ends in a   *
      * vowel (VV contact rule / Iranya ry'impanvu).                          *
@@ -375,11 +420,116 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
         check_deverbative(curr);
     }
 
-    /* Re-check has_verb after context pass */
+    /* ── Context Pass B: Izina ntera (POS_RELATIVE_NOUN) detection ──────── *
+     * An izina ntera is a noun that functions as a qualifier (adjective)     *
+     * of another noun.  It is connected via an ikinyazina ngenera            *
+     * (possessive connector) that AGREES with the head noun's class.         *
+     *                                                                         *
+     * Pattern:  [NOUN Nt.X] + [PRON.POSSESSIVE Nt.X] + [NOUN ?]             *
+     *   "igitabo cy'Ikinyarwanda"  → igitabo(Nt.7) + cya(Nt.7) + Ikinyarwanda
+     *   "inzu y'abantu"            → inzu(Nt.9)   + ya(Nt.9)   + abantu
+     *   "umwana w'umugabo"         → umwana(Nt.1) + wa(Nt.1)   + umugabo
+     *                                                                         *
+     * When the possessive connector class matches the head noun class,       *
+     * the following noun is functioning as izina ntera (relative noun).      *
+     * We re-tag it POS_RELATIVE_NOUN to distinguish it from a free noun.    *
+     *                                                                         *
+     * Guard: we only apply this when we can confirm the poss.connector       *
+     * class matches a preceding noun — to avoid false positives on           *
+     * sentence-initial possessives (which are standalone pronouns).          */
+    for (int i = 2; i < sa->token_count; i++) {
+        Token *head  = &sa->tokens[i - 2];  /* potential head noun */
+        Token *conn  = &sa->tokens[i - 1];  /* possessive connector */
+        Token *qual  = &sa->tokens[i];       /* potential izina ntera */
+
+        /* Connector must be a possessive pronoun */
+        if (conn->pos != POS_PRONOUN || conn->pron_type != PRON_POSSESSIVE)
+            continue;
+        /* Head must be a noun with a known class */
+        if (head->pos != POS_NOUN || head->noun_class == 0)
+            continue;
+        /* Qualifier must currently be a plain noun */
+        if (qual->pos != POS_NOUN)
+            continue;
+        /* Possessive connector class must agree with head noun class.
+         * Class 0 on the connector means it applies to multiple classes
+         * (e.g. "ya" is used for Nt.4, Nt.6, Nt.9 — all share "ya").
+         * Only re-tag when the class match is confirmed.               */
+        if (conn->noun_class != 0 && conn->noun_class != head->noun_class)
+            continue;
+
+        /* Confirmed: qualifier is an izina ntera (noun as adjective).    *
+         * Transition: POS_NOUN → POS_RELATIVE_NOUN                       *
+         * The noun class and stem remain unchanged; only the POS changes. */
+        qual->pos = POS_RELATIVE_NOUN;
+    }
+
+    /* ── Context Pass C: Verbal noun detection (izina ryaturutse ku nshinga) ─ *
+     *                                                                           *
+     * In Kinyarwanda, a conjugated verb form can function as a noun when:      *
+     *   – Its object-marker (OM) class matches the class of the following      *
+     *     pronoun or the SP of the following verb.                             *
+     *   – There is no prior noun of that class serving as a real subject.     *
+     *                                                                           *
+     * Example: "ibimera byose byera imbuto"                                    *
+     *   ibimera = i(SP·4) + bi(OM·8) + mer + a  → verb analysis               *
+     *   byose   = Nt.8 pronoun (directly modifies ibimera)                     *
+     *   byera   = bi(SP·8) + era  → SP=8 agrees with OM class of ibimera       *
+     *   → ibimera is a Nt.8 verbal noun meaning "crops / plants"              *
+     *                                                                           *
+     * Detection: VERB(obj_class=Y) immediately followed by PRON(class=Y)      *
+     * is the primary signal.  VERB(obj_class=Y) → VERB(sp=Y) is secondary     *
+     * (requires no prior Nt.Y noun that could be the real subject).           */
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *cur = &sa->tokens[i];
+        if (cur->pos != POS_VERB_CONJ) continue;
+        if (cur->obj_class == 0) continue;       /* no OM = not a candidate   */
+        int om_cls = cur->obj_class;
+
+        bool nominal_context = false;
+
+        /* Primary: next token is a pronoun of the same class as OM */
+        if (i + 1 < sa->token_count) {
+            Token *nxt = &sa->tokens[i + 1];
+            if (nxt->pos == POS_PRONOUN && nxt->noun_class == om_cls)
+                nominal_context = true;
+        }
+
+        /* Secondary: one of the next 2 tokens is a verb whose SP = OM class,
+         * AND no prior noun of that class can serve as the subject.           */
+        if (!nominal_context) {
+            for (int j = i + 1; j < sa->token_count && j <= i + 2; j++) {
+                Token *nxt = &sa->tokens[j];
+                if (nxt->pos != POS_VERB_CONJ) continue;
+                if (nxt->noun_class != om_cls) continue;
+                /* Guard: scan back for a prior noun of om_cls */
+                bool prior_subject = false;
+                for (int k = 0; k < i; k++) {
+                    if (sa->tokens[k].pos == POS_NOUN &&
+                        sa->tokens[k].noun_class == om_cls)
+                        { prior_subject = true; break; }
+                }
+                if (!prior_subject) { nominal_context = true; break; }
+            }
+        }
+
+        if (!nominal_context) continue;
+
+        cur->gram_role    = GRAM_ROLE_VERBAL_NOUN;
+        cur->is_deverbative = true;
+        strncpy(cur->verb_root, cur->stem, KIN_MAX_STEM - 1);
+        cur->verb_root[KIN_MAX_STEM - 1] = '\0';
+    }
+
+    /* Re-check has_verb after all context passes.
+     * Verbal nouns (gram_role == GRAM_ROLE_VERBAL_NOUN) are syntactically
+     * nouns; they must not satisfy the "sentence has a verb" requirement.    */
     sa->has_verb = false;
     for (int i = 0; i < sa->token_count; i++) {
-        if (sa->tokens[i].pos == POS_VERB_INF ||
-            sa->tokens[i].pos == POS_VERB_CONJ)
+        Token *t = &sa->tokens[i];
+        if (t->pos == POS_VERB_INF) { sa->has_verb = true; continue; }
+        if (t->pos == POS_VERB_CONJ &&
+            t->gram_role != GRAM_ROLE_VERBAL_NOUN)
             sa->has_verb = true;
     }
 }

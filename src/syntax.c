@@ -177,6 +177,10 @@ void kin_check_syntax(SentenceAnalysis *sa) {
 
         if (noun->pos != POS_NOUN)      continue;
         if (verb->pos != POS_VERB_CONJ) continue;
+        /* Verbal nouns (izina ryaturutse ku nshinga) are syntactically nouns
+         * even though they carry POS_VERB_CONJ morphology.  They do not
+         * agree with a preceding subject noun — they ARE the subject noun. */
+        if (verb->gram_role == GRAM_ROLE_VERBAL_NOUN) continue;
         /* Skip when either side has an unknown or ambiguous class */
         if (noun->noun_class == 0 || verb->noun_class == 0) continue;
         /* Nt.1 and Nt.3 both use the same SP "a/u"; treat as compatible */
@@ -187,6 +191,11 @@ void kin_check_syntax(SentenceAnalysis *sa) {
          * e.g. "Imana iravuga" — Imana is Nt.9 but iravuga's SP "i" is
          * stored as Nt.4 (first-match in the SP table).              */
         if ((nc == 4 || nc == 9) && (vc == 4 || vc == 9)) continue;
+        /* Nt.9 (singular) and Nt.10 (plural) are a paired noun class.
+         * Class 9 nouns used with plural reference take class 10 agreement
+         * e.g. "imbuto zikwiriye" — imbuto is Nt.9 but plural agreement
+         * uses SP "zi" (Nt.10). These are grammatically correct forms.  */
+        if ((nc == 9 || nc == 10) && (vc == 9 || vc == 10)) continue;
         /* "ya" SP (stored as cls 6) is ambiguous: it is ALSO the Nt.1 past
          * tense form (a-subject + past 'a' marker → "ya").  Do not flag   *
          * agreement errors when verb SP class is 6 and noun is Nt.1/3/9.  *
@@ -215,6 +224,10 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                 if ((tc == 4 || tc == 9) && (vc == 4 || vc == 9))
                     { has_remote_subject = true; break; }
                 if ((tc == 1 || tc == 3) && (vc == 1 || vc == 3))
+                    { has_remote_subject = true; break; }
+                /* Nt.9 (singular) / Nt.10 (plural) are a paired class.
+                 * imbuto (Nt.9) is a valid remote subject for a Nt.10 verb. */
+                if ((tc == 9 || tc == 10) && (vc == 9 || vc == 10))
                     { has_remote_subject = true; break; }
             }
             if (has_remote_subject) continue;
