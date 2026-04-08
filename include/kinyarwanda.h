@@ -216,7 +216,21 @@ typedef enum {
     POS_LOCATIVE,          /* Indangahantu                                 */
     POS_VERB_PARTICLE,     /* Ikegeranshinga: ngo, ko                      */
     POS_FOREIGN,           /* Word not matching any Kinyarwanda pattern    */
+    POS_PUNCTUATION,       /* Punctuation mark (comma, period, quote, etc.)*/
 } POS;
+
+/* ─── Punctuation sub-types ──────────────────────────────────────────────────── */
+typedef enum {
+    PUNCT_NONE        = 0,
+    PUNCT_COMMA,           /* , – clause boundary (imisumari)              */
+    PUNCT_PERIOD,          /* . – sentence end (ibirango byo gusoza)       */
+    PUNCT_QUESTION,        /* ? – question end (ikibazo)                   */
+    PUNCT_EXCLAIM,         /* ! – exclamation end (uburakari)              */
+    PUNCT_SEMICOLON,       /* ; – clause boundary (heavier than comma)     */
+    PUNCT_COLON,           /* : – introduces a list or direct speech       */
+    PUNCT_QUOTE_OPEN,      /* " or « – opens quoted/direct speech          */
+    PUNCT_QUOTE_CLOSE,     /* " or » – closes quoted/direct speech         */
+} PunctType;
 
 /* ─── Verb tense (ibihe by'inshinga) ─────────────────────────────────────────
  * REB 2020 "Amashuri yisumbuye" terminology (section 1.8):
@@ -275,6 +289,7 @@ typedef enum {
      *   abeho  = a(SP1)   + b + e + ho  → "that he/she be there"            *
      *   mubemo = mu(SP2)  + b + e + mo  → "let you all be inside"           */
     TENSE_SUBJUNCTIVE_LOC, /* Ikigombero + ahantu: SP+stem+e+ho/mo/yo  habeho*/
+    TENSE_STATIVE_POSS,   /* Indagihe ya "kugira": SP+fite  bifite, afite  */
 } VerbTense;
 
 /* ─── Grammatical sentence role (inshingwa y'ijambo mu nteruro) ──────────────
@@ -463,6 +478,12 @@ typedef struct {
     char verb_root[KIN_MAX_STEM];   /* Verb root the noun was derived from   */
     /* ── Grammatical sentence role (filled by kin_tag_gram_roles) ─────────── */
     GramRole  gram_role;            /* Role in the sentence (main/aux/rel/…) */
+    /* ── Punctuation (filled when pos == POS_PUNCTUATION) ──────────────── */
+    PunctType  punct_type;          /* Which punctuation mark this is        */
+    bool       is_clause_boundary;  /* Comma/semicolon: clause boundary      */
+    bool       is_sent_boundary;    /* Period/question/exclaim: sentence end */
+    bool       is_quote_open;       /* Opens direct speech / quotation       */
+    bool       is_quote_close;      /* Closes direct speech / quotation      */
     /* ── Type-specific morpheme breakdown (filled by kin_morpheme_analyze) ─ */
     MorphBreakdown morph;           /* Per-type D+RT+C / SP+TM+C+FV / RS+C  */
 } Token;

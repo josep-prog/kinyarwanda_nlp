@@ -1194,6 +1194,7 @@ static const char *VERB_STEMS[] = {
     "ish",      /* kwisha      – to finish / end                         */
     "va",       /* kuva        – to come from / leave from / depart      */
     "van",      /* guvana      – to part from / separate                 */
+    "tan",      /* gutana      – to part ways / separate (base verb; gutanduka ← tan+uk, gutandukana ← tan+uk+an) */
     "nyur",     /* kunyura     – to pass through / traverse              */
     "zam",      /* kuzamura    – to lift / raise up                      */
     "vunik",    /* guvunika    – to break / fracture                     */
@@ -2042,6 +2043,7 @@ const char *kin_pos_name(POS pos) {
         case POS_LOCATIVE:     return "Indangahantu (Locative)";
         case POS_VERB_PARTICLE:return "Ikegeranshinga (Verb particle)";
         case POS_FOREIGN:      return "Ijambo ry'amahanga (Foreign/Unknown)";
+        case POS_PUNCTUATION:  return "Ibirango (Punctuation)";
         default:               return "Ntizwi (Unknown)";
     }
 }
@@ -2086,6 +2088,7 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_COPULA_PRES:  return "Indagihe y'inshinga nkene (Present copula: ariho, ndiho, iriho…)";
         case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira…)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
+        case TENSE_STATIVE_POSS:    return "Indagihe y'ugutunga (Stative possessive: bifite, afite, nfite…)";
         default:                 return "";
     }
 }

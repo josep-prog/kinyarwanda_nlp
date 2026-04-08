@@ -708,6 +708,7 @@ static const char *final_vowel(VerbTense t, const char *word) {
                    ? "tse" : "ye";
         case TENSE_PAST_IMPF:     return "aga";
         case TENSE_SUBJUNCTIVE:   return "e";
+        case TENSE_STATIVE_POSS:  return "e";  /* bifite: SP+fit+e */
         case TENSE_SUBJUNCTIVE_LOC:
             if (wlen >= 2) {
                 if (word[wlen-2]=='h' && word[wlen-1]=='o') return "eho";
@@ -1097,7 +1098,53 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "root", root, root, "");
             }
         } else {
-            set_morph(&mb->m[n++], "root", root, root, "");
+            /* Deep-root check: when an outer extension exists (e.g. reciprocal
+             * -an-), also inspect whether the root itself contains an embedded
+             * reversive -uk-/-ur- applied to a nasal-final base via r→d/n_:
+             *   gutana (root -tan-) + reversive (-ruk-) → -tan-ruk- →
+             *   r→d / n_ rule → surface -tanduk-
+             * We detect this by:
+             *   1. root ends in -uk or -ur
+             *   2. stripping those 2 chars gives inner stem ending in -nd or -mb
+             *      (epenthetic stop after nasal: n+d or m+b)
+             *   3. removing that stop gives a known verb stem (base root)
+             * If confirmed, store: base(root) + ruk/rur(REV, with rule) + ext(EXT) */
+            bool wrote_deep = false;
+            size_t rlen = strlen(root);
+            if (rlen > 4 && ext[0] &&
+                ((root[rlen-1]=='k' && root[rlen-2]=='u') ||
+                 (root[rlen-1]=='r' && root[rlen-2]=='u'))) {
+                bool is_uk = (root[rlen-1] == 'k');
+                char inner[KIN_MAX_STEM];
+                size_t ilen = rlen - 2;
+                strncpy(inner, root, ilen); inner[ilen] = '\0';
+                if (ilen >= 3) {
+                    char last = inner[ilen-1];
+                    char prev = inner[ilen-2];
+                    if ((last == 'd' && prev == 'n') ||
+                        (last == 'b' && prev == 'm')) {
+                        char base[KIN_MAX_STEM];
+                        strncpy(base, inner, ilen-1); base[ilen-1] = '\0';
+                        if (kin_is_known_verb_stem(base)) {
+                            /* Underlying reversive: -ruk- or -rur-
+                             * Surface after r→d/n_: -duk- or -dur-         */
+                            char und_rev[4], srf_rev[4];
+                            snprintf(und_rev, sizeof(und_rev), "r%s", is_uk ? "uk" : "ur");
+                            snprintf(srf_rev, sizeof(srf_rev), "d%s", is_uk ? "uk" : "ur");
+                            char rev_rule[KIN_MORPH_RULE_LEN];
+                            snprintf(rev_rule, sizeof(rev_rule),
+                                "r\xe2\x86\x92""d / n_ (ingombajwi r ihinduka d inyuma "
+                                "y'ingombajwi n): -%s-%s- \xe2\x86\x92 -%s%s-",
+                                base, und_rev, base, srf_rev);
+                            set_morph(&mb->m[n++], "root", base,    base,    "");
+                            set_morph(&mb->m[n++], "REV",  und_rev, srf_rev, rev_rule);
+                            wrote_deep = true;
+                        }
+                    }
+                }
+            }
+            if (!wrote_deep)
+                set_morph(&mb->m[n++], "root", root, root, "");
             if (ext[0])
                 set_morph(&mb->m[n++], "EXT", ext, ext, "");
         }

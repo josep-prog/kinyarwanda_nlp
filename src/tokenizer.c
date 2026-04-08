@@ -54,6 +54,37 @@ static bool is_dquote(const char *p) {
     return false;
 }
 
+/* Emit a single punctuation token.  Returns 1 on success, 0 if at capacity. */
+static int emit_punct(Token *out, int count, int max_tokens,
+                      const char *ch, size_t nbytes, PunctType pt) {
+    if (count >= max_tokens) return 0;
+    memset(&out[count], 0, sizeof(Token));
+    memcpy(out[count].surface, ch, nbytes);
+    out[count].surface[nbytes] = '\0';
+    memcpy(out[count].lower,   ch, nbytes);
+    out[count].lower[nbytes]   = '\0';
+    out[count].pos             = POS_PUNCTUATION;
+    out[count].punct_type      = pt;
+    out[count].is_clause_boundary = (pt == PUNCT_COMMA || pt == PUNCT_SEMICOLON);
+    out[count].is_sent_boundary   = (pt == PUNCT_PERIOD || pt == PUNCT_QUESTION ||
+                                     pt == PUNCT_EXCLAIM);
+    out[count].is_quote_open      = (pt == PUNCT_QUOTE_OPEN);
+    out[count].is_quote_close     = (pt == PUNCT_QUOTE_CLOSE);
+    out[count].is_kinyarwanda     = false;
+    return 1;
+}
+
+/* Known stative-possessive (-fite) prefix forms that may appear merged with a
+ * following noun (e.g. "bifiteubugingo" written as one word instead of two).
+ * When detected, the tokenizer splits them at the boundary so each part is
+ * analysed independently.
+ * Ordered longest-first to prevent prefix mismatch (bafite before afite). */
+static const char * const FITE_FORMS[] = {
+    "bafite", "bifite", "zifite", "rufite", "gafite", "dufite",
+    "mufite", "bufite", "gifite", "nfite",  "ufite",  "afite",
+    "ifite",  NULL
+};
+
 int kin_tokenize(const char *text, Token *out, int max_tokens) {
     int count = 0;
     const char *p = text;
@@ -63,12 +94,42 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
         if (!*p) break;
 
-        /* Skip leading double-quote characters (ASCII " and curly " ") so
-         * they are not emitted as Foreign tokens.  Trailing quotes are
-         * handled below in the post-word skip.                              */
-        while (*p == '"' || is_dquote(p))
-            p += ((unsigned char)*p == '"') ? 1 : 3;
-        if (!*p) break;
+        /* ── Punctuation tokens ──────────────────────────────────────────── *
+         * Emit punctuation marks as explicit POS_PUNCTUATION tokens instead  *
+         * of silently discarding them.  This lets the analyser know about    *
+         * clause and sentence boundaries, and about direct-speech openings.  *
+         *                                                                    *
+         * ASCII double-quote (") is treated as QUOTE_OPEN or QUOTE_CLOSE    *
+         * based on context: OPEN when no unmatched open quote precedes it;  *
+         * CLOSE otherwise.  Curly " (U+201C) is always OPEN, " (U+201D)    *
+         * always CLOSE.                                                      */
+        if (*p == ',')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COMMA);      p++; continue; }
+        if (*p == '.')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_PERIOD);     p++; continue; }
+        if (*p == '?')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_QUESTION);   p++; continue; }
+        if (*p == '!')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_EXCLAIM);    p++; continue; }
+        if (*p == ';')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_SEMICOLON);  p++; continue; }
+        if (*p == ':')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COLON);      p++; continue; }
+        if (*p == '"')  {
+            /* ASCII " is ambiguous: open when no prior unmatched open exists,
+             * close otherwise (toggle logic). */
+            bool seen_open = false;
+            for (int qi = 0; qi < count; qi++) {
+                if (out[qi].is_quote_open)  seen_open = true;
+                if (out[qi].is_quote_close) seen_open = false;
+            }
+            PunctType qt = seen_open ? PUNCT_QUOTE_CLOSE : PUNCT_QUOTE_OPEN;
+            count += emit_punct(out,count,max_tokens,p,1,qt); p++; continue;
+        }
+        /* UTF-8 U+201C LEFT DOUBLE QUOTATION MARK  E2 80 9C  " */
+        if ((unsigned char)p[0]==0xE2 && (unsigned char)p[1]==0x80 &&
+            (unsigned char)p[2]==0x9C) {
+            count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_OPEN);  p+=3; continue;
+        }
+        /* UTF-8 U+201D RIGHT DOUBLE QUOTATION MARK E2 80 9D  " */
+        if ((unsigned char)p[0]==0xE2 && (unsigned char)p[1]==0x80 &&
+            (unsigned char)p[2]==0x9D) {
+            count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_CLOSE); p+=3; continue;
+        }
 
         /* Find end of current word (whitespace, punctuation, or double quote) */
         const char *word_end = p;
@@ -118,15 +179,26 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         count++;
         p = word_end;
 
-        /* Skip trailing punctuation and double-quote characters */
-        for (;;) {
-            if (*p == '.' || *p == ',' || *p == '!' || *p == '?' ||
-                *p == ';' || *p == ':' || *p == '"') {
-                p++;
-            } else if (is_dquote(p)) {
-                p += 3;
-            } else {
-                break;
+        /* ── Split -fite compounds ────────────────────────────────────────── *
+         * If this word starts with a known -fite stative form (e.g. "bifite")*
+         * immediately followed by more characters (another word run on       *
+         * without a space, e.g. "bifiteubugingo"), back p up so the main     *
+         * loop re-processes the overflow as a separate token.                *
+         *                                                                    *
+         * e.g. "bifiteubugingo" → emit "bifite", re-read "ubugingo"         */
+        {
+            Token *last = &out[count - 1];
+            for (int fi = 0; FITE_FORMS[fi]; fi++) {
+                size_t flen = strlen(FITE_FORMS[fi]);
+                if (wlen > flen &&
+                    strncmp(last->lower, FITE_FORMS[fi], flen) == 0) {
+                    /* Truncate the emitted token to just the -fite part */
+                    last->surface[flen] = '\0';
+                    last->lower[flen]   = '\0';
+                    /* Back p up to re-process the overflow (wlen - flen chars) */
+                    p = p - (wlen - flen);
+                    break;
+                }
             }
         }
     }

@@ -353,6 +353,9 @@ static void print_verb_morphemes(const Token *t) {
                 printf(" %s(OM\xC2\xB7Nt.%d)", form, t->obj_class);
             } else if (strcmp(m->label, "root") == 0) {
                 printf(" %s(root)", form);
+            } else if (strcmp(m->label, "REV") == 0) {
+                /* Reversive with nasal+r→d rule: show underlying/surface pair */
+                printf(" %s\xe2\x86\x92%s(REV\xc2\xb7Ngiruka)", form, m->surface);
             } else if (strcmp(m->label, "EXT") == 0) {
                 printf(" %s(EXT)", form);
             } else if (strcmp(m->label, "LOC") == 0) {
@@ -412,6 +415,7 @@ static const char *tense_marker_key(VerbTense t) {
         case TENSE_NEG_RELATIVE:    return "NEG='ta' iboneka mu mwanya wa 2";
         case TENSE_COPULA_PAST:     return "SP(impitagihe) + 'ri' + ahantu";
         case TENSE_COPULA_PRES:     return "SP(indagihe) + 'ri' + ahantu";
+        case TENSE_STATIVE_POSS:    return "SP + -fite (FV='e', igicumbi cya kugira)";
         default:                    return "";
     }
 }
@@ -836,6 +840,29 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
             ? "Izina mbonera (ivuye mu nshinga)"
             : kin_pos_name(t->pos);
 
+        /* Punctuation tokens: display compactly and skip morpheme detail */
+        if (t->pos == POS_PUNCTUATION) {
+            const char *pname = "";
+            switch (t->punct_type) {
+                case PUNCT_COMMA:       pname = "Imisumari (Comma `,`)";         break;
+                case PUNCT_PERIOD:      pname = "Indangahantu (Period `.`)";      break;
+                case PUNCT_QUESTION:    pname = "Ikibazo (Question mark `?`)";   break;
+                case PUNCT_EXCLAIM:     pname = "Uburakari (Exclamation `!`)";   break;
+                case PUNCT_SEMICOLON:   pname = "Impande (Semicolon `;`)";        break;
+                case PUNCT_COLON:       pname = "Agakorwa (Colon `:`)";           break;
+                case PUNCT_QUOTE_OPEN:  pname = "Indangajwi (Quote open `\"`)";  break;
+                case PUNCT_QUOTE_CLOSE: pname = "Indangajwi (Quote close `\"`)"; break;
+                default:                pname = "Ibirango (Punctuation)";         break;
+            }
+            printf("  `%s`  %s\n", t->surface, pname);
+            if (t->is_sent_boundary)    printf("        [Igenanzira: iherezo ry'interuro]\n");
+            if (t->is_clause_boundary)  printf("        [Igenanzira: imipaka y'interuro nto]\n");
+            if (t->is_quote_open)       printf("        [Igenanzira: intangiriro y'amagambo yavuzwe]\n");
+            if (t->is_quote_close)      printf("        [Igenanzira: iherezo ry'amagambo yavuzwe]\n");
+            putchar('\n');
+            continue;
+        }
+
         /* Mark tokens with errors */
         char marker = (t->error_count > 0) ? '!' : ' ';
         printf("%c%-19s  %-30s  %-8s  %-8s\n",
@@ -911,6 +938,62 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                     printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s%sa%s"
                            "  (igicumbi -%s-)\n",
                            ci_pfx, t->stem, ci_loc, t->stem);
+
+                    /* Deep root analysis: detect nasal + reversive -uk-/-ur- derivation.
+                     * Rule: a nasal-final root (-n or -m) + reversive -uk- triggers
+                     * epenthetic -d- insertion between nasal and extension vowel:
+                     *   -tan- + -uk- → -tan·d·uk- = -tanduk-   (n+u → ndu)
+                     *   -fung- + -uk- → -funguk- (no epenthesis; g is not a nasal)
+                     * Strip -uk or -ur from stem; if result ends in -nd or -mb,
+                     * remove the epenthetic stop to recover the nasal-final base root.
+                     * If the recovered base is a known verb stem, display the chain. */
+                    {
+                        size_t slen = strlen(t->stem);
+                        bool has_rev_uk = slen > 4 &&
+                            t->stem[slen-1]=='k' && t->stem[slen-2]=='u';
+                        bool has_rev_ur = slen > 4 &&
+                            t->stem[slen-1]=='r' && t->stem[slen-2]=='u';
+                        if (has_rev_uk || has_rev_ur) {
+                            /* Strip the reversive -uk or -ur */
+                            char inner[KIN_MAX_STEM];
+                            size_t ilen = slen - 2;
+                            strncpy(inner, t->stem, ilen);
+                            inner[ilen] = '\0';
+                            /* Check for epenthetic stop after nasal:
+                             *   -nd  ← n + d (before -u- of reversive)
+                             *   -mb  ← m + b (before -u- of reversive, rarer) */
+                            char base[KIN_MAX_STEM];
+                            bool found_base = false;
+                            if (ilen >= 3) {
+                                char last = inner[ilen-1];
+                                char prev = inner[ilen-2];
+                                if ((last == 'd' && prev == 'n') ||
+                                    (last == 'b' && prev == 'm')) {
+                                    strncpy(base, inner, ilen-1);
+                                    base[ilen-1] = '\0';
+                                    if (kin_is_known_verb_stem(base))
+                                        found_base = true;
+                                }
+                            }
+                            if (found_base) {
+                                char b0 = base[0];
+                                bool bv = (b0=='a'||b0=='e'||b0=='i'||b0=='o'||b0=='u');
+                                bool bd = (b0=='b'||b0=='d'||b0=='g'||b0=='j'||
+                                           b0=='r'||b0=='v'||b0=='z'||b0=='m'||
+                                           b0=='n'||b0=='y'||b0=='c');
+                                const char *bpfx = bv ? "kw" : bd ? "ku" : "gu";
+                                const char *rev_sfx = has_rev_uk ? "uk" : "ur";
+                                printf("  \342\224\224\342\224\200 Inkomoko y'igicumbi (Root etymology):\n");
+                                printf("       Igicumbi cy'ibanze: -%s- \342\206\222 %s%sa"
+                                       "  (igicumbi -%s-)\n",
+                                       base, bpfx, base, base);
+                                printf("       Itegeko: r\342\206\222d / n_ (ingombajwi r ihinduka d"
+                                       " inyuma y'ingombajwi n):\n");
+                                printf("                -%s- + -r%s- \342\206\222 -%s-\n",
+                                       base, rev_sfx, t->stem);
+                            }
+                        }
+                    }
                 }
                 /* 2. Tense label with morpheme-position confirmation */
                 if (t->verb_tense != TENSE_NONE) {

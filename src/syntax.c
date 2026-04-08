@@ -82,7 +82,8 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         for (int ii = 0; ii < sa->token_count; ii++) {
             POS p = sa->tokens[ii].pos;
             if (p != POS_INTERJECTION && p != POS_ADVERB &&
-                p != POS_VERB_PARTICLE && p != POS_CONJUNCTION) {
+                p != POS_VERB_PARTICLE && p != POS_CONJUNCTION &&
+                p != POS_PUNCTUATION) {
                 all_interj = false;
                 break;
             }
@@ -99,6 +100,8 @@ void kin_check_syntax(SentenceAnalysis *sa) {
     for (int i = 0; i < sa->token_count - 1; i++) {
         Token *cur  = &sa->tokens[i];
         Token *next = &sa->tokens[i + 1];
+        if (cur->pos  == POS_PUNCTUATION) continue;
+        if (next->pos == POS_PUNCTUATION) continue;
 
         /* RULE 1: Noun followed immediately by adjective */
         if (cur->pos == POS_NOUN && cur->noun_class > 0 &&
@@ -155,6 +158,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
     /* RULE 4: Flag unrecognised non-proper-noun words */
     for (int i = 0; i < sa->token_count; i++) {
         Token *t = &sa->tokens[i];
+        if (t->pos == POS_PUNCTUATION) continue;  /* punctuation is not a word */
         if (t->pos == POS_FOREIGN && !t->is_proper_noun) {
             char msg[KIN_MAX_MSG];
             snprintf(msg, sizeof(msg),
@@ -173,10 +177,31 @@ void kin_check_syntax(SentenceAnalysis *sa) {
      * We only check adjacent noun → verb pairs where both classes are known */
     for (int i = 0; i < sa->token_count - 1; i++) {
         Token *noun = &sa->tokens[i];
-        Token *verb = &sa->tokens[i + 1];
+        /* Skip punctuation in the outer scan */
+        if (noun->pos == POS_PUNCTUATION) continue;
+        /* Find the next non-punctuation token as the verb candidate */
+        int vi = i + 1;
+        while (vi < sa->token_count && sa->tokens[vi].pos == POS_PUNCTUATION) vi++;
+        if (vi >= sa->token_count) continue;
+        Token *verb = &sa->tokens[vi];
 
         if (noun->pos != POS_NOUN)      continue;
         if (verb->pos != POS_VERB_CONJ) continue;
+        /* Do not check agreement across a clause/sentence boundary.
+         * A comma or period between noun and verb means they belong to
+         * different clauses — subject-verb agreement does not apply.       */
+        {
+            bool boundary_between = false;
+            for (int k = i + 1; k < vi; k++) {
+                if (sa->tokens[k].pos == POS_PUNCTUATION &&
+                    (sa->tokens[k].is_clause_boundary ||
+                     sa->tokens[k].is_sent_boundary)) {
+                    boundary_between = true;
+                    break;
+                }
+            }
+            if (boundary_between) continue;
+        }
         /* Verbal nouns (izina ryaturutse ku nshinga) are syntactically nouns
          * even though they carry POS_VERB_CONJ morphology.  They do not
          * agree with a preceding subject noun — they ARE the subject noun. */
@@ -218,8 +243,22 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             bool has_remote_subject = false;
             for (int j = i - 1; j >= 0; j--) {
                 const Token *t = &sa->tokens[j];
-                if (t->pos != POS_NOUN || t->noun_class == 0) continue;
-                int tc = t->noun_class;
+                /* Stop scanning back at sentence boundaries               */
+                if (t->pos == POS_PUNCTUATION && t->is_sent_boundary) break;
+                int tc = 0;
+                if (t->pos == POS_NOUN && t->noun_class > 0) {
+                    tc = t->noun_class;
+                } else if (t->pos == POS_VERB_CONJ && t->noun_class > 0
+                           && t->gram_role != GRAM_ROLE_VERBAL_NOUN) {
+                    /* A preceding conjugated verb with the same SP class means
+                     * this is a coordinate clause sharing the same implicit
+                     * subject.  e.g. "bitegeke ... , bitandukanye ..." — both
+                     * verbs are class 8; the subject (lights) is established
+                     * by the earlier verb's SP, not by any intervening noun.  */
+                    tc = t->noun_class;
+                } else {
+                    continue;
+                }
                 if (tc == vc) { has_remote_subject = true; break; }
                 if ((tc == 4 || tc == 9) && (vc == 4 || vc == 9))
                     { has_remote_subject = true; break; }
@@ -259,6 +298,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
     for (int i = 0; i < sa->token_count; i++) {
         Token *t = &sa->tokens[i];
         /* Only check words we believe are Kinyarwanda and not interjections */
+        if (t->pos == POS_PUNCTUATION) continue;
         if (!t->is_kinyarwanda) continue;
         if (t->pos == POS_INTERJECTION) continue;
         if (t->is_proper_noun) continue;
@@ -307,7 +347,12 @@ void kin_check_syntax(SentenceAnalysis *sa) {
      */
     for (int i = 0; i < sa->token_count - 1; i++) {
         Token *verb = &sa->tokens[i];
-        Token *next = &sa->tokens[i + 1];
+        if (verb->pos == POS_PUNCTUATION) continue;
+        /* Find next non-punctuation token */
+        int ni = i + 1;
+        while (ni < sa->token_count && sa->tokens[ni].pos == POS_PUNCTUATION) ni++;
+        if (ni >= sa->token_count) continue;
+        Token *next = &sa->tokens[ni];
 
         if (verb->pos != POS_VERB_CONJ) continue;
         /* Only flag when the verb stem is "gend" or "end" (both map to kugenda) */

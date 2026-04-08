@@ -59,13 +59,38 @@ static void check_deverbative(Token *tok) {
 
 /* Tag a single token in isolation */
 void kin_tag_token(Token *tok) {
+    /* Punctuation tokens are already fully tagged by the tokenizer — preserve. */
+    if (tok->pos == POS_PUNCTUATION) return;
+
     const char *w = tok->lower;
 
     /* Step 1 → Tree 5 (amagambo adahinduka): invariable word? */
     POS inv_pos;
     if (kin_is_invariable(w, &inv_pos)) {
-        tok->pos           = inv_pos;
+        tok->pos            = inv_pos;
         tok->is_kinyarwanda = true;
+        /* ── -fite stative possessive: set class + stem so morph display is right.
+         * Forms: bifite(Nt.8), afite(Nt.1), bafite(Nt.2), gifite(Nt.7), etc.
+         * Structure: SP + -fite  (stative of "to have", not a regular tense). */
+        if (inv_pos == POS_VERB_CONJ && kin_ends_with(w, "fite")) {
+            strncpy(tok->stem, "fit", KIN_MAX_STEM - 1);
+            tok->verb_tense = TENSE_STATIVE_POSS;  /* -fite stative possessive */
+            size_t wlen = strlen(w);
+            static const struct { const char *sp; int cls; } FITE_SP[] = {
+                { "bi",  8  }, { "ba",  2  }, { "gi",  7  }, { "zi", 10  },
+                { "ru", 11  }, { "ga", 12  }, { "du",  1  }, { "mu",  2  },
+                { "bu", 14  }, { "u",   1  }, { "a",   1  }, { "n",   1  },
+                { "i",   9  }, { NULL,  0  }
+            };
+            for (int fi = 0; FITE_SP[fi].sp; fi++) {
+                size_t slen = strlen(FITE_SP[fi].sp);
+                if (wlen > 4 && wlen - 4 == slen &&
+                    strncmp(w, FITE_SP[fi].sp, slen) == 0) {
+                    tok->noun_class = FITE_SP[fi].cls;
+                    break;
+                }
+            }
+        }
         return;
     }
 
