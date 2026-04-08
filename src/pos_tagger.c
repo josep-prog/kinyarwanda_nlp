@@ -172,7 +172,11 @@ void kin_tag_token(Token *tok) {
         if (kin_is_verb_conjugated(tok->lower, pn_stem, &pn_cls, &pn_tense,
                                    &pn_obj, &pn_ext, &pn_neg)
             && pn_tense != TENSE_PRESENT_NORA
-            && pn_tense != TENSE_SUBJUNCTIVE
+            /* Subjunctive: allow when stem is a known verb root.
+             * e.g. Mwororoke = mw(2pl SP) + ororok(kororoka) + e(SUBJ).
+             * Bare subjunctive forms at sentence-start (quoted speech) must be
+             * admitted when the stem is confirmed in the verb lexicon.          */
+            && (pn_tense != TENSE_SUBJUNCTIVE || kin_is_known_verb_stem(pn_stem))
             && pn_tense != TENSE_IMPERATIVE
             && (pn_tense == TENSE_SUBJUNCTIVE_LOC
                 || pn_tense == TENSE_PAST_PERF
@@ -183,6 +187,7 @@ void kin_tag_token(Token *tok) {
                 || pn_tense == TENSE_PRESENT
                 || pn_tense == TENSE_COPULA_PAST
                 || pn_tense == TENSE_COPULA_PRES
+                || pn_tense == TENSE_SUBJUNCTIVE
                 || kin_is_known_verb_stem(pn_stem))) {
             tok->pos            = POS_VERB_CONJ;
             tok->noun_class     = pn_cls;
@@ -275,7 +280,13 @@ void kin_tag_token(Token *tok) {
             && (v_tense != TENSE_PRESENT_NORA
                 || kin_is_known_verb_stem(v_stem)
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))
-            && v_tense != TENSE_SUBJUNCTIVE
+            /* SUBJUNCTIVE: allow when stem is known OR when bare phon-SP makes
+             * the verb reading unambiguous (by/cy/ry/zy can only be verb SPs).
+             * e.g. byororoke = by(Nt.8 SP) + ororok + e(SUBJ) — safe to admit.
+             * mugwire/mwuzure also pass via kin_is_known_verb_stem gate.        */
+            && (v_tense != TENSE_SUBJUNCTIVE
+                || kin_is_known_verb_stem(v_stem)
+                || is_bare_phon_sp)
             && v_tense != TENSE_IMPERATIVE
             /* Tenses with unambiguous morphological markers bypass stem check:
              * PAST_PERF  – surface differs from citation stem (murakoze→koz)
@@ -291,6 +302,7 @@ void kin_tag_token(Token *tok) {
                 || v_tense == TENSE_COPULA_PAST
                 || v_tense == TENSE_COPULA_PRES
                 || v_tense == TENSE_SUBJUNCTIVE_LOC
+                || v_tense == TENSE_SUBJUNCTIVE
                 || kin_is_known_verb_stem(v_stem)
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))) {
             /* Verb interpretation wins */

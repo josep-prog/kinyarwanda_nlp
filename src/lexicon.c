@@ -1304,6 +1304,7 @@ static const char *VERB_STEMS[] = {
      * flagged with false object-marker errors.                           */
     "z",        /* kuza        – to come / arrive (very common!)         */
     "b",        /* kuba        – to be / exist (copular: araba, rurabaho)*/
+    "h",        /* guha        – to give (e.g. ibiha=i+bi(OM.8)+h+a)    */
     "rakar",    /* gurakarira  – to be angry / furious                   */
     "rakaz",    /* gurakariza  – to make angry / enrage                  */
     "mer",      /* kumera      – to grow / thrive (already "mer" added?) */
@@ -1373,6 +1374,16 @@ static const char *VERB_STEMS[] = {
     "sanzur",   /* gusanzura   – to spread/stretch out (sky, cloth);
                    ALSO kwisanzura – to free oneself (→ ubwisanzure = freedom) */
     "kwir",     /* gukwira     – to fit / be appropriate / suitable (zikwiriye) */
+    /* ── Genesis 1 corpus + Biblical subjunctive forms ─────────────────── */
+    "ororok",   /* kororoka    – to be fruitful / reproduce / multiply
+                   Infinitive: ku+ororok+a → kororoka (u→∅/_o §1.2)
+                   Conjugated: Mwororoke (mw+ororok+e, 2pl SUBJ),
+                               byororoke (by+ororok+e, Nt.8 SUBJ)          */
+    "gwir",     /* kugwira     – to multiply / increase / be numerous
+                   Conjugated: mugwire (mu+gwir+e, 2pl SUBJ)                */
+    "uzur",     /* kuzura      – to fill / be full
+                   Infinitive: ku+uzur+a → kuzura (u+u→u §1.2)
+                   Conjugated: mwuzure (mw+uzur+e, 2pl SUBJ, u→w/_u)       */
     NULL
 };
 

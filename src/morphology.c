@@ -649,6 +649,12 @@ bool kin_is_verb_infinitive(const char *word, char *stem_out) {
     else if (kin_starts_with(word, "gw") && is_vowel(word[2])) inner = word + 2;
     else if (kin_starts_with(word, "gu") && !is_vowel(word[2])) inner = word + 2;
     else if (kin_starts_with(word, "ku") && !is_vowel(word[2])) inner = word + 2;
+    /* §1.2 u→∅ before back vowels o and u (not glide formation):
+     * ku + o-initial stem → k + o... (kororoka = ku+ororok+a, not *kwororoka)
+     * ku + u-initial stem → k + u... (kuzura   = ku+uzur+a,   not *kwuzura)
+     * Minimum length guard > 4: k + vowel + stem(≥1) + a = at least 4 chars. */
+    else if (word[0] == 'k' && (word[1] == 'o' || word[1] == 'u') && len > 4)
+        inner = word + 1;
     else return false;
 
     /* Inner must be at least 2 chars */
@@ -741,15 +747,18 @@ static const OmEntry OM_TABLE[] = {
 /*
  * om_strip() — try to peel an object marker off the front of `stem`.
  * Returns true if an OM was found.
- * bare_out receives the stem text after the OM (must be ≥ 2 chars to be valid).
+ * bare_out receives the stem text after the OM (≥ 1 char; LAYER 3c in
+ * kin_is_verb_conjugated validates the bare stem is a known root).
+ * Single-char roots like "h" (guha), "b" (kuba), "z" (kuza) are valid
+ * and must be reachable here — e.g. i+bi+h+a = ibiha (God gives).
  */
 static bool om_strip(const char *stem, int *om_cls_out,
                      char *bare_out, size_t bare_sz) {
     size_t slen = strlen(stem);
     for (int i = 0; OM_TABLE[i].om; i++) {
-        /* Try normal form */
+        /* Try normal form: require at least 1 char of bare stem remaining */
         size_t olen = strlen(OM_TABLE[i].om);
-        if (slen > olen + 1 && kin_starts_with(stem, OM_TABLE[i].om)) {
+        if (slen > olen && kin_starts_with(stem, OM_TABLE[i].om)) {
             if (om_cls_out) *om_cls_out = OM_TABLE[i].cls;
             if (bare_out) { strncpy(bare_out, stem + olen, bare_sz - 1);
                             bare_out[bare_sz - 1] = '\0'; }
@@ -757,7 +766,7 @@ static bool om_strip(const char *stem, int *om_cls_out,
         }
         /* Try vowel-initial variant */
         size_t ovlen = strlen(OM_TABLE[i].om_v);
-        if (slen > ovlen + 1 && kin_starts_with(stem, OM_TABLE[i].om_v)) {
+        if (slen > ovlen && kin_starts_with(stem, OM_TABLE[i].om_v)) {
             /* Disambiguate single-char variants: 'y' could be cls4/6/9,
              * 'w' cls3/13/14/15, 'b' cls2 — only accept if next char is vowel */
             if (ovlen == 1 && !is_vowel(stem[1])) continue;
@@ -899,10 +908,11 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "ndi",   0  },  /* 1sg copula                                   */
         /* 2-char prefixes */
         { "ba",    2  },
-        /* Vowel-initial stem variants: u→w before vowel (bu→bw, ru→rw, tu→tw) */
+        /* Vowel-initial stem variants: u→w before vowel (bu→bw, ru→rw, tu→tw, mu→mw) */
         { "bw",   14  },  /* Nt.14 bu+vowel → bw (bwera, bwigisha)        */
         { "rw",   11  },  /* Nt.11 ru+vowel → rw (rwera, rwemera)         */
         { "tw",    0  },  /* 1pl   tu+vowel → tw (twemera, twiga)         */
+        { "mw",    0  },  /* 2pl   mu+vowel → mw (mwuzure, mwororoke)     */
         /* Past augment variants: consonant SP + a(past augment) → 3-char SP  *
          * In past tense, the vowel SP (ki/bi/ri/zi) fuses with the past      *
          * augment 'a': ki+a = kya → surface cy before vowel = cya.           *

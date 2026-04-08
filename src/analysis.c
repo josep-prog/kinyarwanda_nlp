@@ -638,8 +638,12 @@ static void print_inf_morphemes(const Token *t) {
         for (int i = 0; i < mb->n; i++)
             if (mb->m[i].rule[0]) { any_rule = true; break; }
 
-        /* Helper: surface of a morpheme (fall back to form when surface is empty) */
+        /* Helper: surface of a morpheme (fall back to form when surface is empty).
+         * Exception: for absorbed morphemes (e.g. EXT "y" in VEXT_CAUSATIVE_Y),
+         * the surface is intentionally "" — callers should guard with [0] check
+         * before printing so the morpheme is silently omitted from Guhuza.      */
 #define INF_SURF(m) ((m)->surface[0] ? (m)->surface : (m)->form)
+#define INF_SURF_OR_EMPTY(m) ((m)->surface)
 
         if (any_rule) {
             /* Separate Itegeko + Guhuza lines */
@@ -647,10 +651,14 @@ static void print_inf_morphemes(const Token *t) {
             for (int i = 0; i < mb->n; i++)
                 if (mb->m[i].rule[0])
                     printf("       Itegeko:  %s\n", mb->m[i].rule);
-            /* Guhuza: use surface forms so the concatenation matches the word */
+            /* Guhuza: use surface forms so the concatenation matches the word.
+             * For absorbed EXT morphemes (VEXT_CAUSATIVE_Y: EXT surface=""),
+             * omit the slot entirely — the -y- is already represented inside
+             * the root surface (r→z), so printing it again would be wrong.  */
             printf("       Guhuza:   %s", INF_SURF(pref_m));
             printf(" + %s", INF_SURF(root_m));
-            if (ext_m)  printf(" + %s", INF_SURF(ext_m));
+            if (ext_m && INF_SURF_OR_EMPTY(ext_m)[0])
+                printf(" + %s", INF_SURF_OR_EMPTY(ext_m));
             printf(" + %s", INF_SURF(fv_m));
             if (loc_m)  printf(" + %s", INF_SURF(loc_m));
             printf("  \342\206\222  %s%s\n", lword, mb->verified ? "  \342\234\223" : "");
@@ -664,6 +672,7 @@ static void print_inf_morphemes(const Token *t) {
             printf("%s\n", mb->verified ? "  \342\234\223" : "");
         }
 #undef INF_SURF
+#undef INF_SURF_OR_EMPTY
         return;
     }
 
@@ -808,7 +817,15 @@ static void print_noun_morphemes(const Token *t) {
             printf("  └─ Ivuye mu nshinga (Deverbative): igicumbi -%s-"
                    " (cf. kw%sa)\n", t->verb_root, t->verb_root + 1);
         } else {
-            const char *pfx = is_vowel ? "kw" : (is_voiced ? "ku" : "gu");
+            const char *pfx;
+            if (is_vowel && (r0 == 'o' || r0 == 'u'))
+                pfx = "k";    /* u→∅/_[o,u] §1.2 */
+            else if (is_vowel)
+                pfx = "kw";   /* u→w §1.1 */
+            else if (is_voiced)
+                pfx = "ku";
+            else
+                pfx = "gu";
             printf("  └─ Ivuye mu nshinga (Deverbative): igicumbi -%s-"
                    " (cf. %s%sa)\n", t->verb_root, pfx, t->verb_root);
         }
@@ -897,7 +914,15 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                 bool vn_voiced = (r0=='b'||r0=='d'||r0=='g'||r0=='j'||r0=='r'||
                                   r0=='v'||r0=='z'||r0=='m'||r0=='n'||r0=='y'||
                                   r0=='c');
-                const char *pfx = vn_vowel ? "kw" : (vn_voiced ? "ku" : "gu");
+                const char *pfx;
+                if (vn_vowel && (r0 == 'o' || r0 == 'u'))
+                    pfx = "k";
+                else if (vn_vowel)
+                    pfx = "kw";
+                else if (vn_voiced)
+                    pfx = "ku";
+                else
+                    pfx = "gu";
                 printf("  \342\224\224\342\224\200 Ivuye mu nshinga (Derived from verb): %s%sa (igicumbi -%s-)\n",
                        pfx, t->stem, t->stem);
             }
@@ -942,8 +967,21 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                                       ci_r0=='j'||ci_r0=='r'||ci_r0=='v'||
                                       ci_r0=='z'||ci_r0=='m'||ci_r0=='n'||
                                       ci_r0=='y'||ci_r0=='c');
-                    const char *ci_pfx = ci_vowel  ? "kw"
-                                       : ci_voiced ? "ku" : "gu";
+                    /* Prefix selection: standard rule is kw+V (u→w §1.1).
+                     * Exception §1.2 — u elides (u→∅) before back vowels:
+                     *   ku + o-initial → ko... (kororoka, not *kwororoka)
+                     *   ku + u-initial → ku... (kuzura, not *kwuzura)
+                     * In these cases the surface prefix is just 'k', and the
+                     * stem's leading vowel is visible: k·ororok·a = kororoka. */
+                    const char *ci_pfx;
+                    if (ci_vowel && (ci_r0 == 'o' || ci_r0 == 'u'))
+                        ci_pfx = "k";       /* u→∅/_[o,u] §1.2 */
+                    else if (ci_vowel)
+                        ci_pfx = "kw";      /* u→w §1.1 before a/e/i        */
+                    else if (ci_voiced)
+                        ci_pfx = "ku";
+                    else
+                        ci_pfx = "gu";
                     /* TENSE_SUBJUNCTIVE_LOC: the locative suffix is part of the
                      * base verb form (e.g. kubaho, kubamo, kubayo).  Detect the
                      * suffix from the last 2 chars of the surface word and append
@@ -960,6 +998,28 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                     printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s%sa%s"
                            "  (igicumbi -%s-)\n",
                            ci_pfx, t->stem, ci_loc, t->stem);
+
+                    /* Homograph disambiguation: some roots correspond to two
+                     * distinct verbs that differ only in vowel length, which
+                     * standard Kinyarwanda orthography does not mark.
+                     * Show both readings so the user is aware of the ambiguity. */
+                    {
+                        static const struct { const char *root; const char *note; } HOMOGRAPH_ROOTS[] = {
+                            { "sig",
+                              "gusiga (guturika/gusigara \342\200\224 to leave/to remain, igicumbi fupi)"
+                              " | gusiiga (gushora amavuta/gusiga ibara \342\200\224 to paint/anoint,"
+                              " igicumbi kirekire) \342\200\224 bitandukanye n'uburebure bw'ijwi gusa"
+                              " (distinguished by vowel length in speech only)" },
+                            { NULL, NULL }
+                        };
+                        for (int hi = 0; HOMOGRAPH_ROOTS[hi].root; hi++) {
+                            if (strcmp(t->stem, HOMOGRAPH_ROOTS[hi].root) == 0) {
+                                printf("  \342\224\224\342\224\200 Icyitonderwa (Homograph note):\n"
+                                       "       %s\n", HOMOGRAPH_ROOTS[hi].note);
+                                break;
+                            }
+                        }
+                    }
 
                     /* Reflexive derivative citation: when VEXT_REFLEXIVE with
                      * consonant-initial root (i- present in surface), show

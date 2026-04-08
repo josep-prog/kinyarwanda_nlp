@@ -806,6 +806,7 @@ static void analyse_vconj(Token *tok)
             else if (kin_starts_with(eff_word, "tu"))   sp_under = "tu";
             else if (kin_starts_with(eff_word, "u"))    sp_under = "u";
             else if (kin_starts_with(eff_word, "mu"))   sp_under = "mu";
+            else if (kin_starts_with(eff_word, "mw"))   sp_under = "mu";  /* 2pl mu+vowel → mw (mwuzure, mwororoke) */
             else sp_under = "?";
         }
     }
@@ -1230,6 +1231,12 @@ static VerbExtension detect_ext_in_stem(const char *stem,
     bare_root[0] = '\0';
     ext_str[0]   = '\0';
 
+    /* Short-circuit: if the whole stem is a known verb root, it is integral —
+     * do not attempt to split it into root + extension.
+     * e.g. "uzur" (kuzura = to fill) must not be split into "uz" + "-ur-"
+     *      (reversive), since "uz" is not a valid root.                      */
+    if (kin_is_known_verb_stem(stem)) return VEXT_NONE;
+
     /* Causative: stem ends in "ish" or "esh" */
     if (len > 3) {
         const char *s = stem + len - 3;
@@ -1488,6 +1495,22 @@ static void analyse_vinf(Token *tok)
     set_morph(&mb->m[n++], "PREF", pref_under, pref_surf, pref_rule);
 
     if (inf_ext != VEXT_NONE) {
+        if (inf_ext == VEXT_CAUSATIVE_Y) {
+            /* r+y→z (§1.3): bare_root ends in 'r' (citation form); the causative
+             * morpheme -y- fuses with that 'r' to yield 'z' on the surface.
+             * Display: root underlying="gwir", surface="gwiz"; EXT underlying="y",
+             * surface="" (absorbed).  This shows y is present without r and z
+             * coexisting — the rule consumes both r and y to produce z.            */
+            size_t brlen = strlen(bare_root);
+            char root_surface[KIN_MAX_STEM];
+            strncpy(root_surface, bare_root, brlen - 1);
+            root_surface[brlen - 1] = 'z';   /* replace final 'r' with 'z' */
+            root_surface[brlen]     = '\0';
+            set_morph(&mb->m[n++], "root", bare_root, root_surface,
+                      "r+y\342\206\222z \302\2471.3 (causative -y- fuses with"
+                      " stem-final r \342\206\222 z)");
+            set_morph(&mb->m[n++], "EXT", "y", "", ""); /* -y- absorbed into root surface */
+        } else {
         /* Split: bare_root + extension.
          *
          * Elision check: if bare_root ends in 'a' and ext_str is vowel-initial
@@ -1519,6 +1542,7 @@ static void analyse_vinf(Token *tok)
         }
         set_morph(&mb->m[n++], "root", bare_root, root_surface, root_elision_rule);
         set_morph(&mb->m[n++], "EXT",  ext_str,   ext_str,   kin_verb_ext_name(inf_ext));
+        } /* end non-CAUSATIVE_Y */
     } else {
         set_morph(&mb->m[n++], "root", root, root, "");
     }
