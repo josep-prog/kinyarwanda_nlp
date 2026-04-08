@@ -343,6 +343,26 @@ void kin_tag_token(Token *tok) {
         return;
     }
 
+    /* Step 7b → Known noun stem: the word itself IS a recognised noun stem
+     * whose noun-class prefix (i/in/im) was elided — e.g. "nyanja" (inyanja,
+     * sea/lake, Nt.9) arrives without its "i-" prefix.  Guard: ≥ 5 chars so
+     * that short ambiguous forms (si, zi, gi, ko…) are not affected.
+     * Checked before the open-ended verb heuristic (step 8) to prevent
+     * legitimate nouns from being reinvented as conjugated-verb readings.   */
+    {
+        int ns_cls = 0;
+        if (strlen(w) >= 5 && kin_is_known_noun_stem(w, &ns_cls)) {
+            tok->pos             = POS_NOUN;
+            tok->noun_class      = ns_cls;
+            tok->is_kinyarwanda  = true;
+            strncpy(tok->stem, w, KIN_MAX_STEM - 1);
+            tok->stem[KIN_MAX_STEM - 1] = '\0';
+            tok->detected_prefix[0] = '\0';   /* indomo was elided */
+            check_deverbative(tok);
+            return;
+        }
+    }
+
     /* Step 8 → Tree 3b (inshinga itondaguye): conjugated verb heuristic. */
     int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
@@ -442,6 +462,41 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
         strncpy(curr->stem, curr->lower, KIN_MAX_STEM - 1);
         curr->stem[KIN_MAX_STEM - 1] = '\0';
         curr->detected_prefix[0] = '\0';  /* indomo was elided */
+        check_deverbative(curr);
+    }
+
+    /* ── Context Pass A2: Indangahantu (locative) noun rescue ──────────── *
+     * Rule: after a locative preposition (mu/ku/i/kuri/muri/kwa) the next  *
+     * word refers to a place or thing — prefer noun over verb reading.     *
+     * Handles forms where the noun prefix 'i/in' is elided after a         *
+     * locative, e.g. "mu nyanja" (in the sea) where "nyanja" = inyanja.   *
+     * No length guard here: the locative context is strong enough evidence.*
+     * Belt-and-suspenders over step 7b in kin_tag_token.                   */
+    for (int i = 1; i < sa->token_count; i++) {
+        Token *prev = &sa->tokens[i - 1];
+        Token *curr = &sa->tokens[i];
+        if (curr->pos != POS_VERB_CONJ) continue;
+        if (prev->pos != POS_PREPOSITION) continue;
+        const char *plo = prev->lower;
+        bool is_loc = (strcmp(plo, "mu")   == 0 ||
+                       strcmp(plo, "ku")   == 0 ||
+                       strcmp(plo, "i")    == 0 ||
+                       strcmp(plo, "kuri") == 0 ||
+                       strcmp(plo, "muri") == 0 ||
+                       strcmp(plo, "kwa")  == 0);
+        if (!is_loc) continue;
+        int lcls = 0;
+        if (!kin_is_known_noun_stem(curr->lower, &lcls)) continue;
+        curr->pos            = POS_NOUN;
+        curr->noun_class     = lcls;
+        curr->verb_tense     = TENSE_NONE;
+        curr->verb_ext       = VEXT_NONE;
+        curr->obj_class      = 0;
+        curr->is_negative    = false;
+        curr->is_kinyarwanda = true;
+        strncpy(curr->stem, curr->lower, KIN_MAX_STEM - 1);
+        curr->stem[KIN_MAX_STEM - 1] = '\0';
+        curr->detected_prefix[0] = '\0';   /* indomo elided after locative */
         check_deverbative(curr);
     }
 

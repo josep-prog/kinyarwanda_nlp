@@ -365,9 +365,14 @@ static void print_verb_morphemes(const Token *t) {
                 printf(" %s(%s)", form, m->label);
             }
         }
-        /* Reflexive note: the i- prefix was elided (kwi- → i- dropped) */
-        if (t->verb_ext == VEXT_REFLEXIVE)
-            printf(" + [i-(imbundo, elided from kwi-)]");
+        /* Reflexive note: when morph chain is filled, the REFL slot already
+         * appears in the chain above; this fallback line is only for the old
+         * bare-subjunctive case where 'i' was elided entirely.              */
+        if (t->verb_ext == VEXT_REFLEXIVE) {
+            bool refl_i_present = t->stem[0] && !is_vowel_c(t->stem[0]);
+            if (!refl_i_present)
+                printf(" + [i-(imbundo, elided from kwi-)]");
+        }
         printf("\n");
         return;
     }
@@ -390,7 +395,11 @@ static void print_verb_morphemes(const Token *t) {
     printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s(SP\xC2\xB7Nt.%d)", sp, t->noun_class);
     if (tm[0])  printf(" + %s(TM)", tm);
     if (om[0])  printf(" + %s(OM\xC2\xB7Nt.%d)", om, t->obj_class);
-    if (t->verb_ext == VEXT_REFLEXIVE) printf(" + [i-(imbundo, elided from kwi-)]");
+    if (t->verb_ext == VEXT_REFLEXIVE) {
+        bool refl_i_present = t->stem[0] && !is_vowel_c(t->stem[0]);
+        if (refl_i_present) printf(" + i(REFL)");
+        else                printf(" + [i-(imbundo, elided from kwi-)]");
+    }
     printf(" + %s(root)", t->stem[0] ? t->stem : "?");
     if (ext[0]) printf(" + %s(EXT)", ext);
     printf(" + %s(FV)\n", fv);
@@ -939,6 +948,23 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                            "  (igicumbi -%s-)\n",
                            ci_pfx, t->stem, ci_loc, t->stem);
 
+                    /* Reflexive derivative citation: when VEXT_REFLEXIVE with
+                     * consonant-initial root (i- present in surface), show
+                     * the reflexive infinitive kwi+root_alt+a as a secondary
+                     * citation alongside the base verb.                       */
+                    if (t->verb_ext == VEXT_REFLEXIVE && !is_vowel_c(ci_r0)) {
+                        size_t slen = strlen(t->stem);
+                        char refl_root[KIN_MAX_STEM];
+                        strncpy(refl_root, t->stem, slen);
+                        refl_root[slen] = '\0';
+                        /* Apply nd→nz for the reflexive infinitive display */
+                        if (slen >= 2 && refl_root[slen - 1] == 'd')
+                            refl_root[slen - 1] = 'z';
+                        printf("  \342\224\224\342\224\200 Inyandiko yo kwisanzura"
+                               " (Reflexive infinitive): kwi%sa"
+                               "  (nd\xe2\x86\x92nz mutation)\n", refl_root);
+                    }
+
                     /* Deep root analysis: detect nasal + reversive -uk-/-ur- derivation.
                      * Rule: a nasal-final root (-n or -m) + reversive -uk- triggers
                      * epenthetic -d- insertion between nasal and extension vowel:
@@ -1011,8 +1037,15 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                     printf("  \342\224\224\342\224\200 OM(Nt.%d/-%s-): %s\n",
                            t->obj_class, kin_om_str(t->obj_class),
                            kin_class_name(t->obj_class));
-                if (t->verb_ext != VEXT_NONE)
-                    printf("  \342\224\224\342\224\200 %s\n", kin_verb_ext_name(t->verb_ext));
+                if (t->verb_ext != VEXT_NONE) {
+                    /* For VEXT_REFLEXIVE: distinguish present-i vs elided-i */
+                    if (t->verb_ext == VEXT_REFLEXIVE &&
+                        t->stem[0] && !is_vowel_c(t->stem[0]))
+                        printf("  \342\224\224\342\224\200 Imbundo y'ikwisanzura"
+                               " (Reflexive: i- present, nd\xe2\x86\x92nz mutation)\n");
+                    else
+                        printf("  \342\224\224\342\224\200 %s\n", kin_verb_ext_name(t->verb_ext));
+                }
                 /* 4. Reconstruction: morphemes + rules → surface verification */
                 print_verb_reconstruction(t);
             } else {

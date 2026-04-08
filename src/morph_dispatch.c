@@ -844,8 +844,19 @@ static void analyse_vconj(Token *tok)
     }
     const char *om   = (tok->obj_class > 0) ? kin_om_str(tok->obj_class) : "";
 
-    /* Determine SP surface: check for phonological change at SP-next boundary */
-    const char *next_after_sp = tm[0] ? tm : (om[0] ? om : root);
+    /* Reflexive -i- present in surface: VEXT_REFLEXIVE with consonant-initial root.
+     * The marker 'i' (from kwi-) sits between SP and root, causing:
+     *   (a) SP 'bi'+'i' → 'by'   (i→y §1.1)
+     *   (b) root-final 'd' → 'z'  (nd→nz mutation in reflexive context)
+     * Example: byigenza = bi + i + gend(d→z) + a  →  by + i + genz + a       */
+    bool refl_i_present = (tok->verb_ext == VEXT_REFLEXIVE &&
+                           root[0] && !mv(root[0]));
+
+    /* Determine SP surface: check for phonological change at SP-next boundary *
+     * When the reflexive 'i' is present it is the element that immediately      *
+     * follows the SP — use "i" as next_after_sp so the i→y mutation fires.      */
+    const char *next_after_sp = refl_i_present ? "i"
+        : (tm[0] ? tm : (om[0] ? om : root));
     char sp_surface[KIN_MORPH_FORM_LEN];
     char sp_rule[KIN_MORPH_RULE_LEN] = "";
     strncpy(sp_surface, sp_under, sizeof(sp_surface)-1);
@@ -995,11 +1006,29 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Reflexive root surface: d→z mutation when refl_i_present */
+    char root_refl_surface[KIN_MAX_STEM];
+    char root_refl_rule[KIN_MORPH_RULE_LEN] = "";
+    if (refl_i_present) {
+        strncpy(root_refl_surface, root, sizeof(root_refl_surface) - 1);
+        root_refl_surface[sizeof(root_refl_surface) - 1] = '\0';
+        size_t rlen = strlen(root);
+        if (rlen >= 2 && root[rlen - 1] == 'd') {
+            root_refl_surface[rlen - 1] = 'z';  /* nd→nz in reflexive context */
+            snprintf(root_refl_rule, sizeof(root_refl_rule),
+                     "nd\xe2\x86\x92nz (final d\xe2\x86\x92z before reflexive -a in -i- context)");
+        }
+    }
+
     /* Build expected surface for verification.
      * Include negation prefix in built string so verification works for
      * negative verbs (ntaragenda, sindagenda, etc.).                        */
     char built[KIN_MAX_WORD];
-    if (tok->verb_tense == TENSE_CONDITIONAL) {
+    if (refl_i_present) {
+        /* SP + i(REFL) + root_refl_surface + FV */
+        snprintf(built, sizeof(built), "%s%si%s%s",
+                 neg_pfx, sp_surface, root_refl_surface, fv);
+    } else if (tok->verb_tense == TENSE_CONDITIONAL) {
         /* When TM 'a' is elided (a+a→a), omit it from the built surface */
         snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
                  neg_pfx,
@@ -1042,6 +1071,15 @@ static void analyse_vconj(Token *tok)
                                         : "Ikivugana cy'inziganyo (conditional modal particle)");
     } else if (om[0]) {
         set_morph(&mb->m[n++], "OM", om, om_surface[0] ? om_surface : om, om_rule);
+    }
+    /* Reflexive 'i' morpheme: insert between TM/OM slot and root */
+    if (refl_i_present) {
+        set_morph(&mb->m[n++], "REFL", "i", "i",
+                  "Imbundo y'ikwisanzura (Reflexive marker i- from kwi-)");
+        set_morph(&mb->m[n++], "root", root, root_refl_surface, root_refl_rule);
+        set_morph(&mb->m[n++], "FV", fv, fv, "");
+        mb->n = n;
+        return;  /* skip normal root/ext/FV handling below */
     }
     if (tok->verb_ext == VEXT_CAUSATIVE_Y) {
         /* r+y→z (§1.3): citation root ends in 'r'; -y- causative fuses it to 'z'.

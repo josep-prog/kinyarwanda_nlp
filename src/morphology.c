@@ -1510,6 +1510,34 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
         }
     }
 
+    /* ── LAYER 3d: Reflexive 'i' marker + nd→nz mutation detection ─────── *
+     * Pattern: SP + i(REFL) + root_alt + FV                                *
+     * After SP + zero-TM, when no OM was found and bare starts with 'i':   *
+     *   strip leading 'i' → candidate refl_root                            *
+     *   if refl_root ends in 'z', try reversing z→d → base_try             *
+     *   if base_try is a known verb stem → underlying root is base_try,     *
+     *   and the 'i' was the reflexive marker (from kwi-), nd→nz being the  *
+     *   surface mutation in the reflexive context.                          *
+     * Example: byigenza → SP=bi, bare="igenz"                               *
+     *   strip 'i' → "genz", z→d → "gend" = known stem (kugenda) ✓         *
+     * Guard: obj_cls==0 (no OM consumed the 'i') and vext==NONE (no ext).  */
+    if (obj_cls == 0 && vext == VEXT_NONE &&
+        bare[0] == 'i' && strlen(bare) >= 4) {
+        const char *after_i = bare + 1;
+        size_t ai_len = strlen(after_i);
+        if (ai_len >= 3 && after_i[ai_len - 1] == 'z') {
+            char base_try[KIN_MAX_STEM];
+            strncpy(base_try, after_i, ai_len);
+            base_try[ai_len - 1] = 'd';   /* reverse nd→nz: z→d */
+            base_try[ai_len] = '\0';
+            if (kin_is_known_verb_stem(base_try)) {
+                strncpy(bare, base_try, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+                vext = VEXT_REFLEXIVE;
+            }
+        }
+    }
+
     /* ── Write outputs ──────────────────────────────────────────────────── */
     /* stem_out gets the bare stem (most useful for lexicon lookups)        */
     if (stem_out)      { strncpy(stem_out, bare, KIN_MAX_STEM-1);
