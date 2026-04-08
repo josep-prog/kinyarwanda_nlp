@@ -922,6 +922,19 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                  *   voiced-initial root → ku+root+a  (e.g. kubara, kubona)
                  *   voiceless-initial root → gu+root+a (e.g. gukwira, gusoma) */
                 if (t->stem[0]) {
+                    /* TENSE_STATIVE_POSS: the -fite paradigm (bifite, afite…)
+                     * is a suppletive possessive form of "kugira" (to have).
+                     * The surface root "fit" has no real infinitive "gufita";
+                     * cite "kugira" instead with a note on the suppletive root. */
+                    if (t->verb_tense == TENSE_STATIVE_POSS) {
+                        printf("  \342\224\224\342\224\200 Imbundo (Citation verb): kugira"
+                               "  (igicumbi ry'inshinga yo gutunga: -fit-)\n");
+                        printf("  \342\224\224\342\224\200 Ibisobanuro: '-fite' ni umuzi w'indangika"
+                               " (suppletive root) wa 'kugira' mu nshinga yo gutunga;\n"
+                               "       FV='e' ni inyerera y'inshinga ngirika"
+                               " \342\200\224 ntaho ihinduka ry'a\342\206\222e ribaho;\n"
+                               "       kandi ntakintu kijyana na 'gufata' (to grab).\n");
+                    } else {
                     char ci_r0 = t->stem[0];
                     bool ci_vowel  = (ci_r0=='a'||ci_r0=='e'||ci_r0=='i'||
                                       ci_r0=='o'||ci_r0=='u');
@@ -1020,6 +1033,7 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                             }
                         }
                     }
+                    } /* end else (non-STATIVE_POSS citation) */
                 }
                 /* 2. Tense label with morpheme-position confirmation */
                 if (t->verb_tense != TENSE_NONE) {

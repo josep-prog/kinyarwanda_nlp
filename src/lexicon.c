@@ -1536,6 +1536,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "icyaha",   7,  "yaha"   },  /* sin / fault / guilt                 */
     { "igihe",    7,  "gihe"   },  /* time / moment / period              */
     { "igihugu",  7,  "hugu"   },  /* country / nation                    */
+    { "igisiga",  7,  "siga"   },  /* bird of prey: eagle/vulture/hawk    */
+    { "ibisiga",  8,  "siga"   },  /* birds of prey (pl. of igisiga)      */
     /* Common Nt.9 nouns with n+y→nz (§2.4.1) prefix rule */
     { "inzira",   9,  "nzira"  },  /* path / road                         */
     { "inzara",   9,  "nzara"  },  /* hunger / famine                     */
@@ -1927,6 +1929,7 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "iterambere",    "amaterambere",    "terambere",  5,  6  },
     { "ifunguro",      "amafunguro",      "funguro",    5,  6  },
     /* ── Class 7 ↔ 8 (thing singular / plural) ─────────────────────────────── */
+    { "igisiga",       "ibisiga",         "siga",       7,  8  },  /* bird of prey: eagle/vulture/large hawk */
     { "ikitabo",       "ibitabo",         "tabo",       7,  8  },
     { "ikigo",         "ibigo",           "go",         7,  8  },
     { "ikintu",        "ibintu",          "ntu",        7,  8  },

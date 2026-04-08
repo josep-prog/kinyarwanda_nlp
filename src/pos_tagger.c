@@ -36,6 +36,16 @@
 #include <string.h>
 #include "../include/kinyarwanda.h"
 
+/* Primary noun stems that share a stripped form with a known verb root but
+ * are NOT deverbative.  These are lexically independent nouns that happen to
+ * look like verb-derived forms; the deverbative heuristic must skip them.
+ * Add any new collision here rather than changing check_deverbative's logic. */
+static const char *PRIMARY_NOUN_STEMS[] = {
+    "siga",   /* igisiga/ibisiga – birds of prey (eagles/vultures/large hawks)
+               * NOT from gusiga (to leave/anoint); independent lexical item  */
+    NULL
+};
+
 /* Check if a noun token is a deverbative (izina rivuye mu nshinga).
  * Pattern: strip the final vowel from the noun stem; if the result is a
  * known verb stem (≥ 2 chars), the noun was derived from that verb.
@@ -47,6 +57,9 @@ static void check_deverbative(Token *tok) {
     char last = tok->stem[slen - 1];
     bool ends_vowel = (last=='a'||last=='e'||last=='i'||last=='o'||last=='u');
     if (!ends_vowel) return;                 /* nominalizer is always a vowel*/
+    /* Guard: skip known primary nouns that collide with verb roots */
+    for (int pi = 0; PRIMARY_NOUN_STEMS[pi]; pi++)
+        if (strcmp(tok->stem, PRIMARY_NOUN_STEMS[pi]) == 0) return;
     char root[KIN_MAX_STEM];
     strncpy(root, tok->stem, slen - 1);
     root[slen - 1] = '\0';
