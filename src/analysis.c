@@ -714,8 +714,15 @@ static void print_inf_morphemes(const Token *t) {
          * Exception: for absorbed morphemes (e.g. EXT "y" in VEXT_CAUSATIVE_Y),
          * the surface is intentionally "" — callers should guard with [0] check
          * before printing so the morpheme is silently omitted from Guhuza.      */
+/* For Guhuza: always prefer UNDERLYING form.  Compound consonants (kw, gw,
+ * by, ry...) are surface artefacts — they may only appear in the igicumbi
+ * (root).  All other slots (PREF, EXT, FV) must show underlying forms;
+ * the Itegeko line already explains any phonological changes.             */
+#define INF_FORM(m) ((m)->form[0] ? (m)->form : (m)->surface)
+/* For the inline (no-rule) path we still reconstruct what was actually
+ * written, so surface is fine there — compound consonants in the prefix
+ * only arise when a rule fired, which takes the any_rule branch anyway.  */
 #define INF_SURF(m) ((m)->surface[0] ? (m)->surface : (m)->form)
-#define INF_SURF_OR_EMPTY(m) ((m)->surface)
 
         if (any_rule) {
             /* Separate Itegeko + Guhuza lines */
@@ -723,19 +730,19 @@ static void print_inf_morphemes(const Token *t) {
             for (int i = 0; i < mb->n; i++)
                 if (mb->m[i].rule[0])
                     printf("       Itegeko:  %s\n", mb->m[i].rule);
-            /* Guhuza: use surface forms so the concatenation matches the word.
-             * For absorbed EXT morphemes (VEXT_CAUSATIVE_Y: EXT surface=""),
-             * omit the slot entirely — the -y- is already represented inside
-             * the root surface (r→z), so printing it again would be wrong.  */
-            printf("       Guhuza:   %s", INF_SURF(pref_m));
-            printf(" + %s", INF_SURF(root_m));
-            if (ext_m && INF_SURF_OR_EMPTY(ext_m)[0])
-                printf(" + %s", INF_SURF_OR_EMPTY(ext_m));
-            printf(" + %s", INF_SURF(fv_m));
-            if (loc_m)  printf(" + %s", INF_SURF(loc_m));
+            /* Guhuza: UNDERLYING forms on the left, surface word on the right.
+             * Compound consonants (kw, gw...) must not appear in non-root slots.
+             * For absorbed EXT (CAUSATIVE_Y: surface=""), still show underlying
+             * form so the reader sees what was absorbed; Itegeko explains fusion. */
+            printf("       Guhuza:   %s", INF_FORM(pref_m));
+            printf(" + %s", INF_FORM(root_m));
+            if (ext_m && (ext_m->form[0] || ext_m->surface[0]))
+                printf(" + %s", INF_FORM(ext_m));
+            printf(" + %s", INF_FORM(fv_m));
+            if (loc_m)  printf(" + %s", INF_FORM(loc_m));
             printf("  \342\206\222  %s%s\n", lword, mb->verified ? "  \342\234\223" : "");
         } else {
-            /* No rules: inline reconstruction on same Ingingo line */
+            /* No rules fired: inline reconstruction on same Ingingo line */
             printf("  \342\206\222  %s", INF_SURF(pref_m));
             printf("%s", INF_SURF(root_m));
             if (ext_m)  printf("%s", INF_SURF(ext_m));
@@ -743,8 +750,8 @@ static void print_inf_morphemes(const Token *t) {
             if (loc_m)  printf("%s", INF_SURF(loc_m));
             printf("%s\n", mb->verified ? "  \342\234\223" : "");
         }
+#undef INF_FORM
 #undef INF_SURF
-#undef INF_SURF_OR_EMPTY
         return;
     }
 
@@ -820,14 +827,16 @@ static void print_adj_morphemes(const Token *t) {
                rs_m->form, t->noun_class, c_m->form);
         if (rs_changed)
             printf("       Itegeko:  %s\n", rs_m->rule);
+        /* Guhuza shows UNDERLYING forms; Itegeko already explains surface changes */
         printf("       Guhuza:  %s + %s + %s + %s  \342\206\222  %s  \342\234\223\n",
-               rs_m->surface, c_m->surface, rs_m->surface, c_m->surface, t->lower);
+               rs_m->form, c_m->form, rs_m->form, c_m->form, t->lower);
     } else if (rs_changed) {
         printf("       Ingingo: [RS]%s(Nt.%d) + [C]%s\n",
                rs_m->form, t->noun_class, c_m->form);
         printf("       Itegeko:  %s\n", rs_m->rule);
+        /* Guhuza shows UNDERLYING forms; surface fusion is explained by Itegeko above */
         printf("       Guhuza:  %s + %s  \342\206\222  %s%s\n",
-               rs_m->surface, c_m->surface, t->lower,
+               rs_m->form, c_m->form, t->lower,
                mb->verified ? "  \342\234\223" : "");
     } else {
         printf("       Ingingo: [RS]%s(Nt.%d) + [C]%s  \342\206\222  %s%s\n",
