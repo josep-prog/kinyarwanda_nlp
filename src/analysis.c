@@ -275,7 +275,8 @@ static const char *tm_display(VerbTense tense) {
         case TENSE_FUTURE:     return "za";
         case TENSE_NARRATIVE:  return "ka";
         case TENSE_OPTATIVE:   return "raka";
-        case TENSE_NEG_RELATIVE: return "ta";
+        case TENSE_NEG_RELATIVE:  return "ta";
+        case TENSE_NEG_ANTERIOR:  return "ra";
         default:               return "";
     }
 }
@@ -289,7 +290,8 @@ static const char *fv_display(VerbTense tense) {
         case TENSE_NARRATIVE:
         case TENSE_OPTATIVE:
         case TENSE_CONDITIONAL:
-        case TENSE_NEG_RELATIVE:  return "a";
+        case TENSE_NEG_RELATIVE:
+        case TENSE_NEG_ANTERIOR:  return "a";
         case TENSE_PAST_PERF:     return "ye";
         case TENSE_PAST_IMPF:     return "aga";
         case TENSE_SUBJUNCTIVE:   return "e";
@@ -481,6 +483,7 @@ static const char *tense_marker_key(VerbTense t) {
         case TENSE_SUBJUNCTIVE_LOC: return "FV='e' + ahantu (ho/mo/yo)";
         case TENSE_CONDITIONAL:     return "SP + intera 'a' + root + FV='a'";
         case TENSE_NEG_RELATIVE:    return "NEG='ta' iboneka mu mwanya wa 2";
+        case TENSE_NEG_ANTERIOR:    return "NEG='ta' + TM='ra' (ntiraba/kataraba: \"not yet\")";
         case TENSE_COPULA_PAST:     return "SP(impitagihe) + 'ri' + ahantu";
         case TENSE_COPULA_PRES:     return "SP(indagihe) + 'ri' + ahantu";
         case TENSE_STATIVE_POSS:    return "SP + -fite (FV='e', igicumbi cya kugira)";

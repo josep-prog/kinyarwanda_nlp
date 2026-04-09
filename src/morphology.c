@@ -1509,6 +1509,20 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
          * Requires total inner length ≥ 5: ta(2) + stem(≥2) + FV(1).       */
         if (kin_starts_with(inner, "ta") && ilen >= 5 && inner[ilen-1] == 'a') {
             const char *s = inner + 2; size_t sl = ilen - 3;
+            /* Check for additional TM 'ra' after -ta-: SP+ta+ra+stem+a.
+             * This is the "not yet" (negative anterior) form.
+             * e.g. kataraba = ka+ta+ra+b+a (kuba, "not yet being/existing").
+             * Minimum: ta(2)+ra(2)+root(1)+FV(1)=6 → ilen>=6.
+             * Allow 1-char roots (e.g. -b- from kuba) for this case only.  */
+            if (ilen >= 6 && kin_starts_with(s, "ra")) {
+                const char *s2 = s + 2; size_t sl2 = sl - 2;
+                if (sl2 >= 1) {
+                    if (stem_buf) { strncpy(stem_buf, s2, sl2); stem_buf[sl2]='\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_NEG_ANTERIOR;
+                    return true;
+                }
+            }
             if (sl >= 2) {
                 if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
                 if (subj_class) *subj_class = SP[i].cls;

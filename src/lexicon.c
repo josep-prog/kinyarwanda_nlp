@@ -2302,7 +2302,8 @@ const char *kin_verb_tense_name(VerbTense t) {
          * The root is 'b'; final vowel 'a' is retained before consonant 'h'.  */
         case TENSE_COPULA_PAST:  return "Impitagihe y'inshinga nkene (Past copula: yariho, wariho…)";
         case TENSE_COPULA_PRES:  return "Indagihe y'inshinga nkene (Present copula: ariho, ndiho, iriho…)";
-        case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira…)";
+        case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira\xe2\x80\xa6)";
+        case TENSE_NEG_ANTERIOR:    return "Inshinga y'ubunyagatifu bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
         case TENSE_STATIVE_POSS:    return "Indagihe y'ugutunga (Stative possessive: bifite, afite, nfite…)";
         default:                 return "";

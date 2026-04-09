@@ -283,6 +283,11 @@ typedef enum {
      *   nt-: negates a main clause verb (he is NOT going)                   *
      *   ta-: produces a participial / relative clause (who/that does not)   */
     TENSE_NEG_RELATIVE,    /* Inshinga nkurikije y'ubunyagatifu: itagira...  */
+    /* ── Negative anterior ("not yet"): SP + ta + ra + stem + a ─────────────── *
+     * The -ta- negation combined with TM -ra- gives "not yet" meaning.          *
+     *   kataraba  = ka(SP12) + ta(NEG) + ra(TM) + b(kuba) + a  → not yet being *
+     *   itaravuba = i(SP9)   + ta(NEG) + ra(TM) + vub(kuvuba) + a → not yet rain*/
+    TENSE_NEG_ANTERIOR,    /* "Not yet": SP + ta(NEG) + ra(TM) + stem + a       */
     /* ── Subjunctive + locative (Ikigombero + umugereka w'ahantu) ─────────── *
      * Pattern: SP + stem + e(SUBJ FV) + ho/mo/yo                             *
      *   habeho = ha(SP16) + b + e + ho  → "let there be (there)"            *

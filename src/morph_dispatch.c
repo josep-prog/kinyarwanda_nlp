@@ -713,7 +713,8 @@ static const char *tense_marker(VerbTense t) {
         case TENSE_FUTURE:       return "za";
         case TENSE_NARRATIVE:    return "ka";
         case TENSE_OPTATIVE:     return "raka";
-        case TENSE_NEG_RELATIVE: return "ta";
+        case TENSE_NEG_RELATIVE:  return "ta";
+        case TENSE_NEG_ANTERIOR:  return "ra";  /* TM after ta(NEG) */
         /* Conditional: the 'a' TM is fused into the SP surface via vowel
          * contact (tu+a→twa), so the independent TM slot shows "a" while
          * the SP morpheme shows the fused surface form.                  */
@@ -1307,9 +1308,11 @@ static void analyse_vconj(Token *tok)
     } else {
         /* For r/d/g+ye→ze or k+ye→tse: root_surface already has fusion form;
          * FV surfaces as bare 'e' (the 'y' of 'ye' is absorbed by the fusion). */
-        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
+        /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra in the surface. */
+        const char *neg_mid = (tok->verb_tense == TENSE_NEG_ANTERIOR) ? "ta" : "";
+        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s%s",
                  neg_pfx,
-                 sp_surface, tm_contracted ? tm_contracted_buf : tm,
+                 sp_surface, neg_mid, tm_contracted ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
                  root_surface, ext_surface, (past_rye_ze || past_kye_tse) ? "e" : fv);
     }
@@ -1321,6 +1324,10 @@ static void analyse_vconj(Token *tok)
         set_morph(&mb->m[n++], "NEG", neg_pfx, neg_pfx,
                   "Ubunyagatifu (Negation prefix)");
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
+    /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra */
+    if (tok->verb_tense == TENSE_NEG_ANTERIOR)
+        set_morph(&mb->m[n++], "NEG", "ta", "ta",
+                  "Ubunyagatifu (Neg. anterior: 'not yet'; -ta- before TM -ra-)");
     /* i-final past SP: insert explicit past-augment slot ya(PA) after SP.
      * form="ya" = surface of a(past augment) after §1.1 bi+a→bya.
      * surface="" so it doesn't double-count "ya" already inside sp_surface.   */
@@ -1340,7 +1347,8 @@ static void analyse_vconj(Token *tok)
     else if (tok->verb_tense != TENSE_NONE
              && tok->verb_tense != TENSE_IMPERATIVE
              && tok->verb_tense != TENSE_PAST_PERF
-             && tok->verb_tense != TENSE_PAST_IMPF)
+             && tok->verb_tense != TENSE_PAST_IMPF
+             && tok->verb_tense != TENSE_NEG_ANTERIOR)
         /* Zero tense marker: explicit ∅ in Ingingo/Guhuza display.
          * surface="" (empty) keeps the built verification string correct;
          * form="∅" is used by the printer wherever surface is absent.
