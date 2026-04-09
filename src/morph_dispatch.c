@@ -700,7 +700,7 @@ static const char *SP_PRES[17] = {
 /* Subject prefix underlying forms (past tense) per class */
 static const char *SP_PAST[17] = {
     "?",
-    "ya","ba","wa","ya","rya","ya","cya","bya","ya","zya","ru","ka","tu","bu","ku","ha"
+    "ya","ba","wa","ya","rya","ya","cya","bya","ya","za","ru","ka","tu","bu","ku","ha"
 };
 
 static bool is_past_tense(VerbTense t) {
@@ -1026,7 +1026,7 @@ static void analyse_vconj(Token *tok)
     char sp_surface[KIN_MORPH_FORM_LEN];
     char sp_rule[KIN_MORPH_RULE_LEN] = "";
     char sp_pres_buf[KIN_MORPH_FORM_LEN] = "";  /* buffer for i-final present-form SP */
-    bool i_final_pa = false;   /* true → insert ya(PA) slot after SP in chain */
+    char pa_form[KIN_MORPH_FORM_LEN] = ""; /* non-empty → insert PA slot after SP */
     strncpy(sp_surface, sp_under, sizeof(sp_surface)-1);
     sp_surface[sizeof(sp_surface)-1] = '\0';
 
@@ -1112,21 +1112,21 @@ static void analyse_vconj(Token *tok)
          * Retroactively expose the underlying present SP and annotate the rule,
          * consistent with how u-final SPs (tu→twa, ru→rwa) are displayed.     */
         if (sp_rule[0] == '\0') {
+            /* i→y cases: bi→bya, ri→rya, ki→cya.
+             * zy is disallowed in Kinyarwanda, so zi→za (i→∅) is handled
+             * separately below.                                               */
             static const struct { const char *contracted; const char *pres; } i_map[] = {
                 { "bya", "bi" },
                 { "rya", "ri" },
-                { "zya", "zi" },
                 { "cya", "ki" },
                 { NULL,  NULL }
             };
             for (int ii = 0; i_map[ii].contracted; ii++) {
                 if (strcmp(sp_under, i_map[ii].contracted) == 0) {
-                    /* sp_surface already holds the contracted form (initialised
-                     * from sp_under before vowel-contact rules ran).           */
                     strncpy(sp_pres_buf, i_map[ii].pres,
                             sizeof(sp_pres_buf) - 1);
-                    sp_under = sp_pres_buf;   /* show present form as underlying */
-                    i_final_pa = true;        /* insert ya(PA) slot after SP    */
+                    sp_under = sp_pres_buf;
+                    strncpy(pa_form, "ya", sizeof(pa_form) - 1);
                     if (strcmp(i_map[ii].contracted, "cya") == 0) {
                         snprintf(sp_rule, sizeof(sp_rule),
                                  "i\xe2\x86\x92y \xc2\xa7""1.1 + a(past augment)"
@@ -1139,6 +1139,17 @@ static void analyse_vconj(Token *tok)
                     }
                     break;
                 }
+            }
+            /* i→∅ case: zi→za.  zy is an invalid cluster in Kinyarwanda, so
+             * the i of zi elides entirely leaving just z + a(past augment).   */
+            if (sp_rule[0] == '\0' && strcmp(sp_under, "za") == 0
+                    && cls == 10) {
+                strncpy(sp_pres_buf, "zi", sizeof(sp_pres_buf) - 1);
+                sp_under = sp_pres_buf;
+                strncpy(pa_form, "a", sizeof(pa_form) - 1);
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "i\xe2\x86\x92\xe2\x88\x85 (zy disallowed)"
+                         " + a(past augment) \xe2\x86\x92 za (zi past SP)");
             }
         }
     }
@@ -1313,8 +1324,8 @@ static void analyse_vconj(Token *tok)
     /* i-final past SP: insert explicit past-augment slot ya(PA) after SP.
      * form="ya" = surface of a(past augment) after §1.1 bi+a→bya.
      * surface="" so it doesn't double-count "ya" already inside sp_surface.   */
-    if (i_final_pa)
-        set_morph(&mb->m[n++], "PA", "ya", "", "");
+    if (pa_form[0])
+        set_morph(&mb->m[n++], "PA", pa_form, "", "");
     if (tm[0])
         set_morph(&mb->m[n++], "TM", tm,
                   tm_contracted          ? tm_contracted_buf
