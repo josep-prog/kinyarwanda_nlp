@@ -297,6 +297,99 @@ static const PronounEntry PRONOUNS[] = {
     { "rwabyo", PRON_REFLEXIVE, 11 }, { "kabyo",  PRON_REFLEXIVE, 12 },
     { "twabyo", PRON_REFLEXIVE, 13 }, { "bwabyo", PRON_REFLEXIVE, 14 },
     { "kwabyo", PRON_REFLEXIVE, 15 }, { "habyo",  PRON_REFLEXIVE, 16 },
+    /* Nt.3 class-referent possessives (-wo): connector + wo                 */
+    { "wawo",  PRON_REFLEXIVE,  1 }, { "bawo",  PRON_REFLEXIVE,  2 },
+    { "yawo",  PRON_REFLEXIVE,  4 }, { "ryawo", PRON_REFLEXIVE,  5 },
+    { "yawo",  PRON_REFLEXIVE,  6 }, { "cyawo", PRON_REFLEXIVE,  7 },
+    { "byawo", PRON_REFLEXIVE,  8 }, { "zawo",  PRON_REFLEXIVE, 10 },
+    { "rwawo", PRON_REFLEXIVE, 11 }, { "kawo",  PRON_REFLEXIVE, 12 },
+    { "twawo", PRON_REFLEXIVE, 13 }, { "bwawo", PRON_REFLEXIVE, 14 },
+    { "kwawo", PRON_REFLEXIVE, 15 }, { "hawo",  PRON_REFLEXIVE, 16 },
+    /* Nt.4/6/9 class-referent possessives (-yo): connector + yo             *
+     * e.g. "yayo" = ya(Nt.6 conn.) + yo(Nt.4/6/9 ref.) = "its/their"      *
+     *      "zazo" already covered; "yayo"/"yazo" were missing here          */
+    { "wayo",  PRON_REFLEXIVE,  1 }, { "bayo",  PRON_REFLEXIVE,  2 },
+    { "yayo",  PRON_REFLEXIVE,  4 }, { "ryayo", PRON_REFLEXIVE,  5 },
+    { "yayo",  PRON_REFLEXIVE,  6 }, { "cyayo", PRON_REFLEXIVE,  7 },
+    { "byayo", PRON_REFLEXIVE,  8 }, { "zayo",  PRON_REFLEXIVE, 10 },
+    { "rwayo", PRON_REFLEXIVE, 11 }, { "kayo",  PRON_REFLEXIVE, 12 },
+    { "twayo", PRON_REFLEXIVE, 13 }, { "bwayo", PRON_REFLEXIVE, 14 },
+    { "kwayo", PRON_REFLEXIVE, 15 }, { "hayo",  PRON_REFLEXIVE, 16 },
+    /* Nt.5 class-referent possessives (-ryo): connector + ryo               */
+    { "waryo", PRON_REFLEXIVE,  1 }, { "baryo", PRON_REFLEXIVE,  2 },
+    { "yaryo", PRON_REFLEXIVE,  4 }, { "ryaryo",PRON_REFLEXIVE,  5 },
+    { "yaryo", PRON_REFLEXIVE,  6 }, { "cyaryo",PRON_REFLEXIVE,  7 },
+    { "byaryo",PRON_REFLEXIVE,  8 }, { "zaryo", PRON_REFLEXIVE, 10 },
+    { "rwaryo",PRON_REFLEXIVE, 11 }, { "karyo", PRON_REFLEXIVE, 12 },
+    { "twaryo",PRON_REFLEXIVE, 13 }, { "bwaryo",PRON_REFLEXIVE, 14 },
+    { "kwaryo",PRON_REFLEXIVE, 15 }, { "haryo", PRON_REFLEXIVE, 16 },
+    /* Nt.7 class-referent possessives (-cyo): connector + cyo               */
+    { "wacyo", PRON_REFLEXIVE,  1 }, { "bacyo", PRON_REFLEXIVE,  2 },
+    { "yacyo", PRON_REFLEXIVE,  4 }, { "ryacyo",PRON_REFLEXIVE,  5 },
+    { "yacyo", PRON_REFLEXIVE,  6 }, { "cyacyo",PRON_REFLEXIVE,  7 },
+    { "byacyo",PRON_REFLEXIVE,  8 }, { "zacyo", PRON_REFLEXIVE, 10 },
+    { "rwacyo",PRON_REFLEXIVE, 11 }, { "kacyo", PRON_REFLEXIVE, 12 },
+    { "twacyo",PRON_REFLEXIVE, 13 }, { "bwacyo",PRON_REFLEXIVE, 14 },
+    { "kwacyo",PRON_REFLEXIVE, 15 }, { "hacyo", PRON_REFLEXIVE, 16 },
+    /* Nt.10 class-referent possessives (-zo): connector + zo                *
+     * e.g. "yazo" = ya(Nt.6 conn.) + zo(Nt.10 ref.)                        */
+    { "wazo",  PRON_REFLEXIVE,  1 }, { "bazo",  PRON_REFLEXIVE,  2 },
+    { "yazo",  PRON_REFLEXIVE,  4 }, { "ryazo", PRON_REFLEXIVE,  5 },
+    { "yazo",  PRON_REFLEXIVE,  6 }, { "cyazo", PRON_REFLEXIVE,  7 },
+    { "byazo", PRON_REFLEXIVE,  8 }, { "zazo",  PRON_REFLEXIVE, 10 },
+    { "rwazo", PRON_REFLEXIVE, 11 }, { "kazo",  PRON_REFLEXIVE, 12 },
+    { "twazo", PRON_REFLEXIVE, 13 }, { "bwazo", PRON_REFLEXIVE, 14 },
+    { "kwazo", PRON_REFLEXIVE, 15 }, { "hazo",  PRON_REFLEXIVE, 16 },
+    /* Nt.11 class-referent possessives (-rwo): connector + rwo              */
+    { "warwo", PRON_REFLEXIVE,  1 }, { "barwo", PRON_REFLEXIVE,  2 },
+    { "yarwo", PRON_REFLEXIVE,  4 }, { "ryarwo",PRON_REFLEXIVE,  5 },
+    { "yarwo", PRON_REFLEXIVE,  6 }, { "cyarwo",PRON_REFLEXIVE,  7 },
+    { "byarwo",PRON_REFLEXIVE,  8 }, { "zarwo", PRON_REFLEXIVE, 10 },
+    { "rwarwo",PRON_REFLEXIVE, 11 }, { "karwo", PRON_REFLEXIVE, 12 },
+    { "twarwo",PRON_REFLEXIVE, 13 }, { "bwarwo",PRON_REFLEXIVE, 14 },
+    { "kwarwo",PRON_REFLEXIVE, 15 }, { "harwo", PRON_REFLEXIVE, 16 },
+    /* Nt.12 class-referent possessives (-ko): connector + ko                */
+    { "wako",  PRON_REFLEXIVE,  1 }, { "bako",  PRON_REFLEXIVE,  2 },
+    { "yako",  PRON_REFLEXIVE,  4 }, { "ryako", PRON_REFLEXIVE,  5 },
+    { "yako",  PRON_REFLEXIVE,  6 }, { "cyako", PRON_REFLEXIVE,  7 },
+    { "byako", PRON_REFLEXIVE,  8 }, { "zako",  PRON_REFLEXIVE, 10 },
+    { "rwako", PRON_REFLEXIVE, 11 }, { "kako",  PRON_REFLEXIVE, 12 },
+    { "twako", PRON_REFLEXIVE, 13 }, { "bwako", PRON_REFLEXIVE, 14 },
+    { "kwako", PRON_REFLEXIVE, 15 }, { "hako",  PRON_REFLEXIVE, 16 },
+    /* Nt.13 class-referent possessives (-two): connector + two              */
+    { "watwo", PRON_REFLEXIVE,  1 }, { "batwo", PRON_REFLEXIVE,  2 },
+    { "yatwo", PRON_REFLEXIVE,  4 }, { "ryatwo",PRON_REFLEXIVE,  5 },
+    { "yatwo", PRON_REFLEXIVE,  6 }, { "cyatwo",PRON_REFLEXIVE,  7 },
+    { "byatwo",PRON_REFLEXIVE,  8 }, { "zatwo", PRON_REFLEXIVE, 10 },
+    { "rwatwo",PRON_REFLEXIVE, 11 }, { "katwo", PRON_REFLEXIVE, 12 },
+    { "twatwo",PRON_REFLEXIVE, 13 }, { "bwatwo",PRON_REFLEXIVE, 14 },
+    { "kwatwo",PRON_REFLEXIVE, 15 }, { "hatwo", PRON_REFLEXIVE, 16 },
+    /* Nt.14 class-referent possessives (-bwo): connector + bwo              */
+    { "wabwo", PRON_REFLEXIVE,  1 }, { "babwo", PRON_REFLEXIVE,  2 },
+    { "yabwo", PRON_REFLEXIVE,  4 }, { "ryabwo",PRON_REFLEXIVE,  5 },
+    { "yabwo", PRON_REFLEXIVE,  6 }, { "cyabwo",PRON_REFLEXIVE,  7 },
+    { "byabwo",PRON_REFLEXIVE,  8 }, { "zabwo", PRON_REFLEXIVE, 10 },
+    { "rwabwo",PRON_REFLEXIVE, 11 }, { "kabwo", PRON_REFLEXIVE, 12 },
+    { "twabwo",PRON_REFLEXIVE, 13 }, { "bwabwo",PRON_REFLEXIVE, 14 },
+    { "kwabwo",PRON_REFLEXIVE, 15 }, { "habwo", PRON_REFLEXIVE, 16 },
+    /* Nt.15 class-referent possessives (-kwo): connector + kwo              */
+    { "wakwo", PRON_REFLEXIVE,  1 }, { "bakwo", PRON_REFLEXIVE,  2 },
+    { "yakwo", PRON_REFLEXIVE,  4 }, { "ryakwo",PRON_REFLEXIVE,  5 },
+    { "yakwo", PRON_REFLEXIVE,  6 }, { "cyakwo",PRON_REFLEXIVE,  7 },
+    { "byakwo",PRON_REFLEXIVE,  8 }, { "zakwo", PRON_REFLEXIVE, 10 },
+    { "rwakwo",PRON_REFLEXIVE, 11 }, { "kakwo", PRON_REFLEXIVE, 12 },
+    { "twakwo",PRON_REFLEXIVE, 13 }, { "bwakwo",PRON_REFLEXIVE, 14 },
+    { "kwakwo",PRON_REFLEXIVE, 15 }, { "hakwo", PRON_REFLEXIVE, 16 },
+    /* Nt.16 class-referent possessives (-ho): connector + ho                *
+     * Note: "baho/waho" may overlap with common locative forms; pronoun     *
+     * lookup runs before verb analysis so these are preferred as pronouns.  */
+    { "waho",  PRON_REFLEXIVE,  1 }, { "yaho",  PRON_REFLEXIVE,  4 },
+    { "ryaho", PRON_REFLEXIVE,  5 }, { "yaho",  PRON_REFLEXIVE,  6 },
+    { "cyaho", PRON_REFLEXIVE,  7 }, { "byaho", PRON_REFLEXIVE,  8 },
+    { "zaho",  PRON_REFLEXIVE, 10 }, { "rwaho", PRON_REFLEXIVE, 11 },
+    { "kaho",  PRON_REFLEXIVE, 12 }, { "twaho", PRON_REFLEXIVE, 13 },
+    { "bwaho", PRON_REFLEXIVE, 14 }, { "kwaho", PRON_REFLEXIVE, 15 },
+    { "haho",  PRON_REFLEXIVE, 16 },
     /* 3rd singular (-e): we, be, rye, ye, cye, bye, ze, rwe, ke, twe, bwe...
      * connector + ye → fusion: rya+ye → rye, cya+ye → cye, etc.         */
     { "we",    PRON_REFLEXIVE,  1 },  /* his/her/its (Nt.1)                */
@@ -330,9 +423,33 @@ static const PronounEntry PRONOUNS[] = {
     { "kanjye",  PRON_REFLEXIVE, 12 },  /* mine (Nt.12) = ka + njye        */
     { "twanjye", PRON_REFLEXIVE, 13 },  /* mine (Nt.13) = twa + njye       */
     { "hanjye",  PRON_REFLEXIVE, 16 },  /* mine (Nt.16) = ha + njye        */
-    /* Emphatic pronoun nanjye/nawe */
-    { "nanjye",  PRON_PERSONAL,   0 },  /* and I / also I (emphatic 1sg)   */
-    { "nawe",    PRON_PERSONAL,   0 },  /* and you / also you (2sg)        */
+    /* na + pronoun compounds: "and X / with X" ─────────────────────────── */
+    { "nanjye",  PRON_PERSONAL,   0 },  /* and I / with me (emph. 1sg)     */
+    { "nawe",    PRON_PERSONAL,   0 },  /* and you / with you (2sg)        */
+    { "natwe",   PRON_PERSONAL,   0 },  /* and us / with us (1pl)          */
+    { "namwe",   PRON_PERSONAL,   0 },  /* and you / with you (2pl)        */
+    { "nabo",    PRON_PERSONAL,   2 },  /* and them / with them (human)    */
+    { "nayo",    PRON_PERSONAL,   4 },  /* and them/it (Nt.4/6/9)         */
+    { "naryo",   PRON_PERSONAL,   5 },  /* and it (Nt.5)                  */
+    { "nacyo",   PRON_PERSONAL,   7 },  /* and it (Nt.7)                  */
+    { "nabyo",   PRON_PERSONAL,   8 },  /* and them (Nt.8)                */
+    { "nazo",    PRON_PERSONAL,  10 },  /* and them (Nt.10)               */
+    { "narwo",   PRON_PERSONAL,  11 },  /* and it (Nt.11)                 */
+    { "nako",    PRON_PERSONAL,  12 },  /* and it (Nt.12)                 */
+    { "natwo",   PRON_PERSONAL,  13 },  /* and them (Nt.13)               */
+    { "nabwo",   PRON_PERSONAL,  14 },  /* and it (Nt.14)                 */
+    { "nakwo",   PRON_PERSONAL,  15 },  /* and it (Nt.15)                 */
+    { "naho",    PRON_PERSONAL,  16 },  /* and there (Nt.16)              */
+
+    /* ── "nka" + 1st/2nd person pronouns — written together ───────────── *
+     * Official Orthography Rules §1.2.2d: "nka" (like/as) joined to 1st  *
+     * and 2nd person pronouns forms a single written word.                 *
+     * 3rd-person forms (nka bo, nka byo …) are written separately.        */
+    { "nkanje",  PRON_PERSONAL,   0 },  /* like/as me (nka + nje/nge)     */
+    { "nkange",  PRON_PERSONAL,   0 },  /* like/as me (nka + nge, variant)*/
+    { "nkawe",   PRON_PERSONAL,   0 },  /* like/as you (2sg)              */
+    { "nkatwe",  PRON_PERSONAL,   0 },  /* like/as us (1pl)               */
+    { "nkamwe",  PRON_PERSONAL,   0 },  /* like/as you (2pl)              */
 
     /* ── Ikinyazina kibaza (interrogative pronouns) ─────────────────────  */
     { "nde",    PRON_INTERROGATIVE, 0 },  /* who?                          */
@@ -585,10 +702,10 @@ bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out) {
  * Checked at POS priority Step 1 — BEFORE all morphological analysis.
  *
  * Sub-categories (POS values in this table):
- *   POS_PREPOSITION    Umugereka / Ingera      ku, mu, i, kuri, nka, kwa...
+ *   POS_LOCATIVE       Indangahantu            ku, mu, i, kuri, muri, kwa, hasi, hano...
+ *   POS_PREPOSITION    Umugereka               nka, bwa, nyiri (comparison/ownership/time)
  *   POS_CONJUNCTION    Icyungo                 na, kandi, ariko, rero, nuko...
  *   POS_ADVERB         Akamamo                 cyane, neza, gato, kenshi...
- *   POS_LOCATIVE       Indangahantu            hasi, hano, hejuru, hanze...
  *   POS_INTERJECTION   Irangamutima            yee, ahaa, asyi, wee...
  *   POS_VERB_PARTICLE  Ikegeranshinga          ngo, ko, dore, ngwino...
  *   POS_VERB_CONJ      Frozen/suppletive forms ni, si, ndi, ati, bati...
@@ -599,20 +716,27 @@ bool kin_is_pronoun(const char *word, PronounType *type_out, int *class_out) {
 typedef struct { const char *word; POS pos; } InvEntry;
 
 static const InvEntry INVARIABLES[] = {
-    /* ══ Umugereka / Ingera (prepositions / adverbs of manner/time/place) ═ */
-    /* Indangahantu (nt.17/18/19): ku=nt17, mu=nt18, i=nt19 – p.102        */
-    { "mu",      POS_PREPOSITION },  /* in / at (nt.18 locative)           */
-    { "ku",      POS_PREPOSITION },  /* on / at / to (nt.17 locative)      */
-    { "i",       POS_PREPOSITION },  /* at / in (nt.19 – proper nouns)     */
-    { "kuri",    POS_PREPOSITION },  /* to / towards / about               */
-    { "muri",    POS_PREPOSITION },  /* in / among (before pronouns)       */
-    { "nka",     POS_PREPOSITION },  /* like / as (ingereranya)            */
-    { "bwa",     POS_PREPOSITION },  /* at the time of                     */
-    { "kwa",     POS_PREPOSITION },  /* at / to (someone's place)          */
-    { "ava",     POS_PREPOSITION },  /* from (contraction of kuva)         */
-    { "kuva",    POS_PREPOSITION },  /* from / since                       */
-    { "hagati",  POS_PREPOSITION },  /* between / among                    */
-    { "nyiri",   POS_PREPOSITION },  /* owner of / possessor (nyiri inzu)  */
+    /* ══ Indangahantu (Locative markers – Nt.17/18/19 class prefixes) ══════ */
+    /* These are NOT prepositions; they are locative class markers:           *
+     *   ku = Nt.17 (surfaces, destinations)                                  *
+     *   mu = Nt.18 (interiors, enclosed spaces)                              *
+     *   i  = Nt.19 (proper place names)                                      *
+     * kuri/muri = their forms before pronouns; kwa = ku+wa (someone's place) *
+     * ava/kuva  = ablative/source marker ("from")                            */
+    { "mu",      POS_LOCATIVE },     /* in / at (Nt.18 locative)            */
+    { "ku",      POS_LOCATIVE },     /* on / at / to (Nt.17 locative)       */
+    { "i",       POS_LOCATIVE },     /* at / in (Nt.19 – proper nouns)      */
+    { "kuri",    POS_LOCATIVE },     /* to / towards (ku before pronouns)   */
+    { "muri",    POS_LOCATIVE },     /* in / among (mu before pronouns)     */
+    { "kwa",     POS_LOCATIVE },     /* at / to someone's place (ku+wa)     */
+    { "ava",     POS_LOCATIVE },     /* from (ablative, contraction of kuva)*/
+    { "kuva",    POS_LOCATIVE },     /* from / since (ablative source)      */
+
+    /* ══ Umugereka (True Prepositions – relationship/comparison markers) ════ */
+    /* These establish non-locative relations: comparison, ownership, time.   */
+    { "nka",     POS_PREPOSITION },  /* like / as (ingereranya – comparison)*/
+    { "bwa",     POS_PREPOSITION },  /* at the time of (temporal)           */
+    { "nyiri",   POS_PREPOSITION },  /* owner of / possessor (nyiri inzu)   */
 
     /* ══ Icyungo (conjunctions) ════════════════════════════════════════════ */
     /* Ibyungo ngombwa (necessary – remove changes meaning) */
@@ -721,9 +845,15 @@ static const InvEntry INVARIABLES[] = {
     /* ── Locative adverbs: va + aho/ayo (from there) ─────────────────────  */
     { "vaho",    POS_ADVERB      }, /* from there (va + aho, ablative)       */
     { "vayo",    POS_ADVERB      }, /* from there/it (va + ayo, Nt.6)        */
-    /* ── Compound time adverbs ────────────────────────────────────────────  */
-    { "ejobundi",POS_ADVERB      }, /* the day before/after yesterday        */
-    { "ejuru",   POS_ADVERB      }, /* a long time ago / way back            */
+    /* ── Compound time adverbs ────────────────────────────────────────────  *
+     * Official Orthography Rules §1.2.2k: words indicating time or parts of *
+     * the day are written as a single word.                                  */
+    { "ejobundi", POS_ADVERB     }, /* the day before/after yesterday        */
+    { "ejuru",    POS_ADVERB     }, /* a long time ago / way back            */
+    { "nijoro",   POS_ADVERB     }, /* at night / tonight                    */
+    { "ninjoro",  POS_ADVERB     }, /* at night (variant of nijoro)          */
+    { "nimunsi",  POS_ADVERB     }, /* during the day / by day               */
+    { "nimugoroba",POS_ADVERB    }, /* in the evening / this evening         */
 
     /* ══ Quotative & complementizer particles ══════════════════════════════ */
     { "iti",     POS_VERB_PARTICLE}, /* quotative: (s)he said "..."        */
@@ -748,7 +878,7 @@ static const InvEntry INVARIABLES[] = {
     /* ══ Elided forms (before apostrophe) ══════════════════════════════════ */
     { "n",       POS_CONJUNCTION  }, /* elided 'na' before vowel           */
     { "y",       POS_CONJUNCTION  }, /* elided 'ya' possessive connector   */
-    { "k",       POS_PREPOSITION  }, /* elided 'ku/ka' before vowel        */
+    { "k",       POS_LOCATIVE     }, /* elided 'ku' before vowel           */
     { "b",       POS_CONJUNCTION  }, /* elided 'ba' before vowel           */
     { "w",       POS_CONJUNCTION  }, /* elided 'wa' before vowel           */
     { "r",       POS_CONJUNCTION  }, /* elided 'rya' before vowel          */
@@ -765,7 +895,7 @@ static const InvEntry INVARIABLES[] = {
     { "icy",     POS_CONJUNCTION  }, /* elided 'icya' Nt.7 possessive/rel. */
     { "ab",      POS_CONJUNCTION  }, /* elided 'abo' Nt.2 demonstrative    */
     { "abe",     POS_CONJUNCTION  }, /* elided 'abe' Nt.2 / let them be    */
-    { "kw",      POS_PREPOSITION  }, /* elided 'kwa' before vowel           */
+    { "kw",      POS_LOCATIVE     }, /* elided 'kwa' before vowel           */
     { "uw",      POS_PRONOUN      }, /* elided 'uwa' Nt.1 possessive        */
     { "iy",      POS_PRONOUN      }, /* elided 'iya' Nt.4 possessive        */
     { "ubw",     POS_PRONOUN      }, /* elided 'ubwa' Nt.14 possessive      */
@@ -1384,6 +1514,18 @@ static const char *VERB_STEMS[] = {
     "uzur",     /* kuzura      – to fill / be full
                    Infinitive: ku+uzur+a → kuzura (u+u→u §1.2)
                    Conjugated: mwuzure (mw+uzur+e, 2pl SUBJ, u→w/_u)       */
+    /* Roots of vowel-initial verbs that produce an euphonic-z connector
+     * between the SP and the verb root in conjugated forms:             */
+    "it",       /* kwita       – to call / name (root -it-)
+                   Passive: kwitwa = kw+it+w+a
+                   3sg pres passive: a+z(euph.)+it+w+a = azitwa          */
+    "kur",      /* gukura      – to remove / separate / take out
+                   Passive: gukurwa; phonol. rule r→∅/_w: kur+w → kuw
+                   3sg past passive: ya+kur+w+e → yakuwe (r-drop surface)
+                   cf. Gen 2:23 "yakuwe mu Mugabo" = was taken from Man   */
+    "kurur",    /* gukurura    – to pull / drag / tow
+                   Stative: gukururuka (ki→gi §3.7.1: gikururuka = it is pullable)
+                   3sg: akurura (he/she pulls), bakururuka (they are pullable)  */
     NULL
 };
 
@@ -1414,7 +1556,8 @@ static const char *REFLEXIVE_VERB_STEMS[] = {
     "gir",      /* kwigira     – to do for oneself / to become (→ igire)        */
     "ger",      /* kwigeraho   – to achieve/attain for oneself                  */
     "menyekan", /* kwimenyekana – to make oneself known (→ imenyekane)          */
-    "beshw",    /* kwibeshwa   – to be mistaken (→ ibeshwe, if SP elided)       */
+    "beshw",    /* kwibeshywa  – root: kubeshya (beshy+w→beshw y+w fusion)
+                   bare subj: i+beshw+e = ibeshwe (reflexive passive)        */
     NULL
 };
 
@@ -1477,6 +1620,11 @@ static const NounStem NOUN_STEMS[] = {
     { "ko",      12 }, /* amoko – kinds / types (Nt.6)     */
     { "gibo",    14 }, /* ubugibo – blessing                */
     { "bi",       9 }, /* ibikorwa – deeds                  */
+    /* ── Nouns that are ALSO locative invariables (ambiguous forms) ──────── *
+     * These appear both as standalone locatives (in INVARIABLES[]) AND as   *
+     * elided nouns after ku/mu/i.  Context Pass A2 uses this table to rescue *
+     * the noun reading when a possessive connector follows.                  */
+    { "munsi",    3 }, /* umunsi – day (elided after ku: "ku munsi wa X")    */
     { NULL, 0 }
 };
 
@@ -1508,6 +1656,11 @@ static const KnownWord KNOWN_WORDS[] = {
     { "isi",      9,  "si"     },  /* earth / land / world                */
     { "ifu",      9,  "fu"     },  /* flour                               */
     { "igi",      9,  "gi"     },  /* egg (short form)                    */
+    /* Nt.9 nouns where n→∅ before sh (palato-alveolar sibilant)           *
+     * e.g. ishusho = i + ∅(n) + shusho; confirmed by connector "ya":      *
+     *   "ishusho yacu" (Gen 1:26) — not *ryacu (Nt.5)                     */
+    { "ishusho",  9,  "shusho" },  /* image / likeness / face / shape     */
+    { "isura",    9,  "sura"   },  /* likeness / resemblance / face       */
     /* Common Nt.6 mass nouns */
     { "amazi",    6,  "zi"     },  /* water                               */
     { "amahoro",  6,  "horo"   },  /* peace / greetings                   */
@@ -1549,6 +1702,11 @@ static const KnownWord KNOWN_WORDS[] = {
     { "igihugu",  7,  "hugu"   },  /* country / nation                    */
     { "igisiga",  7,  "siga"   },  /* bird of prey: eagle/vulture/hawk    */
     { "ibisiga",  8,  "siga"   },  /* birds of prey (pl. of igisiga)      */
+    /* ikirere: sky/air/atmosphere — often written without indomo "i" as    *
+     * "kirere" (especially after prepositions like "mu kirere").           *
+     * Without this entry the verb parser reads ki(SP)+rer(root)+e(FV).    */
+    { "ikirere",  7,  "rere"   },  /* sky / air / atmosphere              */
+    { "kirere",   7,  "rere"   },  /* sky / air (elided form of ikirere)  */
     /* Common Nt.9 nouns with n+y→nz (§2.4.1) prefix rule */
     { "inzira",   9,  "nzira"  },  /* path / road                         */
     { "inzara",   9,  "nzara"  },  /* hunger / famine                     */
@@ -1560,6 +1718,8 @@ static const KnownWord KNOWN_WORDS[] = {
     /* Nt.1/3 nouns whose D vowel 'u' is dropped in informal writing       */
     { "musomyi",  1,  "somyi"  },  /* reader / student (= umusomyi)        */
     { "muntu",    1,  "ntu"    },  /* person (= umuntu)                    */
+    { "umugore",  1,  "gore"   },  /* woman (full form; guards vs verb subj)*/
+    { "umugabo",  1,  "gabo"   },  /* man   (full form; guards vs verb subj)*/
     { "mugore",   1,  "gore"   },  /* woman (= umugore)                    */
     { "mugabo",   1,  "gabo"   },  /* man (= umugabo)                      */
     { "mwana",    1,  "wana"   },  /* child (= umwana)                     */
@@ -1635,6 +1795,7 @@ static const KnownWord KNOWN_WORDS[] = {
     /* "nabi" removed from here: it is the manner adverb "badly/poorly" and
      * is listed in INVARIABLES (step 1) to prevent misanalysis as Nt.9 noun. */
     /* Nt.12 with dropped D-vowel 'a' from "aka" */
+    { "akara",    12,  "ra"     }, /* flesh / sinew / cartilage (Nt.12)    */
     { "gakondo",  12,  "kondo"  }, /* = agakondo (ancestral land/heritage) */
     /* Common titles and family terms */
     { "databuja",  1,  "databuja"},/* master / lord / employer (title)     */
@@ -2071,8 +2232,8 @@ const char *kin_pron_type_name(PronounType t) {
     switch (t) {
         case PRON_DEMONSTRATIVE: return "Ikinyazina nyereka (Demonstrative)";
         case PRON_PERSONAL:      return "Ikinyazina ngenga (Personal)";
-        case PRON_POSSESSIVE:    return "Ikinyazina ngenera (Possessive)";
-        case PRON_REFLEXIVE:     return "Ikinyazina ngenera (Possessive)";
+        case PRON_POSSESSIVE:    return "Ikinyazina ngenera (Possessive connector)";
+        case PRON_REFLEXIVE:     return "Ikinyazina ngenera ngenga (Associative possessive)";
         case PRON_RELATIVE:      return "Ikinyazina ngenera (Relative)";
         case PRON_INTERROGATIVE: return "Ikinyazina kibaza (Interrogative)";
         case PRON_INDEFINITE:    return "Ikinyazina ndafutura (Indefinite)";

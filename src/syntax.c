@@ -268,6 +268,13 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                  * imbuto (Nt.9) is a valid remote subject for a Nt.10 verb. */
                 if ((tc == 9 || tc == 10) && (vc == 9 || vc == 10))
                     { has_remote_subject = true; break; }
+                /* "ya" SP (stored as class 6) is also the Nt.1/3/9 past-tense
+                 * form (a + past-TM-a → ya).  A remote Nt.1/3/9 noun or verb
+                 * with the same implicit subject is a valid match for ya- verbs.
+                 * e.g. "Imana irangiza imirimo yakoze" — imirimo is the object
+                 * of the relative clause; yakoze's subject is Imana (Nt.9).    */
+                if (vc == 6 && (tc == 1 || tc == 3 || tc == 9))
+                    { has_remote_subject = true; break; }
             }
             if (has_remote_subject) continue;
 
@@ -327,6 +334,28 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             "Apply phonological rule: %s.",
             rule, rule);
         add_error(sa, ERR_VOWEL_HIATUS, i, msg, sug);
+    }
+
+    /* RULE 6b: Letter 'l' in native Kinyarwanda words
+     * Official Orthography Rules §2.3: 'l' exists only in proper names
+     * (Kigali, Repubulika, Leta) and foreign words.  Any 'l' in a recognised
+     * Kinyarwanda word that is NOT a proper noun is an orthographic error.  */
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        if (t->pos == POS_PUNCTUATION) continue;
+        if (!t->is_kinyarwanda) continue;
+        if (t->is_proper_noun) continue;
+        if (t->pos == POS_FOREIGN) continue;
+        if (!strchr(t->lower, 'l')) continue;
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        snprintf(msg, sizeof(msg),
+            "Inyuguti §2.3: '%s' irimo inyuguti 'l' itavugwa mu Kinyarwanda. "
+            "Letter 'l' in '%s' is not a native Kinyarwanda letter.",
+            t->surface, t->surface);
+        snprintf(sug, sizeof(sug),
+            "Suzuma niba ari ijambo ry'amahanga cyangwa izina bwite. "
+            "Check if this is a foreign word or proper name.");
+        add_error(sa, ERR_SPELLING, i, msg, sug);
     }
 
     /* RULE 7: kugenda vs kujya — directional-motion verb selection

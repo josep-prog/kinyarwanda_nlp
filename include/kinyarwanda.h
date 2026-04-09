@@ -392,6 +392,7 @@ typedef enum {
     ORTHO_STOP_UNDELETED,    /* §3.6:  epenthetic stop (t in nts, p in mpf) kept */
     ORTHO_C_NOT_SH,          /* §3.6.2: nc must become nsh                       */
     ORTHO_VOWEL_ASSIM,       /* §1.3:  -ir-/-ish- before o-stem must be -er-/-esh-*/
+    ORTHO_LETTER_L,          /* §2.3:  'l' only valid in Kigali/Repubulika/Leta   */
 } OrthoViolationType;
 
 typedef struct {
@@ -540,6 +541,10 @@ bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
  * ─────────────────────────────────────────────────────────────────────── */
 bool kin_has_vowel_hiatus(const char *word);
 bool kin_has_invalid_cluster(const char *word);
+/* Join prefix + stem, resolving VV contact at the boundary (rules 2-4 above).
+ * e.g.  mu+iga→mwiga  ku+oma→koma  ki+eza→keza  ki+ama→cyama  ka+iza→keza
+ *       ya+iga→yiga   ba+enda→benda */
+void kin_vv_join(const char *prefix, const char *stem, char *out, size_t out_sz);
 
 /* lexicon.c */
 bool kin_is_invariable(const char *word, POS *pos_out);

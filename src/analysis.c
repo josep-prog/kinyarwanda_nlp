@@ -86,8 +86,11 @@ static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
          * the "y" prefix is shared by Nt.1/6/9 present and Nt.1 past.
          * Scan back for nearest Nt.9 or Nt.1 noun and resolve:
          *   Nt.9 subject → SP was "i" → class 9  (e.g. Imana yita)
-         *   Nt.1 subject + present → SP was "a" → class 1  (e.g. umuntu yiga) */
-        if (vc == 0) {
+         *   Nt.1 subject + present → SP was "a" → class 1  (e.g. umuntu yiga)
+         * Guard: only apply when the surface word actually starts with "y".
+         * Words starting with n/m/mb/mp/mf/mv/tu/mu/du carry unambiguous person
+         * prefixes (1sg/2sg/1pl) and must NOT be reclassified as a noun class. */
+        if (vc == 0 && kin_starts_with(verb->lower, "y")) {
             static const int y_cls[] = {9, 1};
             const Token *subj = scan_back_noun(sa, i - 1, y_cls, 2);
             if (subj) {
@@ -100,6 +103,13 @@ static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
                 }
             }
         }
+
+        /* NOTE: "a" SP (class 1) is also valid for Nt.6 (ama- plural) in
+         * present tense.  We do NOT reclassify here because SP_PRES[6]="ya"
+         * in the code's convention — changing noun_class to 6 would cause
+         * morph_dispatch to display "ya" as SP, which is wrong for words
+         * that actually start with "a" (e.g. azitwa).  The ambiguity is
+         * instead shown in the display via sp_nc_label() as "Nt.1 / Nt.6". */
     }
 }
 
@@ -170,10 +180,16 @@ void kin_tag_gram_roles(SentenceAnalysis *sa) {
         if (tok->gram_role == GRAM_ROLE_VERBAL_NOUN) continue;
         if (tok->gram_role != GRAM_ROLE_MAIN_VERB) continue;
 
-        /* Scan back up to 3 tokens for a verb particle */
+        /* Scan back up to 3 tokens for a complement-introducing particle.
+         * Only "ngo", "ko", "kuti" introduce complement clauses.
+         * Quotative particles (ati/iti/bati/ruti/etc.) introduce direct speech
+         * and must NOT cause the following verb to be marked as complement. */
         for (int j = i - 1; j >= 0 && j >= i - 3; j--) {
             const Token *prev = &sa->tokens[j];
-            if (prev->pos == POS_VERB_PARTICLE) {
+            if (prev->pos == POS_VERB_PARTICLE &&
+                (strcmp(prev->lower, "ngo")  == 0 ||
+                 strcmp(prev->lower, "ko")   == 0 ||
+                 strcmp(prev->lower, "kuti") == 0)) {
                 tok->gram_role = GRAM_ROLE_COMPLEMENT;
                 break;
             }
@@ -229,6 +245,21 @@ static const char *sp_display(int cls, VerbTense tense) {
         case 16: return "ha";
         default: return "?";
     }
+}
+
+/* SP 'a' (class 1 present) is homophonous with class 6 (ama- plural).
+ * Returns "Nt.1 / Nt.6" for that ambiguous case, otherwise "Nt.N".
+ * buf must be at least 16 bytes.                                           */
+static const char *sp_nc_label(int cls, VerbTense tense, char *buf, size_t n) {
+    bool past = (tense == TENSE_PAST_PERF || tense == TENSE_PAST_IMPF ||
+                 tense == TENSE_COPULA_PAST);
+    if (cls == 1 && !past)
+        snprintf(buf, n, "Nt.1 / Nt.6");
+    else if (cls == 0)
+        snprintf(buf, n, "Pers.");   /* person prefix: 1sg/2sg/1pl/2pl */
+    else
+        snprintf(buf, n, "Nt.%d", cls);
+    return buf;
 }
 
 /* Returns tense marker (TM) infix between SP and stem, or "" if none.     */
@@ -331,6 +362,17 @@ static void print_noun_reconstruction(const Token *t) {
  * that EXT, COND particles, and phonological SP surfaces are shown correctly
  * for all tenses and all extension types.                                    */
 static void print_verb_morphemes(const Token *t) {
+    /* Equative copula "ni" / negative copula "si" are invariable forms.
+     * They do not decompose into SP+TM+root+FV — show them as frozen copulas. */
+    if (strcmp(t->lower, "ni") == 0 || strcmp(t->lower, "si") == 0) {
+        const char *gloss = (t->lower[0] == 'n')
+            ? "Inshinga nkene y'ubwitabire \xe2\x80\x93 invariable equative copula (is/am/are)"
+            : "Inshinga nkene y'ubunyagatifu \xe2\x80\x93 invariable negative copula (is not)";
+        printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s (%s)\n",
+               t->lower, gloss);
+        return;
+    }
+
     const MorphBreakdown *mb = &t->morph;
 
     if (mb->n > 0) {
@@ -345,9 +387,11 @@ static void print_verb_morphemes(const Token *t) {
             const char *form = m->form[0] ? m->form : m->surface;
             if (i > 0) printf(" +");
             if (strcmp(m->label, "SP") == 0) {
-                if (t->noun_class > 0)
-                    printf(" %s(SP\xC2\xB7Nt.%d)", form, t->noun_class);
-                else
+                if (t->noun_class > 0) {
+                    char nc_buf[16];
+                    printf(" %s(SP\xC2\xB7%s)", form,
+                           sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
+                } else
                     printf(" %s(SP)", form);   /* personal pronoun class */
             } else if (strcmp(m->label, "OM") == 0) {
                 printf(" %s(OM\xC2\xB7Nt.%d)", form, t->obj_class);
@@ -392,7 +436,11 @@ static void print_verb_morphemes(const Token *t) {
         case VEXT_REVERSIVE:   ext = "-ur-/-uk-"; break;
         default: break;
     }
-    printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s(SP\xC2\xB7Nt.%d)", sp, t->noun_class);
+    {
+        char nc_buf[16];
+        printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s(SP\xC2\xB7%s)", sp,
+               sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
+    }
     if (tm[0])  printf(" + %s(TM)", tm);
     if (om[0])  printf(" + %s(OM\xC2\xB7Nt.%d)", om, t->obj_class);
     if (t->verb_ext == VEXT_REFLEXIVE) {
@@ -413,7 +461,7 @@ static const char *tense_marker_key(VerbTense t) {
     switch (t) {
         case TENSE_PRESENT:         return "TM='ra' iboneka mu mwanya wa 2";
         case TENSE_PRESENT_NORA:    return "TM=\342\210\205 (nta ntera y'igihe), FV='a'";
-        case TENSE_PAST_PERF:       return "FV='ye'/'iye'/'tse' mu iherezo ry'ijambo";
+        case TENSE_PAST_PERF:       return "FV='ye'/'iye'/'tse'; 'aye' mu bigicumbi bigufi (h, b, z…)";
         case TENSE_PAST_IMPF:       return "FV='aga' mu iherezo ry'ijambo";
         case TENSE_FUTURE:          return "TM='za' iboneka mu mwanya wa 2";
         case TENSE_NARRATIVE:       return "TM='ka' iboneka mu mwanya wa 2";
@@ -442,6 +490,14 @@ static const char *tense_marker_key(VerbTense t) {
  * Phonological rules stored per-morpheme in tok->morph.m[i].rule.           */
 static void print_verb_reconstruction(const Token *t) {
     if (t->pos != POS_VERB_CONJ) return;
+
+    /* Equative/negative copula: invariable, no SP+TM+root+FV reconstruction. */
+    if (strcmp(t->lower, "ni") == 0 || strcmp(t->lower, "si") == 0) {
+        printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
+        printf("       Ingingo: [copula]%s (invariable)  \342\206\222  %s  \342\234\223\n",
+               t->lower, t->surface);
+        return;
+    }
 
     /* Copula forms use a different template (SP + ri + locative) */
     if (t->verb_tense == TENSE_COPULA_PAST ||
@@ -484,9 +540,11 @@ static void print_verb_reconstruction(const Token *t) {
             const KinMorpheme *m = &mb->m[i];
             if (i > 0) printf(" + ");
             printf("[%s]%s", m->label, m->form);
-            if (strcmp(m->label, "SP") == 0)
-                printf("(Nt.%d)", t->noun_class);
-            else if (strcmp(m->label, "OM") == 0)
+            if (strcmp(m->label, "SP") == 0) {
+                char nc_buf[16];
+                printf("(%s)", sp_nc_label(t->noun_class, t->verb_tense,
+                                           nc_buf, sizeof(nc_buf)));
+            } else if (strcmp(m->label, "OM") == 0)
                 printf("(Nt.%d)", t->obj_class);
         }
 
@@ -578,7 +636,11 @@ static void print_verb_reconstruction(const Token *t) {
     }
     bool matches = (strcmp(built, lword) == 0);
     printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
-    printf("       Ingingo:  [SP]%s(Nt.%d)", sp, t->noun_class);
+    {
+        char nc_buf[16];
+        printf("       Ingingo:  [SP]%s(%s)", sp,
+               sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
+    }
     if (tm[0])      printf(" + [TM]%s", tm);
     if (om[0])      printf(" + [OM]%s(Nt.%d)", om, t->obj_class);
     printf(" + [root]%s", root);
@@ -764,6 +826,112 @@ static void print_adj_morphemes(const Token *t) {
     }
 }
 
+/* ── Pronoun connector prefix for a given noun class ────────────────────── */
+static const char *pron_connector(int cls) {
+    switch (cls) {
+        case  1: return "wa";  case  2: return "ba";  case  3: return "wa";
+        case  4: return "ya";  case  5: return "rya"; case  6: return "ya";
+        case  7: return "cya"; case  8: return "bya"; case  9: return "ya";
+        case 10: return "za";  case 11: return "rwa"; case 12: return "ka";
+        case 13: return "twa"; case 14: return "bwa"; case 15: return "kwa";
+        case 16: return "ha";
+        default: return "";
+    }
+}
+
+/* ── Map back-reference suffix to class description ─────────────────────── */
+typedef struct { const char *suf; int ref_cls; const char *label; } BackRef;
+/* Ordered longest-first to avoid prefix false-matches */
+static const BackRef BACKREF_TABLE[] = {
+    { "njye",  0, "1sg emp. (wanjye/\"mine\")" },
+    { "byo",   8, "Nt.8 ref. (\"of those things\")" },
+    { "ryo",   5, "Nt.5 ref. (\"of it/that\")" },
+    { "cyo",   7, "Nt.7 ref. (\"of it\")" },
+    { "rwo",  11, "Nt.11 ref. (\"of it\")" },
+    { "kwo",  15, "Nt.15 ref. (\"of it\")" },
+    { "two",  13, "Nt.13 ref. (\"of them\")" },
+    { "bwo",  14, "Nt.14 ref. (\"of it\")" },
+    { "nge",   0, "1sg (\"mine/my\")" },
+    { "nyu",   0, "2pl (\"yours pl./your\")" },
+    { "bo",    2, "3pl human Nt.2 (\"their/theirs\")" },
+    { "wo",    3, "Nt.3 ref. (\"of it\")" },
+    { "yo",    4, "Nt.4/6/9 ref. (\"of them/its\")" },
+    { "zo",   10, "Nt.10 ref. (\"of them\")" },
+    { "ko",   12, "Nt.12 ref. (\"of it\")" },
+    { "ho",   16, "Nt.16 ref. (\"of there\")" },
+    { "cu",    0, "1pl (\"ours/our\")" },
+    { "we",    0, "2sg (\"yours sg./your\")" },
+    { "e",     0, "3sg contracted (\"his/her/its\")" },
+    { NULL,    0, NULL }
+};
+
+/* Print pronoun morpheme breakdown and class info.                         */
+static void print_pronoun_morphemes(const Token *t)
+{
+    if (t->pron_type == PRON_REFLEXIVE) {
+        /* Find the connector prefix used for this head class */
+        const char *conn = pron_connector(t->noun_class);
+        size_t clen = strlen(conn);
+        if (clen == 0 || strncmp(t->lower, conn, clen) != 0) return;
+        const char *suffix = t->lower + clen;
+
+        /* Match suffix against back-reference table */
+        const char *ref_label = NULL;
+        int         ref_cls   = 0;
+        for (int i = 0; BACKREF_TABLE[i].suf; i++) {
+            if (strcmp(suffix, BACKREF_TABLE[i].suf) == 0) {
+                ref_label = BACKREF_TABLE[i].label;
+                ref_cls   = BACKREF_TABLE[i].ref_cls;
+                break;
+            }
+        }
+
+        /* Morpheme line */
+        if (ref_label) {
+            printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes):"
+                   " %s(IC\xC2\xB7Nt.%d) + %s(IK\xC2\xB7%s)\n",
+                   conn, t->noun_class, suffix, ref_label);
+            /* Meaning gloss */
+            if (ref_cls > 0)
+                printf("  \342\224\224\342\224\200 Ibisobanuro: isano ry'izina Nt.%d"
+                       " rifatiye ku nyirabyo Nt.%d\n",
+                       t->noun_class, ref_cls);
+            else
+                printf("  \342\224\224\342\224\200 Ibisobanuro: isano ry'izina Nt.%d"
+                       " rifatiye ku %s\n",
+                       t->noun_class, ref_label);
+        } else {
+            /* Unknown suffix: still show connector split */
+            printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes):"
+                   " %s(IC\xC2\xB7Nt.%d) + %s\n",
+                   conn, t->noun_class, suffix);
+        }
+
+    } else if (t->pron_type == PRON_POSSESSIVE) {
+        /* Bare connector — show class agreement */
+        printf("  \342\224\224\342\224\200 Uturemajambo: %s(IC\xC2\xB7Nt.%d)"
+               "  [inshingano y'uburonko / possessive connector]\n",
+               t->lower, t->noun_class);
+
+    } else if (t->pron_type == PRON_PERSONAL && t->noun_class > 0) {
+        printf("  \342\224\224\342\224\200 Inteko: Nt.%d\n", t->noun_class);
+
+    } else if (t->pron_type == PRON_DEMONSTRATIVE && t->noun_class > 0) {
+        printf("  \342\224\224\342\224\200 Inteko: Nt.%d\n", t->noun_class);
+
+    } else if (t->pron_type == PRON_RELATIVE && t->noun_class > 0) {
+        printf("  \342\224\224\342\224\200 Inteko: Nt.%d"
+               "  [isaku nyejuru distinguishes from demonstrative]\n",
+               t->noun_class);
+
+    } else if (t->pron_type == PRON_INDEFINITE && t->noun_class > 0) {
+        printf("  \342\224\224\342\224\200 Inteko: Nt.%d\n", t->noun_class);
+
+    } else if (t->pron_type == PRON_NUMERICAL && t->noun_class > 0) {
+        printf("  \342\224\224\342\224\200 Inteko: Nt.%d\n", t->noun_class);
+    }
+}
+
 /* Print noun morpheme breakdown line (D + RT + C separately).             */
 static void print_noun_morphemes(const Token *t) {
     const MorphBreakdown *mb = &t->morph;
@@ -861,30 +1029,45 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
         if (display_class > 0)
             snprintf(class_str, sizeof(class_str), "Nt.%d", display_class);
 
-        /* Verbal noun overrides the POS label in the table row */
-        const char *pos_label = (t->gram_role == GRAM_ROLE_VERBAL_NOUN)
-            ? "Izina mbonera (ivuye mu nshinga)"
-            : kin_pos_name(t->pos);
+        /* POS label: verbal noun → special; pronoun → show subtype; else generic */
+        const char *pos_label;
+        if (t->gram_role == GRAM_ROLE_VERBAL_NOUN)
+            pos_label = "Izina mbonera (ivuye mu nshinga)";
+        else if (t->pos == POS_PRONOUN && t->pron_type != PRON_NONE)
+            pos_label = kin_pron_type_name(t->pron_type);
+        else
+            pos_label = kin_pos_name(t->pos);
 
         /* Punctuation tokens: display compactly and skip morpheme detail */
         if (t->pos == POS_PUNCTUATION) {
             const char *pname = "";
             switch (t->punct_type) {
-                case PUNCT_COMMA:       pname = "Imisumari (Comma `,`)";         break;
-                case PUNCT_PERIOD:      pname = "Indangahantu (Period `.`)";      break;
-                case PUNCT_QUESTION:    pname = "Ikibazo (Question mark `?`)";   break;
-                case PUNCT_EXCLAIM:     pname = "Uburakari (Exclamation `!`)";   break;
-                case PUNCT_SEMICOLON:   pname = "Impande (Semicolon `;`)";        break;
-                case PUNCT_COLON:       pname = "Agakorwa (Colon `:`)";           break;
-                case PUNCT_QUOTE_OPEN:  pname = "Indangajwi (Quote open `\"`)";  break;
-                case PUNCT_QUOTE_CLOSE: pname = "Indangajwi (Quote close `\"`)"; break;
-                default:                pname = "Ibirango (Punctuation)";         break;
+                /* Sources: REB S5 Kinyarwanda SB – Imikoreshereze y'utwatuzo (p.82-83) */
+                case PUNCT_COMMA:       pname = "Akitso (`,`)";                  break;
+                case PUNCT_PERIOD:      pname = "Akabago / Akadomo (`.`)";       break;
+                case PUNCT_QUESTION:    pname = "Akabazo (`?`)";                 break;
+                case PUNCT_EXCLAIM:     pname = "Agatangaro (`!`)";              break;
+                case PUNCT_SEMICOLON:   pname = "Akabago n'akitso (`;`)";        break;
+                case PUNCT_COLON:       pname = "Utubago tubiri (`:`)";          break;
+                case PUNCT_QUOTE_OPEN:  pname = "Utwuguruzo (`\"`  ouvrant)";   break;
+                case PUNCT_QUOTE_CLOSE: pname = "Utwugarizo (`\"` fermant)";    break;
+                default:                pname = "Ikimenyetso cy'utwatuzo";       break;
             }
             printf("  `%s`  %s\n", t->surface, pname);
-            if (t->is_sent_boundary)    printf("        [Igenanzira: iherezo ry'interuro]\n");
-            if (t->is_clause_boundary)  printf("        [Igenanzira: imipaka y'interuro nto]\n");
-            if (t->is_quote_open)       printf("        [Igenanzira: intangiriro y'amagambo yavuzwe]\n");
-            if (t->is_quote_close)      printf("        [Igenanzira: iherezo ry'amagambo yavuzwe]\n");
+            if (t->is_sent_boundary && t->punct_type == PUNCT_PERIOD)
+                printf("        [Igenanzira: iherezo ry'interuro ihamya/itegeka]\n");
+            else if (t->is_sent_boundary && t->punct_type == PUNCT_QUESTION)
+                printf("        [Igenanzira: iherezo ry'interuro ibaza]\n");
+            else if (t->is_sent_boundary && t->punct_type == PUNCT_EXCLAIM)
+                printf("        [Igenanzira: iherezo ry'interuro itangara / inyuma y'amarangamutima]\n");
+            else if (t->is_sent_boundary)
+                printf("        [Igenanzira: iherezo ry'interuro]\n");
+            if (t->is_clause_boundary)
+                printf("        [Igenanzira: kuhumeka akanya gato mu nteruro]\n");
+            if (t->is_quote_open)
+                printf("        [Igenanzira: intangiriro y'amagambo yateruwe cyangwa avuzwe]\n");
+            if (t->is_quote_close)
+                printf("        [Igenanzira: iherezo ry'amagambo yateruwe cyangwa avuzwe]\n");
             putchar('\n');
             continue;
         }
@@ -1142,10 +1325,9 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
         /* Adjective morpheme breakdown (Tree 2: ntera, RS + C) */
         if (t->pos == POS_ADJECTIVE)
             print_adj_morphemes(t);
-        /* Extra pronoun info in verbose mode */
-        if (verbose && t->pos == POS_PRONOUN && t->pron_type != PRON_NONE) {
-            printf("  └─ %s\n", kin_pron_type_name(t->pron_type));
-        }
+        /* Pronoun morpheme breakdown (Tree 4: ikinyazina) */
+        if (t->pos == POS_PRONOUN && t->pron_type != PRON_NONE)
+            print_pronoun_morphemes(t);
 
         /* Blank line between tokens for readability */
         putchar('\n');

@@ -43,6 +43,10 @@
 static const char *PRIMARY_NOUN_STEMS[] = {
     "siga",   /* igisiga/ibisiga – birds of prey (eagles/vultures/large hawks)
                * NOT from gusiga (to leave/anoint); independent lexical item  */
+    "gore",   /* umugore – woman; primary lexical noun, NOT deverbative from
+               * kugora (to be difficult/hard); independent root item         */
+    "gabo",   /* umugabo – man;  primary lexical noun, NOT deverbative from
+               * kugaba (to give lavishly/distribute gifts); independent item */
     NULL
 };
 
@@ -171,7 +175,10 @@ void kin_tag_token(Token *tok) {
         bool      pn_neg = false;
         if (kin_is_verb_conjugated(tok->lower, pn_stem, &pn_cls, &pn_tense,
                                    &pn_obj, &pn_ext, &pn_neg)
-            && pn_tense != TENSE_PRESENT_NORA
+            /* PRESENT_NORA is normally too permissive, but allow it when the
+             * extracted stem is confirmed in the verb lexicon (e.g. azitwa
+             * from kwitwa: stem="tw" is a known reflexive root).           */
+            && (pn_tense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(pn_stem))
             /* Subjunctive: allow when stem is a known verb root.
              * e.g. Mwororoke = mw(2pl SP) + ororok(kororoka) + e(SUBJ).
              * Bare subjunctive forms at sentence-start (quoted speech) must be
@@ -491,25 +498,42 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
     }
 
     /* ── Context Pass A2: Indangahantu (locative) noun rescue ──────────── *
-     * Rule: after a locative preposition (mu/ku/i/kuri/muri/kwa) the next  *
-     * word refers to a place or thing — prefer noun over verb reading.     *
-     * Handles forms where the noun prefix 'i/in' is elided after a         *
-     * locative, e.g. "mu nyanja" (in the sea) where "nyanja" = inyanja.   *
-     * No length guard here: the locative context is strong enough evidence.*
-     * Belt-and-suspenders over step 7b in kin_tag_token.                   */
+     * After a locative marker (mu/ku/i/kuri/muri/kwa/ava/kuva) the next   *
+     * word refers to a place or thing — prefer noun over verb/locative.    *
+     *                                                                        *
+     * Case 1 (POS_VERB_CONJ): word mistagged as verb but is a noun with    *
+     *   elided prefix, e.g. "mu nyanja" where "nyanja" = inyanja.          *
+     *                                                                        *
+     * Case 2 (POS_LOCATIVE): word is a locative invariable that is ALSO a  *
+     *   common noun with elided augment, e.g. "ku munsi wa karindwi" where  *
+     *   "munsi" = umunsi (day, Nt.3) NOT the locative "below".             *
+     *   Extra guard: the next token must be a possessive connector —        *
+     *   that disambiguates "ku munsi wa X" (on day X) from standalone       *
+     *   "ku munsi" (below/down, which should stay as a locative).           */
     for (int i = 1; i < sa->token_count; i++) {
         Token *prev = &sa->tokens[i - 1];
         Token *curr = &sa->tokens[i];
-        if (curr->pos != POS_VERB_CONJ) continue;
-        if (prev->pos != POS_PREPOSITION) continue;
+        bool is_verb_cj   = (curr->pos == POS_VERB_CONJ);
+        bool is_loc_invar = (curr->pos == POS_LOCATIVE);
+        if (!is_verb_cj && !is_loc_invar) continue;
+        if (prev->pos != POS_LOCATIVE) continue;
         const char *plo = prev->lower;
         bool is_loc = (strcmp(plo, "mu")   == 0 ||
                        strcmp(plo, "ku")   == 0 ||
                        strcmp(plo, "i")    == 0 ||
                        strcmp(plo, "kuri") == 0 ||
                        strcmp(plo, "muri") == 0 ||
-                       strcmp(plo, "kwa")  == 0);
+                       strcmp(plo, "kwa")  == 0 ||
+                       strcmp(plo, "ava")  == 0 ||
+                       strcmp(plo, "kuva") == 0);
         if (!is_loc) continue;
+        /* Case 2 guard: locative invariable needs a following possessive    *
+         * connector to confirm it is really an elided noun, not a direction.*/
+        if (is_loc_invar) {
+            if (i + 1 >= sa->token_count) continue;
+            Token *nxt = &sa->tokens[i + 1];
+            if (nxt->pos != POS_PRONOUN || nxt->pron_type != PRON_POSSESSIVE) continue;
+        }
         int lcls = 0;
         if (!kin_is_known_noun_stem(curr->lower, &lcls)) continue;
         curr->pos            = POS_NOUN;

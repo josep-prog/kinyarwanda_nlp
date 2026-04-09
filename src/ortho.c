@@ -914,6 +914,24 @@ int kin_ortho_validate(const char *word, OrthoViolation *viol, int max) {
         }
     }
 
+    /* §2.3  Letter 'l' in native words
+     * The letter 'l' exists only in: Kigali, Repubulika, Leta, and foreign
+     * proper names.  Any 'l' in a non-proper-noun, non-foreign word is an
+     * orthographic error (Official Orthography Rules §2.3 / consonant list).
+     * We scan for 'l' here; the caller skips proper nouns and loanwords. */
+    for (int i = 0; i < wlen; i++) {
+        if (word[i] == 'l') {
+            char msg[KIN_MAX_MSG];
+            snprintf(msg, sizeof(msg),
+                     "Inyuguti §2.3: 'l' ikoreshwa gusa mu mazina bwite "
+                     "(Kigali, Repubulika, Leta) no mu magambo y'amahanga. "
+                     "Letter 'l' is only valid in proper names (Kigali, "
+                     "Repubulika, Leta) and foreign loanwords.");
+            ADD_VIOL(ORTHO_LETTER_L, i, "§2.3", msg);
+            break;   /* one report per word is enough */
+        }
+    }
+
 #undef ADD_VIOL
     return count;
 }
@@ -1144,6 +1162,7 @@ const char *kin_ortho_rule_name(OrthoViolationType t) {
         case ORTHO_STOP_UNDELETED:  return "Stop not deleted (§3.6)";
         case ORTHO_C_NOT_SH:        return "c not → sh before n (§3.6.2)";
         case ORTHO_VOWEL_ASSIM:     return "Vowel assimilation (§1.3)";
+        case ORTHO_LETTER_L:        return "Letter 'l' in native word (§2.3)";
         default:                    return "Unknown";
     }
 }

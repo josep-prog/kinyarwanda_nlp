@@ -807,6 +807,11 @@ static void analyse_vconj(Token *tok)
             else if (kin_starts_with(eff_word, "u"))    sp_under = "u";
             else if (kin_starts_with(eff_word, "mu"))   sp_under = "mu";
             else if (kin_starts_with(eff_word, "mw"))   sp_under = "mu";  /* 2pl mu+vowel → mw (mwuzure, mwororoke) */
+            /* 1sg n→m before bilabials (§3.3): surface "mb/mp/mf/mv" → underlying "n" */
+            else if (kin_starts_with(eff_word, "mb"))   sp_under = "n";
+            else if (kin_starts_with(eff_word, "mp"))   sp_under = "n";
+            else if (kin_starts_with(eff_word, "mf"))   sp_under = "n";
+            else if (kin_starts_with(eff_word, "mv"))   sp_under = "n";
             else sp_under = "?";
         }
     }
@@ -820,7 +825,39 @@ static void analyse_vconj(Token *tok)
         strncpy(nda_tm_buf, "da", 3);
         tm = nda_tm_buf;
     }
+    /* Contracted future TM: 'za' → 'z' before vowel-initial root (§1.1).
+     * When future TM 'za' precedes a vowel-initial root, the TM-final 'a'
+     * is absorbed: za + V-root → z + V-root.
+     * e.g. azitwa = a(SP) + z(TM·za→z) + it(root) + w(pass) + a(FV).
+     * Detect by checking: tense=FUTURE, root is vowel-initial, and the word
+     * has only one 'z' char (not the full 'za') after the SP surface.       */
+    static char tm_contracted_buf[4];
+    char tm_contracted_rule[KIN_MORPH_RULE_LEN] = "";
+    bool tm_contracted = false;
+    if (tok->verb_tense == TENSE_FUTURE && tok->stem[0] && mv(tok->stem[0])) {
+        /* Future + vowel-initial root: TM surface is "z" not "za" */
+        strncpy(tm_contracted_buf, "z", 2);
+        snprintf(tm_contracted_rule, sizeof(tm_contracted_rule),
+                 "a\xe2\x86\x92\xe2\x88\x85 / _V \xc2\xa7" "1.1 "
+                 "(TM-final 'a' elides before vowel-initial root '%s': "
+                 "za+%s \xe2\x86\x92 z+%s)",
+                 tok->stem, tok->stem, tok->stem);
+        tm_contracted = true;
+    }
     const char *fv  = final_vowel(tok->verb_tense, word);
+    /* Override FV for monosyllabic consonant root (h, b, z …) in past perfect:
+     * the root inserts an epenthetic 'a' before FV 'ye' → surface FV = "aye".
+     * e.g. guha (root h): m+bi+h+aye = mbihaye, ya+h+aye = yahaye.
+     * Condition: tense=PAST_PERF, root is exactly one consonant char, word ends "aye". */
+    const char *root_tmp = tok->stem[0] ? tok->stem : "";
+    {
+        size_t wlen = strlen(word);
+        if (tok->verb_tense == TENSE_PAST_PERF &&
+            strlen(root_tmp) == 1 && !mv((unsigned char)root_tmp[0]) &&
+            wlen >= 4 && word[wlen-3]=='a' && word[wlen-2]=='y' && word[wlen-1]=='e') {
+            fv = "aye";
+        }
+    }
     const char *root = tok->stem[0] ? tok->stem : "?";
     /* u+u→u fusion: historically vowel-initial roots (e.g. twakubaka ← *twakwubaka).
      * Remap lexicon stem "bak" → true root "ubak" so morpheme display is correct. */
@@ -844,6 +881,50 @@ static void analyse_vconj(Token *tok)
         }
     }
     const char *om   = (tok->obj_class > 0) ? kin_om_str(tok->obj_class) : "";
+
+    /* Root surface: for r-drop passive, stem-final 'r' elides before -w-.
+     * yakuwe = ya + kur(root) + w(pass) + e(FV); surface root = "ku" (r-drop).
+     * Pre-compute here so the `built` verification string is correct.       */
+    char root_surface_buf[KIN_MAX_STEM];
+    const char *root_surface = root;
+    char root_surface_rule[KIN_MORPH_RULE_LEN] = "";
+    if (tok->verb_ext == VEXT_PASSIVE && root[0]) {
+        size_t rlen = strlen(root);
+        if (rlen >= 2 && root[rlen-1] == 'r') {
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = '\0';
+            root_surface = root_surface_buf;
+            snprintf(root_surface_rule, sizeof(root_surface_rule),
+                     "r\xe2\x86\x92\xe2\x88\x85 / __w (r drops before passive -w-): "
+                     "-%s+w- \xe2\x86\x92 -%sw-",
+                     root, root_surface_buf);
+        }
+    }
+
+    /* Past-perfect r+ye→ze: root-final 'r' fuses with past FV 'ye' → 'ze'.
+     * yakoze = ya(past) + kor + ye; surface: ya + koz + e (r+ye→ze, §1.3).
+     * The root_surface becomes z-form; FV surface becomes bare 'e'.          *
+     * Condition: PAST_PERF, no extension, r-final root, word ends in 'e'.    */
+    bool past_rye_ze = false;    /* flag used to fix FV in built string */
+    if (is_past_tense(tok->verb_tense) && tok->verb_ext == VEXT_NONE
+        && root[0] && !root_surface_rule[0]) {
+        size_t rlen = strlen(root);
+        size_t wlen = strlen(word);
+        if (rlen >= 1 && root[rlen-1] == 'r'
+            && wlen >= 1 && word[wlen-1] == 'e'
+            && (wlen < 2 || word[wlen-2] != 'y')) {
+            /* Build z-form of root */
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = 'z';
+            root_surface_buf[rlen]   = '\0';
+            /* Verify: sp_surface + root_z + 'e' should equal word */
+            root_surface = root_surface_buf;
+            snprintf(root_surface_rule, sizeof(root_surface_rule),
+                     "r+ye\xe2\x86\x92ze \xc2\xa71.3 (r assimilates past FV: "
+                     "%sr+ye\xe2\x86\x92%se)", root, root_surface_buf);
+            past_rye_ze = true;
+        }
+    }
 
     /* Reflexive -i- present in surface: VEXT_REFLEXIVE with consonant-initial root.
      * The marker 'i' (from kwi-) sits between SP and root, causing:
@@ -882,11 +963,33 @@ static void analyse_vconj(Token *tok)
             }
             snprintf(sp_rule, sizeof(sp_rule),
                      "i→y §1.1 (SP '%s'+'%c'→'%s')", sp_under, next_c, sp_surface);
-        } else if (sp_last == 'a' && next_c == 'i') {
-            /* a+i→e fusion */
-            sp_surface[slen - 1] = 'e';
+        } else if (sp_last == 'n' &&
+                   (next_c=='b' || next_c=='p' || next_c=='f' || next_c=='v')) {
+            /* n→m §3.3: 1sg SP "n" assimilates to "m" before bilabials/labiodentals */
+            sp_surface[slen - 1] = 'm';
+            sp_surface[slen] = '\0';
             snprintf(sp_rule, sizeof(sp_rule),
-                     "a+i→e §1.1 (SP '%s'+i→'%s')", sp_under, sp_surface);
+                     "n\xe2\x86\x92m \xc2\xa7" "3.3 (1sg SP before bilabial '%c')", next_c);
+        } else if (sp_last == 'a' && next_c == 'i') {
+            /* Check whether the surface word uses euphonic-z insertion
+             * (SP 'a' + z(euphonic) + i-initial root, e.g. azitwa) rather
+             * than the standard a+i→e vowel fusion.
+             * Detection: surface word[sp_len] == 'z'.                    */
+            if (eff_word[slen] == 'z') {
+                /* Euphonic-z: SP stays 'a'; no surface change to SP itself.
+                 * The 'z' is a phonological connector, not part of SP.    */
+                strncpy(sp_surface, sp_under, sizeof(sp_surface) - 1);
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "z(euphon.) \xe2\x80\x94 SP '%s' + i-initial root"
+                         " \xe2\x86\x92 '%s' + z (euphonic insertion)",
+                         sp_under, sp_under);
+            } else {
+                /* Standard a+i→e fusion */
+                sp_surface[slen - 1] = 'e';
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "a+i\xe2\x86\x92""e \xc2\xa71.1 (SP '%s'+i\xe2\x86\x92'%s')",
+                         sp_under, sp_surface);
+            }
         }
     }
 
@@ -1037,11 +1140,12 @@ static void analyse_vconj(Token *tok)
                  cond_particle_surface[0] ? cond_particle_surface : "ku",
                  root, ext, fv);
     } else {
+        /* For r+ye→ze past-perfect: root_surface has 'z', FV surfaces as bare 'e' */
         snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
                  neg_pfx,
-                 sp_surface, tm,
+                 sp_surface, tm_contracted ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
-                 root, ext, fv);
+                 root_surface, ext, past_rye_ze ? "e" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -1053,8 +1157,11 @@ static void analyse_vconj(Token *tok)
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
     if (tm[0])
         set_morph(&mb->m[n++], "TM", tm,
-                  cond_tm_elided ? "" : tm,   /* surface="" when a+a→a elision */
-                  tok->verb_tense == TENSE_CONDITIONAL
+                  tm_contracted          ? tm_contracted_buf
+                : cond_tm_elided         ? ""
+                :                          tm,
+                  tm_contracted          ? tm_contracted_rule
+                : tok->verb_tense == TENSE_CONDITIONAL
                       ? (cond_tm_elided
                          ? "a+a\342\206\222a \302\2471.1 (TM 'a' elided after SP ending in 'a')"
                          : "Inziganyo TM (conditional marker; fused into SP by \302\2471.1)")
@@ -1134,7 +1241,9 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "EXT",  det_ext,  det_ext,
                           kin_verb_ext_name(det_vext));
             } else {
-                set_morph(&mb->m[n++], "root", root, root, "");
+                /* Use root_surface/rule if set (e.g. by past_rye_ze r→z) */
+                set_morph(&mb->m[n++], "root", root, root_surface,
+                          root_surface_rule[0] ? root_surface_rule : "");
             }
         } else {
             /* Deep-root check: when an outer extension exists (e.g. reciprocal
@@ -1183,7 +1292,8 @@ static void analyse_vconj(Token *tok)
                 }
             }
             if (!wrote_deep)
-                set_morph(&mb->m[n++], "root", root, root, "");
+                set_morph(&mb->m[n++], "root", root, root_surface,
+                          root_surface_rule[0] ? root_surface_rule : "");
             if (ext[0])
                 set_morph(&mb->m[n++], "EXT", ext, ext, "");
         }
@@ -1199,6 +1309,21 @@ static void analyse_vconj(Token *tok)
          * directly without consonant mutation.  Empty rule prevents it
          * from appearing in the Itegeko (phonological-rule) display.    */
         set_morph(&mb->m[n++], "LOC", fv + 1, fv + 1, "");
+    } else if (past_rye_ze) {
+        /* r+ye→ze in past perfect: underlying FV is 'ye', surface is 'e'.
+         * The 'y' is absorbed by the r→z mutation already shown on root.  */
+        set_morph(&mb->m[n++], "FV", "ye", "e",
+                  "y\xe2\x86\x92\xe2\x88\x85 / r_ (y elided: r+ye\xe2\x86\x92ze, \xc2\xa71.3)");
+    } else if (strcmp(fv, "aye") == 0) {
+        /* Monosyllabic root (h, b, z…) + epenthetic 'a' before past perfect FV.
+         * The Kinyarwanda verb always ends in a vowel; '-y-' is the perfectivity
+         * marker; '-e' is the true final vowel (iherezo).  The 'a' is an
+         * icyungo cy'ijwi (liaison vowel) inserted to avoid an illegal
+         * consonant cluster when the root is a single consonant (h+ye→ *hye).
+         * Display as two slots: EPEN('a') + FV('ye').                        */
+        set_morph(&mb->m[n++], "EPEN", "a", "a",
+                  "Icyungo cy'ijwi (epenthesis: root+a+ye avoids *root+ye cluster)");
+        set_morph(&mb->m[n++], "FV", "ye", "ye", "");
     } else {
         set_morph(&mb->m[n++], "FV", fv, fv, "");
     }
