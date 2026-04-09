@@ -1205,6 +1205,31 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 return true;
             }
         }
+        /* PAST PERFECT: y-final root + bare 'e' FV                              *
+         * Rule: some roots end in 'y' and take bare 'e' FV (not 'ye').         *
+         *   giy+e = giye  (yagiye ← kugenda, suppletive past stem)             *
+         *   jy+e  = jye   (bajye  ← kujya, directional go)                    *
+         * Only fires for past-form SPs (same list as PAST_SP_LIST).            */
+        {
+            static const char *PAST_SP_Y[] = {
+                "twa","ya","wa","na","bya","cya","rya","zya",
+                "bwa","kwa","rwa","mwa","za","ba","mu","tu","a",
+                "ni","ri","zi","bi","ki","ru","ka","bu","ku","ha", NULL
+            };
+            (void)PAST_SP_Y; /* gate: try y-root for any SP but validate stem */
+            if (ilen >= 3 && inner[ilen-1] == 'e' && inner[ilen-2] == 'y') {
+                size_t sl = ilen - 1;   /* strip just 'e', keep 'y' */
+                char cand_y[KIN_MAX_STEM];
+                strncpy(cand_y, inner, sl); cand_y[sl] = '\0';
+                if (kin_is_known_verb_stem(cand_y)) {
+                    if (stem_buf) { strncpy(stem_buf, cand_y, KIN_MAX_STEM-1);
+                                    stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                    return true;
+                }
+            }
+        }
         /* PAST PERFECT: ends in ye */
         if (ilen > 3 && kin_ends_with(inner, "ye")) {
             size_t sl = ilen - 2;
@@ -1243,11 +1268,55 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 return true;
             }
         }
-        /* PAST PERFECT: past-form SP + stem + bare 'e' FV (r+ye→ze rule)          *
-         * In Kinyarwanda, the past FV -ye fuses with root-final 'r': r+ye→ze.  *
-         * e.g. yakoze = ya(past Nt.1) + kor + ye → yakoze (r+ye→ze §1.3).     *
+        /* PAST PERFECT with 'tse' FV: k+y→ts rule §1.3 (andik+ye→anditse).       *
+         * Only fires for past-form SPs.  Strip "tse", recover 'k', check stem.  *
+         * Also handles vowel contact: ya+a-initial-root → root's initial 'a'    *
+         * is absorbed by SP's 'a'; prepend 'a' to recover full root (andik).    */
+        {
+            static const char *PAST_SP_TSE[] = {
+                "twa","ya","wa","na","bya","cya","rya","zya",
+                "bwa","kwa","rwa","mwa","za", NULL
+            };
+            bool sp_is_past_k = false;
+            for (int pi = 0; PAST_SP_TSE[pi]; pi++) {
+                if (strcmp(SP[i].pfx, PAST_SP_TSE[pi]) == 0)
+                    { sp_is_past_k = true; break; }
+            }
+            if (sp_is_past_k && ilen >= 4 && kin_ends_with(inner, "tse")) {
+                size_t sl = ilen - 3;   /* strip "tse" */
+                /* Try stem+k directly */
+                char cand_k[KIN_MAX_STEM];
+                if (sl + 2 < KIN_MAX_STEM) {
+                    strncpy(cand_k, inner, sl); cand_k[sl] = 'k'; cand_k[sl+1] = '\0';
+                    if (kin_is_known_verb_stem(cand_k)) {
+                        if (stem_buf) { strncpy(stem_buf, cand_k, KIN_MAX_STEM-1); stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                        if (subj_class) *subj_class = SP[i].cls;
+                        if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                        return true;
+                    }
+                    /* Recover 'a' prefix for vowel-initial roots (ya+andik: a+a→a elides root's 'a') */
+                    if (sl + 3 < KIN_MAX_STEM) {
+                        char cand_ak[KIN_MAX_STEM];
+                        cand_ak[0] = 'a';
+                        strncpy(cand_ak + 1, inner, sl);
+                        cand_ak[sl+1] = 'k'; cand_ak[sl+2] = '\0';
+                        if (kin_is_known_verb_stem(cand_ak)) {
+                            if (stem_buf) { strncpy(stem_buf, cand_ak, KIN_MAX_STEM-1); stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                            if (subj_class) *subj_class = SP[i].cls;
+                            if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        /* PAST PERFECT: past-form SP + stem + bare 'e' FV                       *
+         * Handles three root-final fusions with past FV 'ye':                   *
+         *   r+ye→ze (§1.3): kor+ye=koze (yakoze ← gukora)                      *
+         *   nd+ye→nze:      tsind+ye=tsinze (yatsinze ← gutsinda)              *
+         *   ng+ye→nze:      tang+ye=tanze (yatanze ← gutanga)                  *
          * Condition: SP is a past-form prefix AND inner ends in 'e' AND the     *
-         * stem (inner minus 'e') is known directly OR after z→r reversal.       *
+         * stem (inner minus 'e') is known directly OR after z/nz reversal.      *
          * This takes priority over SUBJUNCTIVE for past-form SPs.               */
         {
             static const char *PAST_SP_LIST[] = {
@@ -1265,11 +1334,26 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 strncpy(cand, inner, sl); cand[sl] = '\0';
                 bool known = kin_is_known_verb_stem(cand);
                 if (!known && sl >= 1 && cand[sl-1] == 'z') {
-                    /* z→r reversal: recover r-final root */
+                    /* r+y→z reversal: recover r-final root (r+ye→ze) */
                     char cand_r[KIN_MAX_STEM];
                     strncpy(cand_r, cand, sl - 1);
                     cand_r[sl-1] = 'r'; cand_r[sl] = '\0';
                     known = kin_is_known_verb_stem(cand_r);
+                    /* nd+y→nz and ng+y→nz reversals: prenasalized consonant + ye */
+                    if (!known && sl >= 2 && cand[sl-2] == 'n') {
+                        /* Try nd: tsind+ye→tsinze */
+                        char cand_nd[KIN_MAX_STEM];
+                        strncpy(cand_nd, cand, sl - 1);
+                        cand_nd[sl-1] = 'd'; cand_nd[sl] = '\0';
+                        known = kin_is_known_verb_stem(cand_nd);
+                        if (!known) {
+                            /* Try ng: tang+ye→tanze, fung+ye→funze */
+                            char cand_ng[KIN_MAX_STEM];
+                            strncpy(cand_ng, cand, sl - 1);
+                            cand_ng[sl-1] = 'g'; cand_ng[sl] = '\0';
+                            known = kin_is_known_verb_stem(cand_ng);
+                        }
+                    }
                 }
                 if (known) {
                     if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl] = '\0'; }
@@ -1710,6 +1794,34 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     if (tense == TENSE_PAST_PERF && vext == VEXT_CAUSATIVE_Y) {
         vext = VEXT_NONE;
         /* bare already holds the r-restored root (ext_strip did z→r) */
+    }
+    /* ── LAYER 3b.7: Past-perfect nz-final stem — nd/ng+y→nz reversal ────── *
+     * When tense=PAST_PERF and bare ends in "nz" (after ext_strip returned   *
+     * false or CAUSATIVE_Y was already cleared above), the 'nz' came from    *
+     * the past FV fusion: nd+ye→nze or ng+ye→nze.                            *
+     * Recover the true root by reversing nz→nd or nz→ng.                    *
+     * e.g. yatsinze: bare="tsinz" → "tsind" (gutsinda)                       *
+     *      yatanze:  bare="tanz"  → "tang"  (gutanga)                        *
+     *      yafunze:  bare="funz"  → "fung"  (gufunga)                        */
+    if (tense == TENSE_PAST_PERF && vext == VEXT_NONE) {
+        size_t blen = strlen(bare);
+        if (blen >= 3 && bare[blen-1] == 'z' && bare[blen-2] == 'n') {
+            char try_nd[KIN_MAX_STEM];
+            strncpy(try_nd, bare, blen - 1);
+            try_nd[blen-1] = 'd'; try_nd[blen] = '\0';
+            if (kin_is_known_verb_stem(try_nd)) {
+                strncpy(bare, try_nd, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            } else {
+                char try_ng[KIN_MAX_STEM];
+                strncpy(try_ng, bare, blen - 1);
+                try_ng[blen-1] = 'g'; try_ng[blen] = '\0';
+                if (kin_is_known_verb_stem(try_ng)) {
+                    strncpy(bare, try_ng, KIN_MAX_STEM - 1);
+                    bare[KIN_MAX_STEM - 1] = '\0';
+                }
+            }
+        }
     }
 
     /* ── LAYER 3c: Validate OM; revert if bare stem is unknown ──────────── *

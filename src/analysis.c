@@ -248,13 +248,18 @@ static const char *sp_display(int cls, VerbTense tense) {
 }
 
 /* SP 'a' (class 1 present) is homophonous with class 6 (ama- plural).
- * Returns "Nt.1 / Nt.6" for that ambiguous case, otherwise "Nt.N".
- * buf must be at least 16 bytes.                                           */
+ * SP 'ya' (class 6 present) is also the past SP for Nt.1/Nt.4/Nt.9.
+ * Returns the appropriate label; buf must be at least 20 bytes.            */
 static const char *sp_nc_label(int cls, VerbTense tense, char *buf, size_t n) {
     bool past = (tense == TENSE_PAST_PERF || tense == TENSE_PAST_IMPF ||
                  tense == TENSE_COPULA_PAST);
     if (cls == 1 && !past)
         snprintf(buf, n, "Nt.1 / Nt.6");
+    else if (cls == 6 && past)
+        /* "ya" in past tense: Nt.1 (he/she) most common; Nt.4/Nt.6/Nt.9 also use ya-past.
+         * Context reclassification in kin_tag_sentence() sets the correct class when a
+         * preceding subject noun is present.  Without context, show the ambiguity. */
+        snprintf(buf, n, "Nt.1/Nt.6\xC2\xB7past");
     else if (cls == 0)
         snprintf(buf, n, "Pers.");   /* person prefix: 1sg/2sg/1pl/2pl */
     else
@@ -461,8 +466,13 @@ static const char *tense_marker_key(VerbTense t) {
     switch (t) {
         case TENSE_PRESENT:         return "TM='ra' iboneka mu mwanya wa 2";
         case TENSE_PRESENT_NORA:    return "TM=\342\210\205 (nta ntera y'igihe), FV='a'";
-        case TENSE_PAST_PERF:       return "FV='ye'/'iye'/'tse'; 'aye' mu bigicumbi bigufi (h, b, z…)";
-        case TENSE_PAST_IMPF:       return "FV='aga' mu iherezo ry'ijambo";
+        case TENSE_PAST_PERF:
+            return "SP imere y'igihe gishize (ya/wa/ba/...) + FV='ye'/'iye'/'tse'\n"
+                   "       Nta mwanya wa TM kuri Impitakare \xe2\x80\x94 igihe gitangaza mu meso\n"
+                   "       y'SP (ya \xe2\x86\x92 Nt.1 past; wa \xe2\x86\x92 Nt.3; ba \xe2\x86\x92 Nt.2...) no mu FV 'ye'";
+        case TENSE_PAST_IMPF:
+            return "SP imere y'igihe gishize + FV='aga'\n"
+                   "       Nta mwanya wa TM kuri Imvangura \xe2\x80\x94 igihe gitangaza mu SP + FV 'aga'";
         case TENSE_FUTURE:          return "TM='za' iboneka mu mwanya wa 2";
         case TENSE_NARRATIVE:       return "TM='ka' iboneka mu mwanya wa 2";
         case TENSE_OPTATIVE:        return "TM='raka' iboneka mu mwanya wa 2";
@@ -1178,9 +1188,40 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                             else if (t->lower[wl-2]=='y' && t->lower[wl-1]=='o') ci_loc = "yo";
                         }
                     }
+                    /* Suppletive stem mapping: some roots are suppletive past
+                     * stems whose canonical citation is a different infinitive.
+                     *   giy → kugenda  (giye/bagiye ← kugenda, not *kugiya)
+                     *   jye → kujya    (jyeye/bajye – alternate: kujya is valid)
+                     * When a suppletive stem is found, display the canonical
+                     * infinitive and note the suppletive root in parentheses. */
+                    {
+                        static const struct {
+                            const char *stem;
+                            const char *canonical;  /* full canonical infinitive  */
+                            const char *note;        /* brief note for the user    */
+                        } SUPPLETIVE_CITATIONS[] = {
+                            { "giy", "kugenda",
+                              "umuzi w'indangika (suppletive past stem) wa kugenda" },
+                            { NULL, NULL, NULL }
+                        };
+                        bool supp_found = false;
+                        for (int si = 0; SUPPLETIVE_CITATIONS[si].stem; si++) {
+                            if (strcmp(t->stem, SUPPLETIVE_CITATIONS[si].stem) == 0) {
+                                printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s"
+                                       "  (igicumbi -%s-)\n",
+                                       SUPPLETIVE_CITATIONS[si].canonical, t->stem);
+                                printf("  \342\224\224\342\224\200 Icyitonderwa (Suppletive note):"
+                                       " -%s- ni %s\n",
+                                       t->stem, SUPPLETIVE_CITATIONS[si].note);
+                                supp_found = true;
+                                break;
+                            }
+                        }
+                        if (!supp_found)
                     printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s%sa%s"
                            "  (igicumbi -%s-)\n",
                            ci_pfx, t->stem, ci_loc, t->stem);
+                    }
 
                     /* Homograph disambiguation: some roots correspond to two
                      * distinct verbs that differ only in vowel length, which

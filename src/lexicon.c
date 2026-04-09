@@ -1212,6 +1212,7 @@ static const char *VERB_STEMS[] = {
     "subiz",    /* gusubiza    – to answer                                */
     "koresh",   /* gukoresha   – to use                                   */
     "kor",      /* gukora      – to work / do                             */
+    "mar",      /* kumara      – to finish / run out / be exhausted       */
     "ram",      /* gurama      – to grow crops                            */
     "bik",      /* kubika      – to store                                 */
     "hind",     /* guhinda     – to plant                                 */

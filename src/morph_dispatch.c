@@ -858,6 +858,20 @@ static void analyse_vconj(Token *tok)
             fv = "aye";
         }
     }
+    /* Override FV for y-final roots in past perfect:
+     * root ends in 'y' + FV = bare 'e' (not 'iye' or 'ye').
+     * e.g. giy+e=giye (yagiye), jy+e=jye (bajye)
+     * final_vowel() may return "iye" (if word ends ...iye and root has 'i')
+     * or "ye" (normal case).  Both are wrong: the 'y' is the root's own final
+     * consonant, not the perfectivity glide of the FV 'ye'.                  */
+    {
+        size_t rtlen = strlen(root_tmp);
+        if (tok->verb_tense == TENSE_PAST_PERF &&
+            rtlen >= 2 && root_tmp[rtlen-1] == 'y' &&
+            (strcmp(fv, "iye") == 0 || strcmp(fv, "ye") == 0)) {
+            fv = "e";
+        }
+    }
     const char *root = tok->stem[0] ? tok->stem : "?";
     /* u+u→u fusion: historically vowel-initial roots (e.g. twakubaka ← *twakwubaka).
      * Remap lexicon stem "bak" → true root "ubak" so morpheme display is correct. */
@@ -901,28 +915,59 @@ static void analyse_vconj(Token *tok)
         }
     }
 
-    /* Past-perfect r+ye→ze: root-final 'r' fuses with past FV 'ye' → 'ze'.
-     * yakoze = ya(past) + kor + ye; surface: ya + koz + e (r+ye→ze, §1.3).
-     * The root_surface becomes z-form; FV surface becomes bare 'e'.          *
-     * Condition: PAST_PERF, no extension, r-final root, word ends in 'e'.    */
-    bool past_rye_ze = false;    /* flag used to fix FV in built string */
+    /* Past-perfect consonant+y→z/ts fusion with FV 'ye':
+     *   r+ye→ze  (§1.3): kor+ye=koze   yakoze ← gukora
+     *   nd+ye→nze(§1.3): tsind+ye=tsinze  yatsinze ← gutsinda
+     *   ng+ye→nze(§1.3): tang+ye=tanze    yatanze ← gutanga
+     *   k+ye→tse (§1.3): andik+ye=anditse yanditse ← kwandika
+     * The root_surface becomes z/ts-form; FV surface becomes bare 'e'.      */
+    bool past_rye_ze  = false;   /* r/d/g-final root: FV 'ye' → surface 'e', root→z */
+    bool past_kye_tse = false;   /* k-final root:     FV 'ye' → surface 'e', root→ts */
+    char past_fuse_cons = '\0';  /* which consonant fused ('r','d','g','k')          */
     if (is_past_tense(tok->verb_tense) && tok->verb_ext == VEXT_NONE
         && root[0] && !root_surface_rule[0]) {
         size_t rlen = strlen(root);
         size_t wlen = strlen(word);
-        if (rlen >= 1 && root[rlen-1] == 'r'
+        char last_c = root[rlen-1];
+        if (rlen >= 1 && (last_c == 'r' || last_c == 'd' || last_c == 'g')
             && wlen >= 1 && word[wlen-1] == 'e'
             && (wlen < 2 || word[wlen-2] != 'y')) {
-            /* Build z-form of root */
+            /* Build z-form: replace last consonant with 'z' */
             strncpy(root_surface_buf, root, rlen - 1);
             root_surface_buf[rlen-1] = 'z';
             root_surface_buf[rlen]   = '\0';
-            /* Verify: sp_surface + root_z + 'e' should equal word */
             root_surface = root_surface_buf;
-            snprintf(root_surface_rule, sizeof(root_surface_rule),
-                     "r+ye\xe2\x86\x92ze \xc2\xa71.3 (r assimilates past FV: "
-                     "%sr+ye\xe2\x86\x92%se)", root, root_surface_buf);
-            past_rye_ze = true;
+            if (last_c == 'r')
+                snprintf(root_surface_rule, sizeof(root_surface_rule),
+                         "r+ye\xe2\x86\x92ze \xc2\xa71.3 (r assimilates past FV: "
+                         "%sr+ye\xe2\x86\x92%se)", root, root_surface_buf);
+            else
+                snprintf(root_surface_rule, sizeof(root_surface_rule),
+                         "n%c+ye\xe2\x86\x92nze \xc2\xa71.3 (n%c fuses with past FV: "
+                         "n%c+ye\xe2\x86\x92nze)", last_c, last_c, last_c);
+            past_rye_ze  = true;
+            past_fuse_cons = last_c;
+        } else if (rlen >= 2 && last_c == 'k'
+                   && wlen >= 3 && word[wlen-3]=='t' && word[wlen-2]=='s' && word[wlen-1]=='e') {
+            /* k+ye→tse: replace 'k' with "ts"; handle a+a vowel contact
+             * (ya + andik: SP underlying ends in 'a', root starts with 'a' → surface "ndits")
+             * Use sp_under for the contact check (sp_surface not yet computed here). */
+            size_t sp_ulen = strlen(sp_under);
+            size_t root_start = (sp_ulen > 0 && sp_under[sp_ulen-1]=='a'
+                                 && root[0]=='a') ? 1 : 0;
+            size_t copy_len = rlen - 1 - root_start;
+            if (copy_len + 3 < (size_t)KIN_MAX_STEM) {
+                strncpy(root_surface_buf, root + root_start, copy_len);
+                root_surface_buf[copy_len]   = 't';
+                root_surface_buf[copy_len+1] = 's';
+                root_surface_buf[copy_len+2] = '\0';
+                root_surface = root_surface_buf;
+                snprintf(root_surface_rule, sizeof(root_surface_rule),
+                         "k+ye\xe2\x86\x92tse \xc2\xa71.3 (k palatalized by past FV 'y': "
+                         "%s+ye\xe2\x86\x92%stse)", root, root_surface_buf);
+                past_kye_tse   = true;
+                past_fuse_cons = 'k';
+            }
         }
     }
 
@@ -1140,12 +1185,13 @@ static void analyse_vconj(Token *tok)
                  cond_particle_surface[0] ? cond_particle_surface : "ku",
                  root, ext, fv);
     } else {
-        /* For r+ye→ze past-perfect: root_surface has 'z', FV surfaces as bare 'e' */
+        /* For r/d/g+ye→ze or k+ye→tse: root_surface already has fusion form;
+         * FV surfaces as bare 'e' (the 'y' of 'ye' is absorbed by the fusion). */
         snprintf(built, sizeof(built), "%s%s%s%s%s%s%s",
                  neg_pfx,
                  sp_surface, tm_contracted ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
-                 root_surface, ext, past_rye_ze ? "e" : fv);
+                 root_surface, ext, (past_rye_ze || past_kye_tse) ? "e" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -1166,10 +1212,17 @@ static void analyse_vconj(Token *tok)
                          ? "a+a\342\206\222a \302\2471.1 (TM 'a' elided after SP ending in 'a')"
                          : "Inziganyo TM (conditional marker; fused into SP by \302\2471.1)")
                       : "");
-    else if (tok->verb_tense != TENSE_NONE && tok->verb_tense != TENSE_IMPERATIVE)
+    else if (tok->verb_tense != TENSE_NONE
+             && tok->verb_tense != TENSE_IMPERATIVE
+             && tok->verb_tense != TENSE_PAST_PERF
+             && tok->verb_tense != TENSE_PAST_IMPF)
         /* Zero tense marker: explicit ∅ in Ingingo/Guhuza display.
          * surface="" (empty) keeps the built verification string correct;
-         * form="∅" is used by the printer wherever surface is absent.    */
+         * form="∅" is used by the printer wherever surface is absent.
+         * NOT shown for PAST_PERF / PAST_IMPF: the textbook Impitakare
+         * formula is SP(past-form) + root + ye(FV) — there is no TM slot.
+         * Showing ∅(TM) there contradicts the tense label; past tense is
+         * encoded in the SP's past form and in the FV 'ye', not in a TM. */
         set_morph(&mb->m[n++], "TM", "\342\210\205", "", "");
     /* Conditional particle (ku/gu) replaces OM slot for CONDITIONAL tense */
     if (tok->verb_tense == TENSE_CONDITIONAL && cond_particle[0]) {
@@ -1310,10 +1363,24 @@ static void analyse_vconj(Token *tok)
          * from appearing in the Itegeko (phonological-rule) display.    */
         set_morph(&mb->m[n++], "LOC", fv + 1, fv + 1, "");
     } else if (past_rye_ze) {
-        /* r+ye→ze in past perfect: underlying FV is 'ye', surface is 'e'.
-         * The 'y' is absorbed by the r→z mutation already shown on root.  */
+        /* r/d/g+ye→ze in past perfect: underlying FV is 'ye', surface is 'e'.
+         * The 'y' is absorbed by the consonant fusion shown on root.          */
+        {
+            char fv_rule[KIN_MORPH_RULE_LEN];
+            if (past_fuse_cons == 'r')
+                snprintf(fv_rule, sizeof(fv_rule),
+                         "y\xe2\x86\x92\xe2\x88\x85 / r_ (y elided: r+ye\xe2\x86\x92ze, \xc2\xa71.3)");
+            else
+                snprintf(fv_rule, sizeof(fv_rule),
+                         "y\xe2\x86\x92\xe2\x88\x85 / n%c_ (y elided: n%c+ye\xe2\x86\x92nze, \xc2\xa71.3)",
+                         past_fuse_cons, past_fuse_cons);
+            set_morph(&mb->m[n++], "FV", "ye", "e", fv_rule);
+        }
+    } else if (past_kye_tse) {
+        /* k+ye→tse in past perfect: underlying FV is 'ye', surface 'e'.
+         * The 'k+y' fusion is shown on root as →ts; only 'e' remains as FV. */
         set_morph(&mb->m[n++], "FV", "ye", "e",
-                  "y\xe2\x86\x92\xe2\x88\x85 / r_ (y elided: r+ye\xe2\x86\x92ze, \xc2\xa71.3)");
+                  "y\xe2\x86\x92\xe2\x88\x85 / k_ (y elided: k+ye\xe2\x86\x92tse, \xc2\xa71.3)");
     } else if (strcmp(fv, "aye") == 0) {
         /* Monosyllabic root (h, b, z…) + epenthetic 'a' before past perfect FV.
          * The Kinyarwanda verb always ends in a vowel; '-y-' is the perfectivity
