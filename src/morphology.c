@@ -1896,6 +1896,20 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
         }
     }
 
+    /* ── LAYER 3c.1: Prefer full raw_stem over OM + short bare root ──────── *
+     * If an OM was stripped AND the un-stripped raw_stem is ALSO a known     *
+     * verb root, the OM match is ambiguous.  Prefer the longer root.         *
+     * e.g. raw_stem="ruk" (kuruka) matched OM=ru(Nt.11) + bare="k" (kuba):  *
+     *   both k and ruk are known → prefer ruk (no OM).                       *
+     * This only fires when bare IS known (the ≥2-char ambiguity case);       *
+     * the !known case is already handled by LAYER 3c above.                  */
+    if (obj_cls > 0 && kin_is_known_verb_stem(bare) && kin_is_known_verb_stem(raw_stem)) {
+        obj_cls = 0;
+        vext = VEXT_NONE;
+        strncpy(bare, raw_stem, KIN_MAX_STEM - 1);
+        bare[KIN_MAX_STEM - 1] = '\0';
+    }
+
     /* ── LAYER 3c.5: Euphonic-z before vowel-initial root ──────────────── *
      * Pattern: SP(vowel-final) + z(euphonic) + root(vowel-initial) + (ext) + FV
      * e.g. azitwa = a(SP·Nt.1) + z(euph.) + it(root) + w(passive) + a(FV)  *

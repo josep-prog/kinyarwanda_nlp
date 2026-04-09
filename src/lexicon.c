@@ -1298,6 +1298,7 @@ static const char *VERB_STEMS[] = {
     "ham",      /* guhamya (short) – to confirm / be firm                 */
     "nywa",     /* kunywa      – to drink                                 */
     "rug",      /* kuruga      – to cook / prepare food                   */
+    "ruk",      /* kuruka      – to vomit (modern); to sprout/grow [crops] (archaic/Bible) */
     "jyan",     /* kujyana     – to take / go together                    */
     "iruk",     /* kwiruka     – to run                                   */
     "irukan",   /* kwirukana   – to chase away                            */

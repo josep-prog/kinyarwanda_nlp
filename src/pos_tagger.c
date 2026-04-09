@@ -47,6 +47,8 @@ static const char *PRIMARY_NOUN_STEMS[] = {
                * kugora (to be difficult/hard); independent root item         */
     "gabo",   /* umugabo – man;  primary lexical noun, NOT deverbative from
                * kugaba (to give lavishly/distribute gifts); independent item */
+    "taka",   /* ubutaka – soil/land/earth; primary lexical noun, NOT from
+               * gutaka (to shout/cry out); unrelated independent root       */
     NULL
 };
 
