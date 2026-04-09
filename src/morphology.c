@@ -1205,8 +1205,12 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 }
             }
         }
-        /* PAST IMPERFECT: ends in aga */
-        if (ilen > 4 && kin_ends_with(inner, "aga")) {
+        /* PAST IMPERFECT: ends in aga
+         * ilen >= 4 (not > 4): single-consonant roots must be reachable.
+         * e.g. kuva (root=v): cya+v+aga=cyavaga → inner="vaga" (len=4)
+         *      kuba (root=b): cya+b+aga=cyabaga → inner="baga" (len=4)
+         * These are unrelated verbs; both happen to have 1-char roots. */
+        if (ilen >= 4 && kin_ends_with(inner, "aga")) {
             size_t sl = ilen - 3;
             if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
             if (subj_class) *subj_class = SP[i].cls;

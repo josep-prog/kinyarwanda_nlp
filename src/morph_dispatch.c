@@ -1127,16 +1127,28 @@ static void analyse_vconj(Token *tok)
                     strncpy(sp_pres_buf, i_map[ii].pres,
                             sizeof(sp_pres_buf) - 1);
                     sp_under = sp_pres_buf;
-                    strncpy(pa_form, "ya", sizeof(pa_form) - 1);
+                    /* PA is always 'a' (the true past augment vowel).
+                     * The 'y' seen in the surface (bya, rya, cya) is NOT part
+                     * of the PA — it is the phonological output of the SP's
+                     * final 'i' converting to semivowel 'y' before the
+                     * following vowel 'a' (i→y §1.1).
+                     *   bi + a → b·i·a → b·y·a = bya
+                     *   ri + a → r·i·a → r·y·a = rya
+                     *   ki + a → k·i·a → k·y·a = kya → cya  (ky→cy §3.9)
+                     * Consistent with u-final SPs: tu+a→twa, ru+a→rwa (PA='a').*/
+                    strncpy(pa_form, "a", sizeof(pa_form) - 1);
                     if (strcmp(i_map[ii].contracted, "cya") == 0) {
                         snprintf(sp_rule, sizeof(sp_rule),
-                                 "i\xe2\x86\x92y \xc2\xa7""1.1 + a(past augment)"
-                                 " + ky\xe2\x86\x92""cy \xe2\x86\x92 cya (ki past SP)");
+                                 "i\xe2\x86\x92y \xc2\xa7""1.1 (SP ki + PA a:"
+                                 " ki+a \xe2\x86\x92 kia \xe2\x86\x92 kya"
+                                 " \xe2\x86\x92 cya; ky\xe2\x86\x92""cy \xc2\xa7""3.9)");
                     } else {
                         snprintf(sp_rule, sizeof(sp_rule),
-                                 "i\xe2\x86\x92y \xc2\xa7""1.1 + a(past augment)"
-                                 " \xe2\x86\x92 %s (%s past SP)",
-                                 i_map[ii].contracted, i_map[ii].pres);
+                                 "i\xe2\x86\x92y \xc2\xa7""1.1 (SP %s + PA a:"
+                                 " %s+a \xe2\x86\x92 %sa \xe2\x86\x92 %s)",
+                                 i_map[ii].pres, i_map[ii].pres,
+                                 i_map[ii].pres,   /* "bi"+"a" = "bia" */
+                                 i_map[ii].contracted);
                     }
                     break;
                 }

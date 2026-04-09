@@ -1331,7 +1331,7 @@ static const char *VERB_STEMS[] = {
     "pang",     /* gupanga     – to plan / arrange                       */
     "kang",     /* gukanguka   – to wake up / be vigilant               */
     "ish",      /* kwisha      – to finish / end                         */
-    "va",       /* kuva        – to come from / leave from / depart      */
+    "v",        /* kuva        – to come from / leave from / depart (root=v, like kuba→b) */
     "van",      /* guvana      – to part from / separate                 */
     "tan",      /* gutana      – to part ways / separate (base verb; gutanduka ← tan+uk, gutandukana ← tan+uk+an) */
     "nyur",     /* kunyura     – to pass through / traverse              */
