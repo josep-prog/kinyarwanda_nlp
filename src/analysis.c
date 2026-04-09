@@ -323,6 +323,12 @@ static void print_noun_reconstruction(const Token *t) {
     const KinMorpheme *c_m  = &mb->m[2];  /* C  (Igicumbi)      */
 
     bool rt_changed = (strcmp(rt_m->form, rt_m->surface) != 0);
+    /* Show 3-line (Ingingo + Itegeko + Guhuza) whenever a phonological rule
+     * fired, even if the RT surface is unchanged.  This covers:
+     *   – RT-elision rules stored in rt_m->rule (ri→∅, n→∅, etc.)
+     *   – D-elision rules (u→∅ after locative)
+     *   – D-alternation rules (u→i for Nt.14 directional compounds)     */
+    bool show_rule = rt_changed || (rt_m->rule[0] != '\0');
 
     /* Detect deverbative C split: [C·root]sanzur + [C·FV]e */
     size_t vrl = t->verb_root[0] ? strlen(t->verb_root) : 0;
@@ -332,7 +338,7 @@ static void print_noun_reconstruction(const Token *t) {
     char c_fv = c_split ? c_m->form[vrl] : '\0';
 
     printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
-    if (rt_changed) {
+    if (show_rule) {
         /* Show underlying, rule, then surface */
         if (c_split) {
             printf("       Ingingo:  [D]%s + [RT]%s + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c\n",

@@ -2003,10 +2003,15 @@ static const KnownWord KNOWN_WORDS[] = {
     { "fumbwe",   14,  "fumbwe" }, /* = ubufumbwe (secret/private matter)  */
 
     /* ── Religious / biblical titles (very high frequency in corpus) ────── */
-    /* "Uwiteka" = THE LORD (divine title, ~5178 occurrences).               *
-     * Without this entry it is mis-parsed as verb "u+witeka" (SP Nt.3 +     *
-     * stem witek + a).  Listed as Nt.1 human noun (divine person).          */
-    { "uwiteka",   1,  "witeka" }, /* The LORD (Yahweh — Kinyarwanda title)  */
+    /* "Uwiteka" = THE LORD (divine title, ~5178 occurrences).                *
+     * Morphemes: u(D·Nt.1) + mu(RT·Nt.1) + iteka(C, "forever/eternal").   *
+     * Regular §1.1 derivation of u+mu+i-stem gives umwi... (m retained):   *
+     *   umwigisha, umwicanyi, umwitware — m is always kept in regular Nt.1. *
+     * "Uwiteka" is a CONTRACTED divine title: the 'm' was elided lexically; *
+     * the phonologically expected form is "umwiteka".  The surface form      *
+     * "uwiteka" = u(D) + w(RT contracted from mu) + iteka(C).               *
+     * This contraction is specific to this title, not a general rule.        */
+    { "uwiteka",   1,  "iteka"  }, /* The LORD (Yahweh) — contracted: umwiteka→uwiteka */
 
     /* Common high-frequency nouns missed by prefix rules or too short */
     { "umutima",   1,  "tima"   }, /* heart / mind / conscience (Nt.1)       */
@@ -2037,8 +2042,25 @@ static const KnownWord KNOWN_WORDS[] = {
     { "intore",    9,  "ntore"  }, /* warriors / trained youth (Nt.9)         */
     { "imbwirwaruhame",9,"bwirwaruhame"},/* narrative poetry / praise poem    */
 
+    /* ── Cardinal directional nouns (Nt.14 with D-vowel alternation u→i) ─── */
+    /* East and west appear as "ibura..." / "ibure..." (D=i, RT=bu, Nt.14).  *
+     * The standard Nt.14 D-vowel is 'u' (uburasirazuba / uburengerazuba).   *
+     * In directional compound usage the D alternates to 'i':                *
+     *   iburasirazuba  = i(D,alt) + bu(RT) + rasirazuba(C)  = east          *
+     *   iburengerazuba = i(D,alt) + bu(RT) + rengerazuba(C) = west          *
+     * The igicumbi is confirmed by the class-paradigm:                       *
+     *   ururasirazuba (Nt.11), akarasirazuba (Nt.12), uburasirazuba (Nt.14) *
+     * → all share igicumbi "rasirazuba"; same for "rengerazuba" (west).     */
+    { "iburasirazuba",  14, "rasirazuba"  }, /* east  (compound: ibu+rasirazuba)  */
+    { "iburengerazuba", 14, "rengerazuba" }, /* west  (compound: ibu+rengerazuba) */
+
     /* ── Nouns false-positived as verbs due to SP+OM+stem collision ─────── */
     /* These words match SP+OM+known-verb-stem but are nouns, not verbs.     */
+    /* "ruhande": bare Nt.11 form of "uruhande" (D 'u' elided after locative *
+     * "mu ruhande" = beside/at the side of).  Detected as verb by heuristic *
+     * (ru·SP·11 + ha·OM·16 + nd·root + e → subjunctive of kunda) but that   *
+     * analysis is wrong.  Correct: D=∅(elided) + RT=ru(Nt.11) + C=hande.   */
+    { "ruhande",  11,  "hande"  }, /* side / beside — bare form of uruhande   */
     { "umucyo",    3,  "cyo"    }, /* light / beam of light (Nt.3)            */
     { "icyizero",  7,  "izero"  }, /* hope / expectation (Nt.7)               */
     { "ibihimba",  8,  "himba"  }, /* body members / created things (Nt.8)    */

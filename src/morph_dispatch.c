@@ -239,6 +239,7 @@ static void analyse_noun(Token *tok)
     char rt_surface[8]  = "";
     char rule_rt   [KIN_MORPH_RULE_LEN] = "";
     bool d_elided = false;         /* true when D 'u' is dropped after ku/mu  */
+    char d_alt[4]  = "";           /* non-empty when D vowel alternates (e.g. u→i for Nt.14 directional) */
 
     /* Clone RT and D for mutable comparison */
     char d_s[4];
@@ -253,6 +254,23 @@ static void analyse_noun(Token *tok)
                 strncpy(rt_surface, "mw", sizeof(rt_surface)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
                          "u→w §1.1 (mu+'%c' vowel → mw)", word[3]);
+            } else if (cls == 1 && kin_starts_with(word, "uw") && mv(word[2])) {
+                /* Nt.1 surface form uw+V: this is a CONTRACTED title form.
+                 *
+                 * Regular §1.1 on Nt.1 mu+V-stem gives umw..., m retained:
+                 *   umwigisha  (u+mu+igisha),  umwicanyi (u+mu+icanyi),
+                 *   umwitware  (u+mu+itware) — 'm' is always kept in regular nouns.
+                 *
+                 * "Uwiteka" is a lexicalized divine title where the 'm' of RT 'mu'
+                 * was contracted away.  The phonologically regular form would be
+                 * "umwiteka"; the attested title "uwiteka" is a contracted reduction
+                 * specific to this word — NOT a general phonological rule.
+                 * Morphemes: u(D) + mu(RT,→w contracted) + iteka(C) = uwiteka.   */
+                c_start = word + 2;
+                strncpy(rt_surface, "w", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "mu\xe2\x86\x92w (contracted title; regular Nt.1+%c-stem \xe2\x86\x92 umw..., cf. umwigisha; m elided in this form)",
+                         word[2]);
             } else if (kin_starts_with(word, "umu")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "mu", sizeof(rt_surface)-1);
@@ -406,6 +424,23 @@ static void analyse_noun(Token *tok)
             } else if (kin_starts_with(word, "uru")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "ru", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "rw") && mv(word[2])) {
+                /* Bare RT, D 'u' elided after locative ku/mu; vowel-initial C.
+                 * e.g. "ku rwego" → "rwego" = rw(ru+V) + ego, D=∅ dropped.  */
+                c_start = word + 2;
+                strncpy(rt_surface, "rw", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u→w §1.1 (ru+'%c' vowel → rw)", word[2]);
+                d_elided = true;
+            } else if (kin_starts_with(word, "ru")) {
+                /* Bare RT, D 'u' elided after locative ku/mu; consonant-initial C.
+                 * e.g. "mu ruhande" → "ruhande" = ru + hande, D=∅ dropped.
+                 * §locative: D elides when ku/mu provides the locative function. */
+                c_start = word + 2;
+                strncpy(rt_surface, "ru", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u\xe2\x86\x92\xe2\x88\x85 (D elided after locative ku/mu)");
+                d_elided = true;
             } else {
                 strncpy(rt_surface, "ru", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -454,6 +489,27 @@ static void analyse_noun(Token *tok)
             } else if (kin_starts_with(word, "ubu")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "bu", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "ibw") && mv(word[3])) {
+                /* D-vowel alternation u→i: compound directional Nt.14 forms.
+                 * e.g. ibwangu (hypothetical) = i(D,alt) + bw(RT,bu+V) + C.
+                 * Standard form has D='u'; here D='i' (directional compound). */
+                c_start = word + 3;
+                strncpy(rt_surface, "bw", sizeof(rt_surface)-1);
+                strncpy(d_alt, "i", sizeof(d_alt)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "D u\xe2\x86\x92i (directional compound); u\xe2\x86\x92w \302\2471.1 (bu+'%c'\xe2\x86\x92bw)",
+                         word[3]);
+            } else if (kin_starts_with(word, "ibu")) {
+                /* D-vowel alternation u→i: compound directional Nt.14 forms.
+                 * iburasirazuba = i(D,alt·u→i) + bu(RT) + rasirazuba(C) = east.
+                 * iburengerazuba = i(D,alt·u→i) + bu(RT) + rengerazuba(C) = west.
+                 * The standard Nt.14 form uses D='u' (uburasirazuba/uburengerazuba);
+                 * the directional compound form uses D='i' as an augment alternant. */
+                c_start = word + 3;
+                strncpy(rt_surface, "bu", sizeof(rt_surface)-1);
+                strncpy(d_alt, "i", sizeof(d_alt)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "D u\xe2\x86\x92i (directional compound; standard Nt.14 D='u', cf. uburasirazuba)");
             } else {
                 strncpy(rt_surface, "bu", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -521,16 +577,33 @@ static void analyse_noun(Token *tok)
      * re-apply an incorrect rule to the underlying form (e.g. for Nt.6 "a→∅"
      * the generator wrongly turns "ma|o" into "myo" instead of "mo").
      * For no-rule cases, use kin_ortho_gen which handles nasal assimilation etc. */
-    /* When D is elided (bare noun after locative ku/mu), the reconstruction
-     * uses "" for D so the surface form is correct; but the display shows "∅".  */
-    const char *d_recon   = d_elided ? ""                    : d_under;
-    const char *d_display = d_elided ? "\xe2\x88\x85"        : d_under;  /* ∅ */
+    /* D display and reconstruction logic:
+     *   d_elided: D 'u' was dropped after locative ku/mu → display "∅", recon ""
+     *   d_alt:    D vowel alternated (e.g. u→i for Nt.14 directional compounds)
+     *             → display and recon use the alternate surface vowel
+     *   default:  use d_under (underlying D)
+     *
+     * D morpheme: form = underlying (for Ingingo display), surface = actual surface
+     * (for Guhuza).  When d_elided, both are shown as "∅".  When d_alt set, form
+     * stays as d_under (standard underlying) while surface shows the alternate.  */
+    const char *d_recon     = d_elided ? ""                        /* elided: nothing */
+                            : d_alt[0] ? d_alt                     /* alternate vowel */
+                            :            d_under;                  /* standard       */
+    const char *d_form_show = d_elided ? "\xe2\x88\x85" : d_under; /* Ingingo: underlying */
+    const char *d_surf_show = d_elided ? "\xe2\x88\x85"            /* Guhuza:  surface    */
+                            : d_alt[0] ? d_alt
+                            :            d_under;
 
     char reconstructed[KIN_MAX_WORD];
     if (rule_rt[0]) {
-        /* Surface: d_recon + rt_surface + c_form — direct check */
+        /* Surface: d_recon + rt_recon + c_form — direct check.
+         * rt_surface may be the display symbol "∅" (\xe2\x88\x85) when the RT is
+         * fully elided (e.g. Nt.5 ri→∅ before C-initial stem: iburasirazuba,
+         * ikeba, ishuri...).  The ∅ character must NOT appear in the
+         * reconstruction string — use "" for verification in that case.        */
+        const char *rt_recon = (rt_surface[0] == '\xe2') ? "" : rt_surface;
         snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
-                 d_recon, rt_surface, c_form);
+                 d_recon, rt_recon, c_form);
     } else {
         char underlying[128];
         snprintf(underlying, sizeof(underlying), "%s|%s|%s", d_under, rt_under, c_form);
@@ -539,7 +612,7 @@ static void analyse_noun(Token *tok)
     mb->verified = (strcmp(reconstructed, word) == 0);
 
     /* Store morphemes */
-    set_morph(&mb->m[0], "D",  d_display, d_display, "");
+    set_morph(&mb->m[0], "D",  d_form_show, d_surf_show, "");
     set_morph(&mb->m[1], "RT", rt_under,  rt_surface, rule_rt);
     set_morph(&mb->m[2], "C",  c_form,    c_form,     "");
     mb->n = 3;
