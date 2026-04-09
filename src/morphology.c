@@ -1005,9 +1005,10 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
      * Replace final 'z' with 'r'; if the result is a known verb stem, this is
      * the -y- causative form of that r-final base verb.
      * e.g. "mez" → "mer" (kumera → kumeza); bare_out = "mer" (citation root).
+     * e.g. "ez"  → "er"  (kwera→kweza, 2-char root): guard is >= 2.
      * Checked last because z is a valid base-stem consonant; we only strip when
      * the r-form is a confirmed known stem. */
-    if (slen >= 3 && stem[slen-1] == 'z') {
+    if (slen >= 2 && stem[slen-1] == 'z') {
         strncpy(tmp, stem, slen - 1); tmp[slen-1] = 'r'; tmp[slen] = '\0';
         if (kin_is_known_verb_stem(tmp)) {
             if (ext_out)  *ext_out = VEXT_CAUSATIVE_Y;
@@ -1172,7 +1173,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (tense_out)  *tense_out  = TENSE_OPTATIVE;
             return true;
         }
-        /* PRESENT with ra marker */
+        /* PRESENT with ra marker (consonant-initial root) */
         if (kin_starts_with(inner, "ra") && ilen > 3 &&
             (inner[ilen-1]=='a' || inner[ilen-1]=='o')) {
             const char *s = inner + 2; size_t sl = ilen - 3;
@@ -1181,6 +1182,28 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (subj_class) *subj_class = SP[i].cls;
             if (tense_out)  *tense_out  = TENSE_PRESENT;
             return true;
+        }
+        /* PRESENT with ra, vowel-initial root — §1.1 rule 4c: the 'a' of TM 'ra'
+         * elides before a vowel-initial root, leaving only 'r' on the surface.
+         * Pattern: inner = 'r' + vowel + rest + 'a'
+         *   e.g.  ireza  = i(SP·Nt.4) + r[a→∅] + ez(root) + a(FV)
+         *         areza  = a(SP·Nt.1) + r[a→∅] + ez(root) + a(FV)
+         *         iremera= i(SP·Nt.4) + r[a→∅] + emer(root) + a(FV)
+         * Validated: root must be a known stem or a causative-y surface (§1.3)
+         * to prevent accidental matches on consonant-r-initial habitual forms.  */
+        if (ilen >= 4 && inner[0] == 'r' && is_vowel(inner[1]) && inner[ilen-1] == 'a') {
+            size_t rvlen = ilen - 2;   /* strip leading 'r' and trailing 'a' */
+            char   rvbuf[KIN_MAX_STEM];
+            if (rvlen >= 2 && rvlen < KIN_MAX_STEM - 1) {
+                strncpy(rvbuf, inner + 1, rvlen); rvbuf[rvlen] = '\0';
+                if (kin_is_known_verb_stem(rvbuf) || kin_is_causative_y_surface(rvbuf)) {
+                    if (stem_buf) { strncpy(stem_buf, rvbuf, KIN_MAX_STEM-1);
+                                    stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_PRESENT;
+                    return true;
+                }
+            }
         }
         /* PAST IMPERFECT: ends in aga */
         if (ilen > 4 && kin_ends_with(inner, "aga")) {

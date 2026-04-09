@@ -238,6 +238,7 @@ static void analyse_noun(Token *tok)
     const char *c_start = NULL;   /* pointer into word where C begins        */
     char rt_surface[8]  = "";
     char rule_rt   [KIN_MORPH_RULE_LEN] = "";
+    bool d_elided = false;         /* true when D 'u' is dropped after ku/mu  */
 
     /* Clone RT and D for mutable comparison */
     char d_s[4];
@@ -259,6 +260,26 @@ static void analyse_noun(Token *tok)
                 /* umw before consonant (unlikely but guard) */
                 c_start = word + 3;
                 strncpy(rt_surface, "mw", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "mw") && mv(word[2])) {
+                /* Bare RT, D 'u' elided after locative ku/mu; vowel-initial C.
+                 * e.g. "ku mwana" → "mwana" = mw(mu+V) + ana, D=∅ dropped.  */
+                c_start = word + 2;
+                strncpy(rt_surface, "mw", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u→w §1.1 (mu+'%c' vowel → mw)", word[2]);
+                d_elided = true;
+            } else if (kin_starts_with(word, "mu")) {
+                /* Bare RT, D 'u' elided after locative ku/mu; consonant-initial C.
+                 * e.g. "ku munsi" → "munsi" = mu + nsi, D=∅ dropped.
+                 * §locative: D elides when ku/mu provides the locative function. */
+                c_start = word + 2;
+                strncpy(rt_surface, "mu", sizeof(rt_surface)-1);
+                /* Set rule_rt as signal to use surface-path reconstruction
+                 * (rule text only printed when rt form≠surface, which it is not
+                 * here — "mu"→"mu" — so this won't appear in display output).  */
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u\xe2\x86\x92\xe2\x88\x85 (D elided after locative ku/mu)");
+                d_elided = true;
             } else {
                 /* bare/dropped-D forms: start from stem stored by tagger */
                 strncpy(rt_surface, "mu", sizeof(rt_surface)-1);
@@ -500,11 +521,16 @@ static void analyse_noun(Token *tok)
      * re-apply an incorrect rule to the underlying form (e.g. for Nt.6 "a→∅"
      * the generator wrongly turns "ma|o" into "myo" instead of "mo").
      * For no-rule cases, use kin_ortho_gen which handles nasal assimilation etc. */
+    /* When D is elided (bare noun after locative ku/mu), the reconstruction
+     * uses "" for D so the surface form is correct; but the display shows "∅".  */
+    const char *d_recon   = d_elided ? ""                    : d_under;
+    const char *d_display = d_elided ? "\xe2\x88\x85"        : d_under;  /* ∅ */
+
     char reconstructed[KIN_MAX_WORD];
     if (rule_rt[0]) {
-        /* Surface: d_under + rt_surface + c_form — direct check */
+        /* Surface: d_recon + rt_surface + c_form — direct check */
         snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
-                 d_under, rt_surface, c_form);
+                 d_recon, rt_surface, c_form);
     } else {
         char underlying[128];
         snprintf(underlying, sizeof(underlying), "%s|%s|%s", d_under, rt_under, c_form);
@@ -513,9 +539,9 @@ static void analyse_noun(Token *tok)
     mb->verified = (strcmp(reconstructed, word) == 0);
 
     /* Store morphemes */
-    set_morph(&mb->m[0], "D",  d_under,  d_under,   "");
-    set_morph(&mb->m[1], "RT", rt_under, rt_surface, rule_rt);
-    set_morph(&mb->m[2], "C",  c_form,   c_form,     "");
+    set_morph(&mb->m[0], "D",  d_display, d_display, "");
+    set_morph(&mb->m[1], "RT", rt_under,  rt_surface, rule_rt);
+    set_morph(&mb->m[2], "C",  c_form,    c_form,     "");
     mb->n = 3;
 }
 
@@ -999,6 +1025,8 @@ static void analyse_vconj(Token *tok)
         : (tm[0] ? tm : (om[0] ? om : root));
     char sp_surface[KIN_MORPH_FORM_LEN];
     char sp_rule[KIN_MORPH_RULE_LEN] = "";
+    char sp_pres_buf[KIN_MORPH_FORM_LEN] = "";  /* buffer for i-final present-form SP */
+    bool i_final_pa = false;   /* true → insert ya(PA) slot after SP in chain */
     strncpy(sp_surface, sp_under, sizeof(sp_surface)-1);
     sp_surface[sizeof(sp_surface)-1] = '\0';
 
@@ -1077,6 +1105,42 @@ static void analyse_vconj(Token *tok)
             snprintf(sp_rule, sizeof(sp_rule), "n + a(past augment) → na (1sg past SP)");
         }
         /* 2sg past: u + a → wa (handled above via u-final rule for sp_under="u") */
+
+        /* i-final SPs: bi+a→bya, ri+a→rya, zi+a→zya, ki+a→cya (§1.1 + ky→cy).
+         * SP_PAST[] stores the already-contracted surface form ("bya" etc.) for
+         * these classes, unlike u-final SPs which store the underlying form.
+         * Retroactively expose the underlying present SP and annotate the rule,
+         * consistent with how u-final SPs (tu→twa, ru→rwa) are displayed.     */
+        if (sp_rule[0] == '\0') {
+            static const struct { const char *contracted; const char *pres; } i_map[] = {
+                { "bya", "bi" },
+                { "rya", "ri" },
+                { "zya", "zi" },
+                { "cya", "ki" },
+                { NULL,  NULL }
+            };
+            for (int ii = 0; i_map[ii].contracted; ii++) {
+                if (strcmp(sp_under, i_map[ii].contracted) == 0) {
+                    /* sp_surface already holds the contracted form (initialised
+                     * from sp_under before vowel-contact rules ran).           */
+                    strncpy(sp_pres_buf, i_map[ii].pres,
+                            sizeof(sp_pres_buf) - 1);
+                    sp_under = sp_pres_buf;   /* show present form as underlying */
+                    i_final_pa = true;        /* insert ya(PA) slot after SP    */
+                    if (strcmp(i_map[ii].contracted, "cya") == 0) {
+                        snprintf(sp_rule, sizeof(sp_rule),
+                                 "i\xe2\x86\x92y \xc2\xa7""1.1 + a(past augment)"
+                                 " + ky\xe2\x86\x92""cy \xe2\x86\x92 cya (ki past SP)");
+                    } else {
+                        snprintf(sp_rule, sizeof(sp_rule),
+                                 "i\xe2\x86\x92y \xc2\xa7""1.1 + a(past augment)"
+                                 " \xe2\x86\x92 %s (%s past SP)",
+                                 i_map[ii].contracted, i_map[ii].pres);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     /* OM surface (same rule applies at OM-root boundary) */
@@ -1182,6 +1246,38 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Causative-y root surface (r+y→z §1.3): pre-compute for built verification.
+     * root ends in 'r' (citation); surface form fuses r with -y- → 'z'.
+     * e.g. root="er" → root_surface="ez" (kwera/kweza pair)
+     *      root="mer"→ root_surface="mez" (kumera/kumeza pair)
+     * Also: EXT 'y' is absorbed into the root surface, so ext_surface = "".  */
+    const char *ext_surface = ext;   /* normally same as ext; overridden below */
+    if (tok->verb_ext == VEXT_CAUSATIVE_Y && root[0]) {
+        size_t rlen = strlen(root);
+        if (rlen >= 2) {
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = 'z';
+            root_surface_buf[rlen]   = '\0';
+            root_surface = root_surface_buf;
+            ext_surface  = "";   /* y absorbed into z-fusion */
+        }
+    }
+
+    /* TENSE_PRESENT + vowel-initial root surface: TM 'ra' contracts to 'r'.
+     * Rule §1.1 (4c): a→∅ before vowel — the 'a' of TM 'ra' elides.
+     * e.g. ireza = i(SP) + r(TM ra→r) + ez(root_surface) + a(FV).           */
+    if (tok->verb_tense == TENSE_PRESENT && !tm_contracted
+        && strcmp(tm, "ra") == 0
+        && root_surface[0] && mv(root_surface[0])) {
+        strncpy(tm_contracted_buf, "r", 2);
+        snprintf(tm_contracted_rule, sizeof(tm_contracted_rule),
+                 "a\xe2\x86\x92\xe2\x88\x85 / _V \xc2\xa71.1 "
+                 "(TM-final 'a' elides before vowel-initial root '%s': "
+                 "ra+%s \xe2\x86\x92 r+%s)",
+                 root_surface, root_surface, root_surface);
+        tm_contracted = true;
+    }
+
     /* Build expected surface for verification.
      * Include negation prefix in built string so verification works for
      * negative verbs (ntaragenda, sindagenda, etc.).                        */
@@ -1204,7 +1300,7 @@ static void analyse_vconj(Token *tok)
                  neg_pfx,
                  sp_surface, tm_contracted ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
-                 root_surface, ext, (past_rye_ze || past_kye_tse) ? "e" : fv);
+                 root_surface, ext_surface, (past_rye_ze || past_kye_tse) ? "e" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -1214,6 +1310,11 @@ static void analyse_vconj(Token *tok)
         set_morph(&mb->m[n++], "NEG", neg_pfx, neg_pfx,
                   "Ubunyagatifu (Negation prefix)");
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
+    /* i-final past SP: insert explicit past-augment slot ya(PA) after SP.
+     * form="ya" = surface of a(past augment) after §1.1 bi+a→bya.
+     * surface="" so it doesn't double-count "ya" already inside sp_surface.   */
+    if (i_final_pa)
+        set_morph(&mb->m[n++], "PA", "ya", "", "");
     if (tm[0])
         set_morph(&mb->m[n++], "TM", tm,
                   tm_contracted          ? tm_contracted_buf
@@ -1559,8 +1660,10 @@ static VerbExtension detect_ext_in_stem(const char *stem,
 
     /* Causative-y (Ngiza): stem ends in 'z' ← r+y→z rule (§1.3).
      * Replace final 'z' with 'r'; if result is a known stem it was the -y- causative.
-     * e.g. "mez" → "mer" (kumera→kumeza); bare_root = "mer" (citation form). */
-    if (len >= 3 && stem[len-1] == 'z') {
+     * e.g. "mez" → "mer" (kumera→kumeza); bare_root = "mer" (citation form).
+     * e.g. "ez"  → "er"  (kwera→kweza, len=2): guard relaxed to >= 2 so that
+     * short-root causative pairs like er/ez are handled correctly.              */
+    if (len >= 2 && stem[len-1] == 'z') {
         char try_r[KIN_MAX_STEM];
         strncpy(try_r, stem, len - 1); try_r[len-1] = 'r'; try_r[len] = '\0';
         if (kin_is_known_verb_stem(try_r)) {
@@ -1662,16 +1765,22 @@ static void analyse_vinf(Token *tok)
         fv = "e";
 
     /* Try to detect a derivational extension within the stem.
-     * Exception: skip detection for vowel-initial roots (kw-/gw- prefix verbs,
-     * and uu_fused verbs like kubaka→ubak).  The initial vowel is PART of the
-     * root, not a suffix boundary — splitting e.g. "iruk" as "ir+uk(reversive)"
-     * is a false positive.  Derived forms (kwirukana etc.) are separate entries. */
+     * detect_ext_in_stem() begins with:
+     *   if (kin_is_known_verb_stem(stem)) return VEXT_NONE;
+     * so all integral vowel-initial roots already in VERB_STEMS (iruk, emer,
+     * izer, emez …) exit immediately — no false positives possible.
+     *
+     * The previous "!mv(root[0])" guard was added to stop false splits on
+     * those roots, but it also prevented causative-y detection for roots like
+     * "ez" (from kweza = ku+er+y+a).  Removing the guard is safe because the
+     * inner guard already handles every known vowel-initial root correctly:
+     *   kwiruka  (root "iruk") → known → VEXT_NONE  ✓
+     *   kwemera  (root "emer") → known → VEXT_NONE  ✓
+     *   kweza    (root "ez")   → unknown → causative-y: ez→er (known) → VEXT_CAUSATIVE_Y ✓ */
     char bare_root[KIN_MAX_STEM]      = "";
     char ext_str  [KIN_MORPH_FORM_LEN] = "";
     VerbExtension inf_ext = VEXT_NONE;
-    if (!mv(root[0])) {
-        inf_ext = detect_ext_in_stem(root, bare_root, ext_str, sizeof(ext_str));
-    }
+    inf_ext = detect_ext_in_stem(root, bare_root, ext_str, sizeof(ext_str));
 
     /* Verify against the surface word (including locative if present).
      * For u+u→u fused verbs: drop the prefix's final 'u' before concatenating

@@ -1219,7 +1219,15 @@ static const char *VERB_STEMS[] = {
     "himbir",   /* guhimbira   – to compose for                           */
     "ambuk",    /* kwambuka    – to cross                                 */
     "himb",     /* guhimba     – to compose / invent                      */
-    "er",       /* gutera      – to plant / strike                        */
+    "er",       /* kwera – to shine / be holy / be pure (ku+er+a, u→w §1.1).
+                 * Note: gutera (to plant/strike) root is "ter" — distinct.      */
+    "rez",      /* kureza – to clean / purify / make pure                        */
+    "wez",      /* guweza – consonant-initial surface form (gu+wez+a).
+                 * Phonological note: kweza (ku+ez+a, root "ez") is the
+                 * causative-y form of kwera (er+y→ez §1.3); "wez" is the
+                 * independent guweza root (w is stem-initial, not a glide).
+                 * Both "ez" (detect_ext_in_stem causative-y) and "wez"
+                 * (direct lexicon entry) are valid surface roots.               */
     "um",       /* guuma       – to harden / stay firm                    */
     "tung",     /* gutunga     – to possess / maintain                    */
     "gaban",    /* kugabana    – to share                                 */
@@ -1534,6 +1542,38 @@ bool kin_is_known_verb_stem(const char *stem) {
     for (int i = 0; VERB_STEMS[i]; i++)
         if (strcmp(stem, VERB_STEMS[i]) == 0) return true;
     return false;
+}
+
+/*
+ * kin_is_causative_y_surface()
+ *
+ * Returns true if `stem` is the SURFACE form of a causative-y (r+y→z §1.3)
+ * derivation whose underlying base root is a known verb stem.
+ *
+ * Pattern: the causative -y- morpheme fuses with a stem-final 'r':
+ *   r + y → z  (§1.3)
+ * Surface stem ends in 'z'; restoring 'z'→'r' yields the base root.
+ *
+ * Examples:
+ *   "ez"   → "er"   (kwera → kweza:  to be pure → to purify)
+ *   "mez"  → "mer"  (kumera → kumeza: to germinate → to cause to germinate)
+ *   "gez"  → "ger"  (kugera → kugeza: to reach → to try/put to test)
+ *
+ * Used in conjugated-verb detection to recognise forms like "ireza":
+ *   i(SP·Nt.4) + r(TM ra, a→∅ §1.1) + ez(root) + a(FV) = ireza
+ * without adding "ez" to VERB_STEMS (which would block causative-y detection
+ * in detect_ext_in_stem via its known-stem early-exit guard).
+ */
+bool kin_is_causative_y_surface(const char *stem) {
+    if (!stem) return false;
+    size_t len = strlen(stem);
+    if (len < 2 || stem[len-1] != 'z') return false;
+    if (len >= KIN_MAX_STEM) return false;
+    char try_r[KIN_MAX_STEM];
+    strncpy(try_r, stem, len - 1);
+    try_r[len-1] = 'r';
+    try_r[len]   = '\0';
+    return kin_is_known_verb_stem(try_r);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

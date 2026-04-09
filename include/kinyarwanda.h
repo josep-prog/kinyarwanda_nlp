@@ -556,6 +556,7 @@ bool kin_is_adj_stem(const char *stem);
 bool kin_is_reflexive_verb_stem(const char *stem); /* kwi- reflexive forms */
 bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out);
 bool kin_is_known_verb_stem(const char *stem);
+bool kin_is_causative_y_surface(const char *stem); /* stem ends in z, z→r is a known stem */
 bool kin_is_known_noun_stem(const char *stem, int *class_out);
 bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out);
 

@@ -311,6 +311,7 @@ void kin_tag_token(Token *tok) {
                 || v_tense == TENSE_SUBJUNCTIVE_LOC
                 || v_tense == TENSE_SUBJUNCTIVE
                 || kin_is_known_verb_stem(v_stem)
+                || kin_is_causative_y_surface(v_stem)  /* r+y→z §1.3 surface root */
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))) {
             /* Verb interpretation wins */
             tok->pos            = POS_VERB_CONJ;
