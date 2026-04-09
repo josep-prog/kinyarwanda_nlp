@@ -1479,11 +1479,13 @@ static VerbExtension detect_ext_in_stem(const char *stem,
         }
     }
 
-    /* Stative: stem ends in "ik" (Ngirika: guhingika → hing+ik, gufatika → fat+ik)
-     * Checked before reversive -uk because both share a final 'k'. */
+    /* Stative: stem ends in "ik" or "ek" (Ngirika vowel harmony)
+     *   -ik-: non-mid stem vowel (a/i/u) → guhingika (hing+ik), gufatika (fat+ik)
+     *   -ek-: mid stem vowel (e/o)        → gutekeka  (tek+ek),  gusomeka (som+ek)
+     * Checked before reversive -uk/-ok because both share a final 'k'. */
     if (len > 3) {
         const char *s = stem + len - 2;
-        if (strcmp(s, "ik") == 0) {
+        if (strcmp(s, "ik") == 0 || strcmp(s, "ek") == 0) {
             size_t rlen = len - 2;
             if (rlen >= 2) {
                 strncpy(bare_root, stem, rlen); bare_root[rlen] = '\0';

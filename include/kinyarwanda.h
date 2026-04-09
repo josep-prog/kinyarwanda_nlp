@@ -336,9 +336,12 @@ typedef enum {
     VEXT_REFLEXIVE,      /* Imbundo yo kwisanzura (i-): reflexive marker      *
                           * elided in bare subj/imper form.                   *
                           * e.g. sanzure ← kwi-sanzur-e (i- dropped)         */
-    VEXT_STATIVE,        /* Ngirika:    -ik-         guhingika, gufatika      *
-                          * Marks potential/stative state; stem becomes        *
-                          * passive-capable: gufung-ik-a = "to be openable"  */
+    VEXT_STATIVE,        /* Ngirika:    -ik-/-ek-    guhingika, gufatika,     *
+                          *                          gutekeka, gusomeka       *
+                          * Vowel harmony: mid vowel (e/o) → -ek-;           *
+                          * non-mid (a/i/u) → -ik-.                          *
+                          * Marks potential/doability ("can be V-ed") in     *
+                          * non-past context; anticausative/stative in past. */
     VEXT_REVERSIVE,      /* Ngiruka/Ngirura: -uk-/-ur- gufungura, guhinduka  *
                           * Reverses the action of the base verb:             *
                           * gufunga (close) → gufung-ur-a (open/unclose)     *

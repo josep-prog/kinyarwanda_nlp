@@ -452,5 +452,86 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         }
     }
 
+    /* RULE 9: Vowel harmony on verb extensions (-ish-/-esh-, -ik-/-ek-)
+     *
+     * Kinyarwanda vowel harmony (Zorc & Nibagwire §2.5.13):
+     *   Root last vowel is mid (e/o)     → extension must be -esh- or -ek-
+     *   Root last vowel is non-mid (a/i/u) → extension must be -ish- or -ik-
+     *
+     * gukorisha  → root "kor" has /o/ (mid) → -esh- required → flag gukorisha
+     * gusomisha  → root "som" has /o/ (mid) → -esh- required → flag gusomisha
+     *
+     * Note: verb_ext is not set for POS_VERB_INF tokens (pos_tagger.c limitation),
+     * so we inspect the morpheme breakdown directly instead of filtering by verb_ext.
+     */
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        if (t->pos != POS_VERB_INF && t->pos != POS_VERB_CONJ) continue;
+
+        /* Find the EXT morpheme and the root morpheme in the breakdown */
+        const char *ext_surf = NULL;
+        const char *root_form = NULL;
+        for (int m = 0; m < t->morph.n; m++) {
+            if (strcmp(t->morph.m[m].label, "EXT")  == 0) ext_surf  = t->morph.m[m].surface;
+            if (strcmp(t->morph.m[m].label, "root") == 0) root_form = t->morph.m[m].form;
+        }
+        if (!ext_surf || !root_form) continue;
+        /* Only check harmony-sensitive allomorphs */
+        if (strcmp(ext_surf,"ish") != 0 && strcmp(ext_surf,"esh") != 0 &&
+            strcmp(ext_surf,"ik")  != 0 && strcmp(ext_surf,"ek")  != 0) continue;
+
+        /* Determine if root's last vowel is mid (e/o) */
+        bool root_mid = false;
+        bool found_vowel = false;
+        for (int k = (int)strlen(root_form) - 1; k >= 0 && !found_vowel; k--) {
+            char c = root_form[k];
+            if (c == 'e' || c == 'o') { root_mid = true;  found_vowel = true; }
+            else if (c == 'a' || c == 'i' || c == 'u') { root_mid = false; found_vowel = true; }
+        }
+        if (!found_vowel) continue;
+
+        /* Check: mid root + -ish-/-ik- = wrong; non-mid root + -esh-/-ek- = wrong */
+        bool wrong_ish = root_mid  && (strcmp(ext_surf, "ish") == 0 || strcmp(ext_surf, "ik") == 0);
+        bool wrong_esh = !root_mid && (strcmp(ext_surf, "esh") == 0 || strcmp(ext_surf, "ek") == 0);
+        if (!wrong_ish && !wrong_esh) continue;
+
+        /* Build the correct form: replace the wrong allomorph with the right one */
+        const char *wrong_ext  = wrong_ish ? ext_surf : ext_surf; /* "ish"/"ik" or "esh"/"ek" */
+        const char *right_ext  = wrong_ish
+            ? (strcmp(ext_surf, "ish") == 0 ? "esh" : "ek")
+            : (strcmp(ext_surf, "esh") == 0 ? "ish" : "ik");
+
+        /* Build corrected surface word: find the wrong ext in the surface and replace */
+        char corrected[KIN_MAX_WORD] = {0};
+        const char *pos = strstr(t->surface, wrong_ext);
+        if (pos) {
+            size_t prefix_len = (size_t)(pos - t->surface);
+            strncpy(corrected, t->surface, prefix_len);
+            corrected[prefix_len] = '\0';
+            strncat(corrected, right_ext, sizeof(corrected) - strlen(corrected) - 1);
+            strncat(corrected, pos + strlen(wrong_ext),
+                    sizeof(corrected) - strlen(corrected) - 1);
+        } else {
+            strncpy(corrected, t->surface, sizeof(corrected) - 1);
+        }
+
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        snprintf(msg, sizeof(msg),
+            "Uvuguruye amazina (-ish-/-esh-, -ik-/-ek-): '%s' — igicumbi '%s' "
+            "gifite inshuro y'icyembe (%s), bityo ikinyabiziga kigomba kuba '-%s-', "
+            "si '-%s-'. "
+            "Vowel harmony: '%s' has mid vowel (%s), so extension must be '-%s-', "
+            "not '-%s-'.",
+            t->surface, root_form,
+            root_mid ? "e/o" : "a/i/u",
+            right_ext, wrong_ext,
+            root_form, root_mid ? "e/o" : "a/i/u",
+            right_ext, wrong_ext);
+        snprintf(sug, sizeof(sug), "Hindura '%s' ugakoresheje '%s'."
+            " / Replace '%s' with '%s'.",
+            t->surface, corrected, t->surface, corrected);
+        add_error(sa, ERR_SPELLING, i, msg, sug);
+    }
+
     sa->is_complete = sa->has_verb && (sa->error_count == 0);
 }

@@ -944,9 +944,13 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
             return true;
         }
     }
-    /* Stative: -ik (Ngirika: guhingika → hing+ik+a, gufatika → fat+ik+a)
-     * Checked before reversive -uk because both end in a consonant + k. */
-    if (slen > 4 && kin_ends_with(stem, "ik")) {
+    /* Stative: -ik- / -ek- (Ngirika)
+     * Vowel harmony: stems with mid vowel (e/o) take -ek-, others take -ik-.
+     *   guhingika → hing+ik+a  (stem vowel /i/ → -ik-)
+     *   gutekeka  → tek+ek+a   (stem vowel /e/ → -ek-)
+     *   gusomeka  → som+ek+a   (stem vowel /o/ → -ek-)
+     * Checked before reversive -uk/-ok because both end in consonant+k. */
+    if (slen > 4 && (kin_ends_with(stem, "ik") || kin_ends_with(stem, "ek"))) {
         size_t blen = slen - 2;
         strncpy(tmp, stem, blen); tmp[blen] = '\0';
         if (blen >= 2) {

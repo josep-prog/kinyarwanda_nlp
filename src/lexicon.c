@@ -1210,8 +1210,7 @@ static const char *VERB_STEMS[] = {
     "vug",      /* kuvuga      – to speak / say                           */
     "baz",      /* kubaza      – to ask                                   */
     "subiz",    /* gusubiza    – to answer                                */
-    "koresh",   /* gukoresha   – to use                                   */
-    "kor",      /* gukora      – to work / do                             */
+    "kor",      /* gukora      – to work / do; gukoresha (kor+esh) = to use */
     "mar",      /* kumara      – to finish / run out / be exhausted       */
     "ram",      /* gurama      – to grow crops                            */
     "bik",      /* kubika      – to store                                 */
@@ -1369,7 +1368,6 @@ static const char *VERB_STEMS[] = {
     "hungur",   /* guhungura   – to liberate / free / release            */
     "humuk",    /* guhumuka    – to be freed / loosed / released         */
     "humat",    /* guhumata    – to stick / adhere / cling               */
-    "huguk",    /* guhuguka    – to collapse / fall apart                */
     "gendar",   /* kugendera   – to live / walk / behave                 */
     "hengam",   /* guhenga     – to add beyond / go beyond              */
     "hindir",   /* guhindira   – to pour out / shed                      */
@@ -1380,7 +1378,7 @@ static const char *VERB_STEMS[] = {
     "sim",      /* gusimba     – to replace / substitute                 */
     "rob",      /* kuroha      – to sink / drown                        */
     "boh",      /* guboha      – to tie / bind                          */
-    "hug",      /* guhugurika  – to be destroyed                        */
+    "hug",      /* guhuga – to be busy/occupied; guhugurika – to be destroyed */
     "cur",      /* kucura      – to forge / shape                       */
     "bat",      /* kubata      – to press / oppress                     */
     "hit",      /* guhita      – to pass / go through                   */
@@ -1395,6 +1393,8 @@ static const char *VERB_STEMS[] = {
     "gor",      /* kugora  (dup: keep for coverage)                     */
     /* ── Additional stems from this session's corpus analysis ─────────── */
     "ter",      /* gutera      – to plant / cause / do to (very common)  */
+    "tek",      /* guteka      – to cook                                 */
+    "men",      /* kumena      – to break / shatter                      */
     "teger",    /* gutegera    – to wait for / expect                    */
     "tekerez",  /* gutekereza  – to think / reflect / meditate           */
     "tonderez", /* gutondereza – to be careful / attend to               */
@@ -1465,7 +1465,7 @@ static const char *VERB_STEMS[] = {
     "boher",    /* gubohereza  – to tighten / bind up                    */
     "kub",      /* gukuba      – to fold / multiply                      */
     "gob",      /* kugoba      – to surround / encircle                  */
-    "koter",    /* gukoresha   – extended applicative base               */
+    "koter",    /* gukotera    – to work for / towards (applicative)      */
     "witer",    /* kwitera     – to cause oneself / self-initiate        */
     "yemrer",   /* kwiyemera   – already: yemr; add extended form        */
     "imburan",  /* kwimburana  – to compete / contend with              */
@@ -2276,7 +2276,7 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_APPLICATIVE: return "Ikirango (Applicative/Benefactive: -ir-/-er-)";
         case VEXT_RECIPROCAL:  return "Igisubizo (Reciprocal: -an-)";
         case VEXT_REFLEXIVE:   return "Imbundo yo kwisanzura (Reflexive: i- elided in bare form)";
-        case VEXT_STATIVE:     return "Ngirika (Stative/Potential: -ik-)";
+        case VEXT_STATIVE:     return "Ngirika (Stative/Potential: -ik-/-ek-)";
         case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
         case VEXT_CAUSATIVE_Y: return "Ngiza (Causative-y: r+y→z, §1.3)";
         default:               return "";
