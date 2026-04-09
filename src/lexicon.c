@@ -1332,6 +1332,7 @@ static const char *VERB_STEMS[] = {
     "kang",     /* gukanguka   – to wake up / be vigilant               */
     "ish",      /* kwisha      – to finish / end                         */
     "v",        /* kuva        – to come from / leave from / depart (root=v, like kuba→b) */
+    "toh",      /* gutoha      – to get wet / to water (h→s before FV 'a' in conjugated forms: kigatosa) */
     "van",      /* guvana      – to part from / separate                 */
     "tan",      /* gutana      – to part ways / separate (base verb; gutanduka ← tan+uk, gutandukana ← tan+uk+an) */
     "nyur",     /* kunyura     – to pass through / traverse              */

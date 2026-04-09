@@ -1302,6 +1302,60 @@ static void analyse_vconj(Token *tok)
         tm_contracted = true;
     }
 
+    /* NARRATIVE TM voicing: ka→ga (k→g §3.7.1 after vowel-final SP).
+     * When the narrative TM 'ka' is voiced to 'ga' in the surface word,
+     * use 'ga' as the TM surface for both the built-string check and the
+     * morpheme display.  Detect by inspecting the word at the SP+neg position. */
+    bool  nar_voiced = false;
+    char  nar_tm_surf[4] = "ka";
+    char  nar_tm_rule[KIN_MORPH_RULE_LEN] = "";
+    if (tok->verb_tense == TENSE_NARRATIVE) {
+        size_t sp_off = strlen(neg_pfx) + strlen(sp_surface);
+        if (sp_off < strlen(word) && word[sp_off] == 'g') {
+            nar_voiced = true;
+            strncpy(nar_tm_surf, "ga", sizeof(nar_tm_surf) - 1);
+            snprintf(nar_tm_rule, sizeof(nar_tm_rule),
+                     "k\xe2\x86\x92g \xc2\xa7""3.7.1 (narrative TM 'ka'\xe2\x86\x92'ga'"
+                     " after vowel-final SP '%s')", sp_under);
+        }
+    }
+
+    /* h→s surface rule: root-final 'h' surfaces as 's' before FV 'a' in
+     * conjugated Kinyarwanda forms.  The citation/dictionary root retains 'h'
+     * (e.g. gutoha, root=toh), but in conjugated forms: toh+a → surface tosa.
+     * Detect by trying the s-form of the root and checking it matches the word.*/
+    bool root_h_to_s = false;
+    char root_hs_buf[KIN_MAX_STEM] = "";
+    char root_hs_rule[KIN_MORPH_RULE_LEN] = "";
+    if (root_surface[0] && fv[0] == 'a' && !past) {
+        size_t rslen = strlen(root_surface);
+        if (rslen >= 2 && root_surface[rslen - 1] == 'h') {
+            strncpy(root_hs_buf, root_surface, rslen - 1);
+            root_hs_buf[rslen - 1] = 's'; root_hs_buf[rslen] = '\0';
+            /* Build trial surface using the s-form root */
+            char trial[KIN_MAX_WORD];
+            const char *tm_used = nar_voiced       ? nar_tm_surf
+                                : tm_contracted    ? tm_contracted_buf
+                                :                    tm;
+            snprintf(trial, sizeof(trial), "%s%s%s%s%s%s",
+                     neg_pfx, sp_surface, tm_used,
+                     om[0] ? om_surface : "",
+                     root_hs_buf, fv);
+            if (strcmp(trial, word) == 0) {
+                root_h_to_s = true;
+                root_surface = root_hs_buf;
+                snprintf(root_hs_rule, sizeof(root_hs_rule),
+                         "h\xe2\x86\x92s (root-final h surfaces as s before FV 'a':"
+                         " %s+a \xe2\x86\x92 %sa; cf. citation %stoha)",
+                         root, root_hs_buf,
+                         (root[0] && (root[0]=='b'||root[0]=='d'||root[0]=='g'||
+                                      root[0]=='j'||root[0]=='r'||root[0]=='v'||
+                                      root[0]=='z'||root[0]=='m'||root[0]=='n'||
+                                      root[0]=='y'||root[0]=='c') ? "ku" : "gu"));
+            }
+        }
+    }
+
     /* Build expected surface for verification.
      * Include negation prefix in built string so verification works for
      * negative verbs (ntaragenda, sindagenda, etc.).                        */
@@ -1324,7 +1378,9 @@ static void analyse_vconj(Token *tok)
         const char *neg_mid = (tok->verb_tense == TENSE_NEG_ANTERIOR) ? "ta" : "";
         snprintf(built, sizeof(built), "%s%s%s%s%s%s%s%s",
                  neg_pfx,
-                 sp_surface, neg_mid, tm_contracted ? tm_contracted_buf : tm,
+                 sp_surface, neg_mid,
+                 nar_voiced       ? nar_tm_surf :
+                 tm_contracted    ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
                  root_surface, ext_surface, (past_rye_ze || past_kye_tse) ? "e" : fv);
     }
@@ -1347,10 +1403,12 @@ static void analyse_vconj(Token *tok)
         set_morph(&mb->m[n++], "PA", pa_form, "", "");
     if (tm[0])
         set_morph(&mb->m[n++], "TM", tm,
-                  tm_contracted          ? tm_contracted_buf
+                  nar_voiced             ? nar_tm_surf
+                : tm_contracted          ? tm_contracted_buf
                 : cond_tm_elided         ? ""
                 :                          tm,
-                  tm_contracted          ? tm_contracted_rule
+                  nar_voiced             ? nar_tm_rule
+                : tm_contracted          ? tm_contracted_rule
                 : tok->verb_tense == TENSE_CONDITIONAL
                       ? (cond_tm_elided
                          ? "a+a\342\206\222a \302\2471.1 (TM 'a' elided after SP ending in 'a')"
@@ -1439,8 +1497,9 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "EXT",  det_ext,  det_ext,
                           kin_verb_ext_name(det_vext));
             } else {
-                /* Use root_surface/rule if set (e.g. by past_rye_ze r→z) */
+                /* Use root_surface/rule if set (e.g. by past_rye_ze r→z, h→s) */
                 set_morph(&mb->m[n++], "root", root, root_surface,
+                          root_h_to_s        ? root_hs_rule :
                           root_surface_rule[0] ? root_surface_rule : "");
             }
         } else {

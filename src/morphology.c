@@ -1162,6 +1162,42 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (tense_out)  *tense_out  = TENSE_NARRATIVE;
             return true;
         }
+        /* NARRATIVE voiced: ka→ga (k→g §3.7.1 after vowel-final SP).
+         * In the inkurikizo (narrative/sequential) tense the TM 'ka' voices
+         * to 'ga' after certain SPs, e.g. ki+ga+tos+a = kigatosa.
+         * Gate on stem validation (≥ 2 chars, known root) to avoid false
+         * positives against roots that happen to start with the letters
+         * left after stripping 'ga' (e.g. kugaba root='gab' not 'b').   */
+        if (kin_starts_with(inner, "ga") && ilen > 3 && inner[ilen-1]=='a'
+            && strcmp(SP[i].pfx, "ka") != 0
+            && strcmp(SP[i].pfx, "ga") != 0) {
+            size_t sl = ilen - 3;
+            if (sl >= 2) {
+                char cand[KIN_MAX_STEM];
+                strncpy(cand, inner + 2, sl); cand[sl] = '\0';
+                bool found = kin_is_known_verb_stem(cand);
+                /* h→s: root-final h surfaces as s before FV 'a' in conjugated
+                 * forms (e.g. toh→tos in kigatosa from gutoha).  Try restoring
+                 * the citation h-form if the s-form is not in the lexicon.      */
+                if (!found && sl >= 2 && cand[sl - 1] == 's') {
+                    char cand_h[KIN_MAX_STEM];
+                    strncpy(cand_h, cand, sl - 1);
+                    cand_h[sl - 1] = 'h'; cand_h[sl] = '\0';
+                    if (kin_is_known_verb_stem(cand_h)) {
+                        strncpy(cand, cand_h, KIN_MAX_STEM - 1);
+                        cand[KIN_MAX_STEM - 1] = '\0';
+                        found = true;
+                    }
+                }
+                if (found) {
+                    if (stem_buf) { strncpy(stem_buf, cand, KIN_MAX_STEM-1);
+                                    stem_buf[KIN_MAX_STEM-1] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_NARRATIVE;
+                    return true;
+                }
+            }
+        }
         /* OPTATIVE: ra + ka + stem + a  (Inyifurizo: SP+ra+ka+stem+a)    *
          * e.g.  urakabyara = u + ra + ka + byar + a                      *
          * Must be checked BEFORE plain "ra" present to avoid wrong match. */
