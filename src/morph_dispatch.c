@@ -773,14 +773,27 @@ static void analyse_vconj(Token *tok)
     const char *sp_under = (cls >= 1 && cls <= 16)
                            ? (past ? SP_PAST[cls] : SP_PRES[cls])
                            : "?";
-    /* For past tense, verify the word actually starts with the past SP form.
-     * Past perfect with ∅ TM keeps the present-form SP (e.g. "zikwiriye":
-     * SP_PAST[10]="zya" but word starts with "zi" = SP_PRES[10]).
-     * Fallback ensures we display the SP that is really on the surface.    */
+    /* Defensive SP surface check: if the SP form derived from tok->noun_class
+     * doesn't match what the word actually starts with, scan all 16 classes
+     * to find one whose past SP (or present SP) matches the surface.
+     * This guards against kin_resolve_sp_ambiguity wrongly reclassifying the
+     * verb class — e.g. yakoze wrongly assigned cls=3 (SP "wa") when the word
+     * starts with "ya" (cls 1/4/6/9). */
     if (past && cls >= 1 && cls <= 16
-            && !kin_starts_with(eff_word, SP_PAST[cls])
-            && kin_starts_with(eff_word, SP_PRES[cls])) {
-        sp_under = SP_PRES[cls];
+            && !kin_starts_with(eff_word, SP_PAST[cls])) {
+        /* Try present-form first (e.g. zikwiriye: SP_PAST[10]="zya", SP_PRES[10]="zi") */
+        if (kin_starts_with(eff_word, SP_PRES[cls])) {
+            sp_under = SP_PRES[cls];
+        } else {
+            /* Word surface doesn't match cls at all — find the class whose
+             * past SP actually appears at the start of the word. */
+            for (int c = 1; c <= 16; c++) {
+                if (kin_starts_with(eff_word, SP_PAST[c])) {
+                    sp_under = SP_PAST[c];
+                    break;
+                }
+            }
+        }
     }
     /* For 1sg/2sg/1pl/2pl (class 0) */
     if (cls == 0) {

@@ -55,20 +55,21 @@ static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
 
         int vc = verb->noun_class;
 
-        /* "ya" SP (stored cls 6) + Nt.1/3/9 subject + PAST tense → reclassify.
-         * In Kinyarwanda the "ya" SP is shared by:
-         *   Nt.1 past:  umuntu yagiye  (a+past-a → ya)
-         *   Nt.3 past:  umuti waguye    (... but also uses 'wa', less common)
-         *   Nt.9 past:  Imana yaremye   (inka ya- in past)
-         *   Nt.6 pres:  amazu yagenda   (genuine Nt.6 present)
-         * We reclassify "ya" to match the subject class when tense is past.
-         * Scan back for the nearest Nt.1/3/9 noun. */
+        /* "ya" SP (stored cls 6) + past tense → reclassify to correct antecedent.
+         * SP_PAST table: classes 1, 4, 6, 9 ALL share past SP "ya".
+         * Class 3 past SP is "wa" — it must NEVER be in this list.
+         * Class 4 (imi- nouns, e.g. imirimo) uses "ya" past SP and must be included.
+         *   Nt.1 past:  umuntu yagiye      (SP ya = class 1)
+         *   Nt.4 past:  imirimo yakoze     (SP ya = class 4)
+         *   Nt.9 past:  Imana yaremye      (SP ya = class 9)
+         *   Nt.6 pres:  amazu yagenda      (genuine Nt.6 present, not reclassified)
+         * Scan back for nearest noun whose past SP is "ya". */
         if (vc == 6 &&
             (verb->verb_tense == TENSE_PAST_PERF  ||
              verb->verb_tense == TENSE_PAST_IMPF  ||
              verb->verb_tense == TENSE_COPULA_PAST)) {
-            static const int ya_cls[] = {1, 3, 9};
-            const Token *subj = scan_back_noun(sa, i - 1, ya_cls, 3);
+            static const int ya_cls[] = {1, 4, 6, 9};
+            const Token *subj = scan_back_noun(sa, i - 1, ya_cls, 4);
             if (subj) verb->noun_class = subj->noun_class;
         }
 
