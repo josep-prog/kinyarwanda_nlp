@@ -934,6 +934,21 @@ static void analyse_vconj(Token *tok)
             else if (elast == 'r') { strncpy(rev_ext_buf, "ur", 3); ext = rev_ext_buf; }
         }
     }
+    /* Applicative has two surface variants: -ir- (after high-vowel roots) and
+     * -er- (after mid-vowel roots, vowel harmony).  ext_suffix() returns "ir"
+     * as the canonical form, but we read the actual vowel from the word so the
+     * morpheme display and reconstruction match the surface.
+     * The extension occupies the two characters immediately before the FV.
+     * e.g. imuhumekera: FV='a'(len 1) → word[-2]='e', word[-1]='r' → "er"    */
+    static char appl_ext_buf[4];  /* small buffer for "er" or "ir" */
+    if (tok->verb_ext == VEXT_APPLICATIVE) {
+        size_t fvlen = strlen(fv), wlen = strlen(word);
+        if (wlen > fvlen + 2) {
+            char appl_v = word[wlen - fvlen - 2]; /* vowel of ext: 'e' or 'i' */
+            if (appl_v == 'e') { strncpy(appl_ext_buf, "er", 3); ext = appl_ext_buf; }
+            else if (appl_v == 'i') { strncpy(appl_ext_buf, "ir", 3); ext = appl_ext_buf; }
+        }
+    }
     const char *om   = (tok->obj_class > 0) ? kin_om_str(tok->obj_class) : "";
 
     /* Root surface: for r-drop passive, stem-final 'r' elides before -w-.

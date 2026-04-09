@@ -1343,6 +1343,9 @@ static const char *VERB_STEMS[] = {
     "ron",      /* gurona      – to find / discover                      */
     "fung",     /* gufungura   – to open (a door/bottle/etc.)            */
     "hem",      /* guhema      – to breathe with difficulty              */
+    "humek",    /* guhumeka    – to breathe (imuhumekera: i·mu·humek·er·a
+                   SP=i(Nt.9) + OM=mu(Nt.1) + root=humek + APPL=er + FV=a
+                   "She breathed into him": Gen 2:7 imuhumekera mu mazuru) */
     "gor",      /* kugora      – to be difficult / tough                 */
     "shirom",   /* gushiroma   – to be ashamed / embarrassed            */
     "senyur",   /* gusenya     – to demolish / break down               */
@@ -1378,6 +1381,7 @@ static const char *VERB_STEMS[] = {
     "hungur",   /* guhungura   – to liberate / free / release            */
     "humuk",    /* guhumuka    – to be freed / loosed / released         */
     "humat",    /* guhumata    – to stick / adhere / cling               */
+    "humek",    /* guhumeka    – to breathe / respire                    */
     "gendar",   /* kugendera   – to live / walk / behave                 */
     "hengam",   /* guhenga     – to add beyond / go beyond              */
     "hindir",   /* guhindira   – to pour out / shed                      */
