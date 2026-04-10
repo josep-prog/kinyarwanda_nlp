@@ -1737,6 +1737,9 @@ static const KnownWord KNOWN_WORDS[] = {
     { "ubuzima",  14, "zima"   },  /* health / life                       */
     { "ubwami",   14, "ami"    },  /* kingdom / reign                     */
     { "ubwoba",   14, "oba"    },  /* fear / fright                       */
+    /* Nt.12 diminutive with vowel-initial stem: ka+atsi → k+atsi (§1.1 a→∅) *
+     * akatsi = a(D) + k(RT,ka→k before V) + atsi(C); stem "atsi" not "tsi" */
+    { "akatsi",   12, "atsi"   },  /* blade of grass (diminutive, Nt.12)  */
     /* Common Nt.6 body/nature nouns */
     { "amaraso",  6,  "raso"   },  /* blood                               */
     { "amaboko",  6,  "boko"   },  /* arms / hands                        */
@@ -2230,6 +2233,7 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "uburezi",       NULL,              "rezi",      14,  0  },
     { "ubwoba",        NULL,              "oba",       14,  0  },
     { "ubwatsi",       NULL,              "atsi",      14,  0  },  /* u→w§1.1 */
+    { "akatsi",        NULL,              "atsi",      12,  0  },  /* ka+atsi→k+atsi §1.1 */
     { "ubwoko",        "amoko",           "oko",       14,  6  },  /* u→w§1.1 (bu+oko→bw), a→∅§1.1 (ma+oko→m) */
     { "ubutayu",       NULL,              "tayu",      14,  0  },
     { "ubuhemu",       NULL,              "hemu",      14,  0  },

@@ -450,13 +450,29 @@ static void analyse_noun(Token *tok)
         /* ── Class 12: D=a, RT=ka ─────────────────────────────────────────── */
         case 12:
             if (kin_starts_with(word, "aga")) {
+                /* Full form: a(D) + ga(RT, k→g §3.7) + C */
                 c_start = word + 3;
                 strncpy(rt_surface, "ga", sizeof(rt_surface)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
-                         "k→g §3.7 (RT 'ka'→'ga'; Itanisha GR)");
+                         "k\342\206\222g \302\2473.7 (RT 'ka'\342\206\222'ga'; Itanisha GR)");
             } else if (kin_starts_with(word, "aka")) {
+                /* Full form: a(D) + ka(RT) + C */
                 c_start = word + 3;
                 strncpy(rt_surface, "ka", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "ga")) {
+                /* Dropped-D form: ∅(D) + ga(RT, k→g §3.7) + C
+                 * e.g. "mu gasozi" → gasozi = ∅ + ga + sozi (D 'a' elided) */
+                c_start = word + 2;
+                strncpy(rt_surface, "ga", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "k\342\206\222g \302\2473.7 (RT 'ka'\342\206\222'ga'; Itanisha GR)");
+                d_elided = true;
+            } else if (kin_starts_with(word, "ka")) {
+                /* Dropped-D form: ∅(D) + ka(RT) + C
+                 * e.g. "mu kabati" → kabati = ∅ + ka + bati */
+                c_start = word + 2;
+                strncpy(rt_surface, "ka", sizeof(rt_surface)-1);
+                d_elided = true;
             } else {
                 strncpy(rt_surface, "ka", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -570,6 +586,21 @@ static void analyse_noun(Token *tok)
     }
 
     if (!c_form[0]) return;
+
+    /* ── Class 12 post-hoc RT correction for vowel-initial C ─────────────────
+     * When the lookup returns a vowel-initial igicumbi (e.g. "atsi") for a
+     * class-12 word beginning with "aka", the underlying "ka" + V-initial C
+     * triggered §1.1 a→∅ at the RT-C boundary:
+     *   a(D) + ka(RT) + atsi(C) → a + k + atsi = "akatsi"
+     * The switch above set rt_surface="ka" (no rule), but the correct surface
+     * is "k" with rule "a→∅ §1.1".  Correct it now that c_form is known.     */
+    if (cls == 12 && mv(c_form[0])
+        && strcmp(rt_surface, "ka") == 0
+        && kin_starts_with(word, "aka")) {
+        strncpy(rt_surface, "k", sizeof(rt_surface)-1);
+        snprintf(rule_rt, sizeof(rule_rt),
+                 "a\342\206\222\342\210\205 \302\2471.1 (ka+'%c' vowel \342\206\222 k)", c_form[0]);
+    }
 
     /* Verify the reconstruction matches the surface word.
      * When a phonological rule already fired at the RT boundary (rule_rt set),
