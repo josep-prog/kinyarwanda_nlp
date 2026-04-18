@@ -2337,6 +2337,9 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira\xe2\x80\xa6)";
         case TENSE_NEG_ANTERIOR:    return "Inshinga y'ubunyagatifu bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
+        case TENSE_FUTURE_SUBJ:     return "Inzagihe+Ikigombero (NEG-future prohibitive: SP+za+stem+e)";
+        case TENSE_FUTURE_SUBJ_LOC: return "Inzagihe+Ikigombero+ahantu (NEG-future prohibitive+loc: SP+za+stem+e+ho)";
+        case TENSE_NARRATIVE_SUBJ:  return "Inkurikizo+Ikigombero (NEG-narrative prohibitive: SP+ka+stem+e)";
         case TENSE_STATIVE_POSS:    return "Indagihe y'ugutunga (Stative possessive: bifite, afite, nfite…)";
         default:                 return "";
     }

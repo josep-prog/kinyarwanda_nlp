@@ -49,7 +49,7 @@ static const Token *scan_back_noun(const SentenceAnalysis *sa, int from,
 }
 
 static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
-    for (int i = 1; i < sa->token_count; i++) {
+    for (int i = 0; i < sa->token_count; i++) {
         Token *verb = &sa->tokens[i];
         if (verb->pos != POS_VERB_CONJ) continue;
 
@@ -103,6 +103,16 @@ static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
                     verb->noun_class = 1;
                 }
             }
+        }
+
+        /* "u" SP (stored cls 3) is also the 2nd person singular subject prefix.
+         * e.g. "ntuzakiryeho" (you shall not eat of it) uses personal "u", not Nt.3.
+         * If no Nt.3 noun precedes this verb in the sentence, reclassify to
+         * class 0 (personal/2sg) so the agreement checker does not fire. */
+        if (vc == 3) {
+            static const int u_cls[] = {3};
+            const Token *subj = scan_back_noun(sa, i - 1, u_cls, 1);
+            if (!subj) verb->noun_class = 0;
         }
 
         /* NOTE: "a" SP (class 1) is also valid for Nt.6 (ama- plural) in
@@ -272,8 +282,11 @@ static const char *sp_nc_label(int cls, VerbTense tense, char *buf, size_t n) {
 static const char *tm_display(VerbTense tense) {
     switch (tense) {
         case TENSE_PRESENT:    return "ra";
-        case TENSE_FUTURE:     return "za";
-        case TENSE_NARRATIVE:  return "ka";
+        case TENSE_FUTURE:          return "za";
+        case TENSE_FUTURE_SUBJ:     return "za";
+        case TENSE_FUTURE_SUBJ_LOC: return "za";
+        case TENSE_NARRATIVE:       return "ka";
+        case TENSE_NARRATIVE_SUBJ:  return "ka";
         case TENSE_OPTATIVE:   return "raka";
         case TENSE_NEG_RELATIVE:  return "ta";
         case TENSE_NEG_ANTERIOR:  return "ra";
@@ -294,8 +307,11 @@ static const char *fv_display(VerbTense tense) {
         case TENSE_NEG_ANTERIOR:  return "a";
         case TENSE_PAST_PERF:     return "ye";
         case TENSE_PAST_IMPF:     return "aga";
-        case TENSE_SUBJUNCTIVE:   return "e";
+        case TENSE_SUBJUNCTIVE:     return "e";
         case TENSE_SUBJUNCTIVE_LOC: return "e + ho/mo/yo";
+        case TENSE_FUTURE_SUBJ:     return "e";
+        case TENSE_FUTURE_SUBJ_LOC: return "e + ho/mo/yo";
+        case TENSE_NARRATIVE_SUBJ:  return "e";
         case TENSE_COPULA_PAST:
         case TENSE_COPULA_PRES:   return "ri + loc";
         default:                  return "a";
@@ -483,7 +499,10 @@ static const char *tense_marker_key(VerbTense t) {
             return "SP imere y'igihe gishize + FV='aga'\n"
                    "       Nta mwanya wa TM kuri Imvangura \xe2\x80\x94 igihe gitangaza mu SP + FV 'aga'";
         case TENSE_FUTURE:          return "TM='za' iboneka mu mwanya wa 2";
+        case TENSE_FUTURE_SUBJ:     return "TM='za' + FV='e' (NEG-future prohibitive: ntuzakore)";
+        case TENSE_FUTURE_SUBJ_LOC: return "TM='za' + FV='e' + ahantu (ho/mo/yo)";
         case TENSE_NARRATIVE:       return "TM='ka' iboneka mu mwanya wa 2";
+        case TENSE_NARRATIVE_SUBJ:  return "TM='ka' + FV='e' (NEG-narrative prohibitive: ntukabone)";
         case TENSE_OPTATIVE:        return "TM='raka' iboneka mu mwanya wa 2";
         case TENSE_SUBJUNCTIVE:     return "FV='e' mu iherezo ry'ijambo";
         case TENSE_SUBJUNCTIVE_LOC: return "FV='e' + ahantu (ho/mo/yo)";
@@ -939,7 +958,7 @@ static void print_pronoun_morphemes(const Token *t)
     } else if (t->pron_type == PRON_POSSESSIVE) {
         /* Bare connector — show class agreement */
         printf("  \342\224\224\342\224\200 Uturemajambo: %s(IC\xC2\xB7Nt.%d)"
-               "  [inshingano y'uburonko / possessive connector]\n",
+               "  [inshingano y'isano / possessive connector]\n",
                t->lower, t->noun_class);
 
     } else if (t->pron_type == PRON_PERSONAL && t->noun_class > 0) {
@@ -995,6 +1014,14 @@ static void print_noun_morphemes(const Token *t) {
     } else if (t->stem[0]) {
         printf("  \342\224\224\342\224\200 Igicumbi (Stem): %s\n", t->stem);
         print_noun_reconstruction(t);
+    }
+    /* Adjective-derived noun: stem is a known adjective root (e.g. -iza, -bi).
+     * These are class-prefixed forms of the adjective: icyiza = i+ki+iza,
+     * ibyiza = i+bi+iza, etc.  Show the adjective origin when no deverbative
+     * note fires (the two are mutually exclusive).                           */
+    if (!t->is_deverbative && t->stem[0] && kin_is_adj_stem(t->stem)) {
+        printf("  \342\224\224\342\224\200 Ivuye mu ntera (Adjectival noun): igicumbi -%s-"
+               " (inteko %d)\n", t->stem, t->noun_class);
     }
     if (t->is_deverbative && t->verb_root[0]) {
         /* Build infinitive for display.

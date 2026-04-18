@@ -383,7 +383,7 @@ static void analyse_noun(Token *tok)
                 c_start = word + 3;
                 strncpy(rt_surface, "cy", sizeof(rt_surface)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
-                         "i→y §1.1 + k→c §3.9 (ki+'%c' → cy)", word[3]);
+                         "i→y §1.1 (ki+'%c' → ky); ky→cy", word[3]);
             } else if (kin_starts_with(word, "igi")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "gi", sizeof(rt_surface)-1);
@@ -814,8 +814,11 @@ static bool is_past_tense(VerbTense t) {
 static const char *tense_marker(VerbTense t) {
     switch (t) {
         case TENSE_PRESENT:      return "ra";
-        case TENSE_FUTURE:       return "za";
-        case TENSE_NARRATIVE:    return "ka";
+        case TENSE_FUTURE:          return "za";
+        case TENSE_FUTURE_SUBJ:     return "za";
+        case TENSE_FUTURE_SUBJ_LOC: return "za";
+        case TENSE_NARRATIVE:       return "ka";
+        case TENSE_NARRATIVE_SUBJ:  return "ka";
         case TENSE_OPTATIVE:     return "raka";
         case TENSE_NEG_RELATIVE:  return "ta";
         case TENSE_NEG_ANTERIOR:  return "ra";  /* TM after ta(NEG) */
@@ -838,8 +841,11 @@ static const char *final_vowel(VerbTense t, const char *word) {
             return (wlen >= 3 && word[wlen-3]=='t' && word[wlen-2]=='s' && word[wlen-1]=='e')
                    ? "tse" : "ye";
         case TENSE_PAST_IMPF:     return "aga";
-        case TENSE_SUBJUNCTIVE:   return "e";
-        case TENSE_STATIVE_POSS:  return "e";  /* bifite: SP+fit+e */
+        case TENSE_SUBJUNCTIVE:     return "e";
+        case TENSE_STATIVE_POSS:    return "e";  /* bifite: SP+fit+e */
+        case TENSE_FUTURE_SUBJ:     return "e";
+        case TENSE_NARRATIVE_SUBJ:  return "e";
+        case TENSE_FUTURE_SUBJ_LOC:
         case TENSE_SUBJUNCTIVE_LOC:
             if (wlen >= 2) {
                 if (word[wlen-2]=='h' && word[wlen-1]=='o') return "eho";
@@ -863,6 +869,26 @@ static const char *ext_suffix(VerbExtension e) {
         case VEXT_CAUSATIVE_Y: return "y";    /* surface: r+y→z; citation: -y- */
         default:               return "";
     }
+}
+
+/* Vowel harmony (§2.5.13): roots with last vowel e/o take -esh-/-ek-;
+ * roots with last vowel a/i/u take -ish-/-ik-.
+ * Returns true when root's last vowel is mid (e/o).                    */
+static bool root_has_mid_vowel(const char *root) {
+    if (!root || !root[0]) return false;
+    for (int k = (int)strlen(root) - 1; k >= 0; k--) {
+        char c = root[k];
+        if (c == 'e' || c == 'o') return true;
+        if (c == 'a' || c == 'i' || c == 'u') return false;
+    }
+    return false;
+}
+
+/* Surface form of harmony-sensitive extensions (causative, stative). */
+static const char *ext_suffix_surface(VerbExtension e, const char *root) {
+    if (e == VEXT_CAUSATIVE) return root_has_mid_vowel(root) ? "esh" : "ish";
+    if (e == VEXT_STATIVE)   return root_has_mid_vowel(root) ? "ek"  : "ik";
+    return ext_suffix(e);
 }
 
 /* Forward declaration: detect_ext_in_stem is defined after analyse_vconj
@@ -1253,14 +1279,14 @@ static void analyse_vconj(Token *tok)
                      * following vowel 'a' (i→y §1.1).
                      *   bi + a → b·i·a → b·y·a = bya
                      *   ri + a → r·i·a → r·y·a = rya
-                     *   ki + a → k·i·a → k·y·a = kya → cya  (ky→cy §3.9)
+                     *   ki + a → k·i·a → k·y·a = kya → cya  (ky→cy, step 2 of §1.1)
                      * Consistent with u-final SPs: tu+a→twa, ru+a→rwa (PA='a').*/
                     strncpy(pa_form, "a", sizeof(pa_form) - 1);
                     if (strcmp(i_map[ii].contracted, "cya") == 0) {
                         snprintf(sp_rule, sizeof(sp_rule),
                                  "i\xe2\x86\x92y \xc2\xa7""1.1 (SP ki + PA a:"
                                  " ki+a \xe2\x86\x92 kia \xe2\x86\x92 kya"
-                                 " \xe2\x86\x92 cya; ky\xe2\x86\x92""cy \xc2\xa7""3.9)");
+                                 " \xe2\x86\x92 cya; ky\xe2\x86\x92""cy)");
                     } else {
                         snprintf(sp_rule, sizeof(sp_rule),
                                  "i\xe2\x86\x92y \xc2\xa7""1.1 (SP %s + PA a:"
@@ -1394,7 +1420,7 @@ static void analyse_vconj(Token *tok)
      * e.g. root="er" → root_surface="ez" (kwera/kweza pair)
      *      root="mer"→ root_surface="mez" (kumera/kumeza pair)
      * Also: EXT 'y' is absorbed into the root surface, so ext_surface = "".  */
-    const char *ext_surface = ext;   /* normally same as ext; overridden below */
+    const char *ext_surface = ext_suffix_surface(tok->verb_ext, root);
     if (tok->verb_ext == VEXT_CAUSATIVE_Y && root[0]) {
         size_t rlen = strlen(root);
         if (rlen >= 2) {
@@ -1671,7 +1697,7 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "root", root, root_surface,
                           root_surface_rule[0] ? root_surface_rule : "");
             if (ext[0])
-                set_morph(&mb->m[n++], "EXT", ext, ext, "");
+                set_morph(&mb->m[n++], "EXT", ext, ext_surface, "");
         }
     }
     /* TENSE_SUBJUNCTIVE_LOC: fv = "eho"/"emo"/"eyo" — split into FV + LOC.
@@ -1679,7 +1705,8 @@ static void analyse_vconj(Token *tok)
      * is a separate morpheme (ahantu).  This mirrors the infinitive treatment
      * in analyse_vinf() where LOC is always a distinct slot.
      * e.g. habeho = ha + ∅ + b + e(FV·subj) + ho(LOC)                      */
-    if (tok->verb_tense == TENSE_SUBJUNCTIVE_LOC && strlen(fv) > 1) {
+    if ((tok->verb_tense == TENSE_SUBJUNCTIVE_LOC ||
+         tok->verb_tense == TENSE_FUTURE_SUBJ_LOC) && strlen(fv) > 1) {
         set_morph(&mb->m[n++], "FV", "e", "e", "");
         /* No phonological rule for the locative suffix — it is appended
          * directly without consonant mutation.  Empty rule prevents it

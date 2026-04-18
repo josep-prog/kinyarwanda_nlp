@@ -377,6 +377,11 @@ int kin_detect_noun_class(const char *w) {
     if (w[0]=='i' && w[1]=='n' && wlen > 3) return 9;
     if (w[0]=='i' && w[1]=='m' && wlen > 3) return 9;  /* n→m before bilabial */
 
+    /* Nt.7: words surfaced as "icy-" (ki + vowel-initial stem → cy)        *
+     * e.g. icyiza = i + cy(ki+iza) + iza; icyatsi = i + cy(ki+atsi) + atsi.
+     * Checked BEFORE the bare i- fallback so "icyiza" is not misread as Nt.5. */
+    if (kin_starts_with(w, "icy") && wlen > 4) return 7;
+
     /* Nt.5: bare i- prefix when RT 'ri' is elided before the stem.       *
      * Common pattern in Kinyarwanda (p.62): i + ri + C-stem → i + C-stem *
      * e.g. ibuye, izina, ishuri, isoko, itara, ifarasi, itonde.           *
@@ -609,7 +614,7 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             else if (kin_starts_with(word,"ma"))   stem_start = word + 2; /* dropped D */
             break;
         case 7:
-            if (kin_starts_with(word,"icy"))       stem_start = word + 2; /* ky→cy   */
+            if (kin_starts_with(word,"icy"))       stem_start = word + 3; /* i+cy+stem: ki→cy before vowel */
             else if (kin_starts_with(word,"igi"))  stem_start = word + 3; /* k→g rule*/
             else if (kin_starts_with(word,"iki"))  stem_start = word + 3;
             else if (kin_starts_with(word,"gi"))   stem_start = word + 2; /* dropped D k→g */
@@ -617,7 +622,7 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             else if (kin_starts_with(word,"cy"))   stem_start = word + 2; /* dropped i: icy→cy */
             break;
         case 8:
-            if (kin_starts_with(word,"iby"))       stem_start = word + 2;
+            if (kin_starts_with(word,"iby"))       stem_start = word + 3; /* i+by+stem: bi→by before vowel */
             else if (kin_starts_with(word,"ibi"))  stem_start = word + 3;
             else if (kin_starts_with(word,"bi"))   stem_start = word + 2; /* dropped D 'i' */
             else if (kin_starts_with(word,"by"))   stem_start = word + 2; /* dropped i: iby→by */
@@ -1152,6 +1157,40 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             if (tense_out)  *tense_out  = TENSE_FUTURE;
             return true;
         }
+        /* FUTURE + FV=e (neg-future subjunctive/prohibitive): za + stem + e   *
+         * e.g. ntuzakiryeho → inner="zakirye" stripped to stem="kiry"        *
+         * Must be checked BEFORE NARRATIVE to avoid 'za' matching 'ka'.      */
+        if (kin_starts_with(inner, "za") && ilen > 3 && inner[ilen-1]=='e') {
+            const char *s = inner + 2; size_t sl = ilen - 3;
+            if (sl < 1) continue;
+            if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+            if (subj_class) *subj_class = SP[i].cls;
+            if (tense_out)  *tense_out  = TENSE_FUTURE_SUBJ;
+            return true;
+        }
+        /* FUTURE + FV=e + LOCATIVE: za + stem + e + ho/mo/yo                 */
+        if (kin_starts_with(inner, "za") && ilen >= 6 &&
+            (kin_ends_with(inner,"ho") || kin_ends_with(inner,"mo") ||
+             kin_ends_with(inner,"yo")) &&
+            inner[ilen-3] == 'e') {
+            const char *s = inner + 2; size_t sl = ilen - 5;
+            if (sl < 1) continue;
+            if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+            if (subj_class) *subj_class = SP[i].cls;
+            if (tense_out)  *tense_out  = TENSE_FUTURE_SUBJ_LOC;
+            return true;
+        }
+        /* NARRATIVE + FV=e (neg-narrative subjunctive): ka + stem + e        *
+         * e.g. ntukazirye → inner="kazirye" → stem="ziry"                    */
+        if (kin_starts_with(inner, "ka") && ilen > 3 && inner[ilen-1]=='e'
+            && strcmp(SP[i].pfx, "ka") != 0) {
+            const char *s = inner + 2; size_t sl = ilen - 3;
+            if (sl < 1) continue;
+            if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+            if (subj_class) *subj_class = SP[i].cls;
+            if (tense_out)  *tense_out  = TENSE_NARRATIVE_SUBJ;
+            return true;
+        }
         /* NARRATIVE: ka + stem + a (when SP is not "ka" itself) */
         if (kin_starts_with(inner, "ka") && ilen > 3 && inner[ilen-1]=='a'
             && strcmp(SP[i].pfx, "ka") != 0) {
@@ -1283,8 +1322,12 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 "bwa","kwa","rwa","mwa","za","ba","mu","tu","a",
                 "ni","ri","zi","bi","ki","ru","ka","bu","ku","ha", NULL
             };
-            (void)PAST_SP_Y; /* gate: try y-root for any SP but validate stem */
-            if (ilen >= 3 && inner[ilen-1] == 'e' && inner[ilen-2] == 'y') {
+            bool sp_is_past_y = false;
+            for (int pi = 0; PAST_SP_Y[pi]; pi++) {
+                if (strcmp(SP[i].pfx, PAST_SP_Y[pi]) == 0)
+                    { sp_is_past_y = true; break; }
+            }
+            if (sp_is_past_y && ilen >= 3 && inner[ilen-1] == 'e' && inner[ilen-2] == 'y') {
                 size_t sl = ilen - 1;   /* strip just 'e', keep 'y' */
                 char cand_y[KIN_MAX_STEM];
                 strncpy(cand_y, inner, sl); cand_y[sl] = '\0';
@@ -1859,8 +1902,11 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
      * known root, the extension match is a false positive — revert it.       *
      * e.g. ruhuk: bare="ruh" unknown, after_om="ruhuk" known → revert ✓    *
      *      funguk: bare="fung" known → keep (gufunguka, reversive) ✓        */
-    if (vext != VEXT_NONE && !kin_is_known_verb_stem(bare)
-                          &&  kin_is_known_verb_stem(after_om)) {
+    /* Prefer the longest known stem: if after_om itself is a known root,
+     * the extension match is a false split — revert it.
+     * Covers both: bare=unknown (e.g. "ruhuk"→"ruh") and the trickier case
+     * where bare is ALSO known (e.g. "tegek"→"teg"/"tegek" both known).  */
+    if (vext != VEXT_NONE && kin_is_known_verb_stem(after_om)) {
         vext = VEXT_NONE;
         strncpy(bare, after_om, KIN_MAX_STEM - 1);
         bare[KIN_MAX_STEM - 1] = '\0';

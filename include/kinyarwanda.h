@@ -294,6 +294,9 @@ typedef enum {
      *   abeho  = a(SP1)   + b + e + ho  → "that he/she be there"            *
      *   mubemo = mu(SP2)  + b + e + mo  → "let you all be inside"           */
     TENSE_SUBJUNCTIVE_LOC, /* Ikigombero + ahantu: SP+stem+e+ho/mo/yo  habeho*/
+    TENSE_FUTURE_SUBJ,     /* NEG-future subj: SP+za+stem+e  ntuzakore       */
+    TENSE_FUTURE_SUBJ_LOC, /* NEG-future subj+loc: SP+za+stem+e+ho/mo/yo     */
+    TENSE_NARRATIVE_SUBJ,  /* NEG-narrative subj: SP+ka+stem+e  ntukabone    */
     TENSE_STATIVE_POSS,   /* Indagihe ya "kugira": SP+fite  bifite, afite  */
 } VerbTense;
 
