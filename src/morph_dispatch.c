@@ -919,9 +919,10 @@ static void analyse_vconj(Token *tok)
      * neg_pfx:    surface of the NEG morpheme ("nt" or "si") or "".
      * neg_under:  underlying (canonical) form of the NEG morpheme.
      *             For "nt-" verbs the underlying NEG is "nti"; the final 'i'
-     *             elides before the vowel-initial SP (§1.1):
+     *             elides before the vowel-initial SP (iranyura ry'impanvu,
+     *             vowel-hiatus avoidance: V₁→∅ /_V₂):
      *               nti + a(SP) → nta,  nti + u(SP) → ntu,  nti + i(SP) → nti
-     *             This is confirmed by: nturi = nti+u+ri ("you are not").
+     *             Evidence: nturi = nti+u+ri ("you are not"; ELIAS Harvard).
      *             "si" negation has no elision; underlying = surface.           */
     const char *eff_word  = word;
     const char *neg_pfx   = "";
@@ -932,13 +933,23 @@ static void analyse_vconj(Token *tok)
             eff_word  = word + 2;
             neg_pfx   = "nt";
             neg_under = "nti";
-            /* i→∅ §1.1: NEG-final 'i' elides before the vowel-initial SP */
+            /* Vowel elision: NEG-final 'i' elides before the vowel-initial SP.
+             * The negative marker is "nti"; when the following SP begins with
+             * a vowel (a, i, u), "nti" loses its final 'i' to avoid hiatus
+             * (V+V contact across morpheme boundary):
+             *   nti + u(SP) → nt + u  (ntu-)
+             *   nti + a(SP) → nt + a  (nta-)
+             *   nti + i(SP) → nt + i  (nti-)
+             * This is the iranyura ry'impanvu (vowel-elision/hiatus-avoidance)
+             * rule: V₁→∅ /_V₂ when V₁ is the morpheme-final 'i' of "nti".   */
             snprintf(neg_elision_rule, sizeof(neg_elision_rule),
                      "Ubunyagatifu (NEG nti-); "
-                     "i\xe2\x86\x92\xe2\x88\x85 \xc2\xa7""1.1 "
-                     "(nti + '%c'(SP) \xe2\x86\x92 nt + '%c': "
-                     "NEG-final i elides before vowel SP)",
-                     (unsigned char)eff_word[0], (unsigned char)eff_word[0]);
+                     "i\xe2\x86\x92\xe2\x88\x85 /_'%c' "
+                     "(iranyura ry'impanvu: nti + '%c'(SP) \xe2\x86\x92 nt + '%c'; "
+                     "NEG-final i elides before vowel SP to avoid hiatus)",
+                     (unsigned char)eff_word[0],
+                     (unsigned char)eff_word[0],
+                     (unsigned char)eff_word[0]);
         } else if (kin_starts_with(word, "si") && strlen(word) > 2) {
             eff_word  = word + 2;
             neg_pfx   = "si";

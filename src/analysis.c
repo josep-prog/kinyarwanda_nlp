@@ -611,9 +611,29 @@ static void print_verb_reconstruction(const Token *t) {
             bool first_g = true;
             for (int i = 0; i < mb->n; i++) {
                 const KinMorpheme *m = &mb->m[i];
-                /* Determine what to display: always prefer underlying form */
-                const char *disp = m->form[0] ? m->form : m->surface;
-                /* Skip truly invisible morphemes (both form and surface empty) */
+                /* Guhuza: show the post-rule surface form for morphemes where
+                 * a phonological rule caused ELISION (surface is shorter than
+                 * the underlying form).  This ensures the displayed pieces
+                 * concatenate to the actual surface word.
+                 *   NEG "nti" → "nt" (i→∅ before vowel SP): show "nt"
+                 *   TM  "za"  → "z"  (a→∅ before vowel root): show "z"
+                 *   Zero TM "∅" → "" (no surface): skip entirely
+                 * For morphemes that underwent quality change (not length
+                 * change), keep showing the underlying form — e.g. EXT
+                 * "ish"→"esh" (vowel harmony): still show "ish" in Guhuza
+                 * because both have the same length and the Itegeko explains
+                 * the quality alternation.
+                 * For morphemes with compound consonants in their surface (SP
+                 * "bu"→"bwa", "ki"→"cya") we keep the underlying form as per
+                 * the convention that compound consonants (bw, cy, ry…) are
+                 * surface artefacts that must not appear outside root slots. */
+                size_t flen = strlen(m->form), slen = strlen(m->surface);
+                bool elision = (m->rule[0] && slen < flen);
+                const char *disp = elision      ? m->surface
+                                 : m->form[0]   ? m->form
+                                 :                m->surface;
+                /* Skip morphemes that contribute nothing to the surface
+                 * (both form and surface empty, or elision leaves "" ) */
                 if (!disp[0]) continue;
                 if (!first_g) printf(" + ");
                 printf("%s", disp);
