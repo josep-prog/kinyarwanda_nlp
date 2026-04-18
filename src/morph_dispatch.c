@@ -915,15 +915,35 @@ static void analyse_vconj(Token *tok)
     const char *word = tok->lower;
     bool past = is_past_tense(tok->verb_tense);
 
-    /* eff_word: effective SP start, stripping negation prefix if present.
-     * neg_pfx:  the negation morpheme surface ("nt" or "si") or "".        */
-    const char *eff_word = word;
-    const char *neg_pfx  = "";
+    /* eff_word:    effective SP start after stripping negation prefix.
+     * neg_pfx:    surface of the NEG morpheme ("nt" or "si") or "".
+     * neg_under:  underlying (canonical) form of the NEG morpheme.
+     *             For "nt-" verbs the underlying NEG is "nti"; the final 'i'
+     *             elides before the vowel-initial SP (§1.1):
+     *               nti + a(SP) → nta,  nti + u(SP) → ntu,  nti + i(SP) → nti
+     *             This is confirmed by: nturi = nti+u+ri ("you are not").
+     *             "si" negation has no elision; underlying = surface.           */
+    const char *eff_word  = word;
+    const char *neg_pfx   = "";
+    const char *neg_under = "";
+    char neg_elision_rule[KIN_MORPH_RULE_LEN] = "";
     if (tok->is_negative) {
-        if (kin_starts_with(word, "nt") && strlen(word) > 2)
-            { eff_word = word + 2; neg_pfx = "nt"; }
-        else if (kin_starts_with(word, "si") && strlen(word) > 2)
-            { eff_word = word + 2; neg_pfx = "si"; }
+        if (kin_starts_with(word, "nt") && strlen(word) > 2) {
+            eff_word  = word + 2;
+            neg_pfx   = "nt";
+            neg_under = "nti";
+            /* i→∅ §1.1: NEG-final 'i' elides before the vowel-initial SP */
+            snprintf(neg_elision_rule, sizeof(neg_elision_rule),
+                     "Ubunyagatifu (NEG nti-); "
+                     "i\xe2\x86\x92\xe2\x88\x85 \xc2\xa7""1.1 "
+                     "(nti + '%c'(SP) \xe2\x86\x92 nt + '%c': "
+                     "NEG-final i elides before vowel SP)",
+                     (unsigned char)eff_word[0], (unsigned char)eff_word[0]);
+        } else if (kin_starts_with(word, "si") && strlen(word) > 2) {
+            eff_word  = word + 2;
+            neg_pfx   = "si";
+            neg_under = "si";
+        }
     }
 
     /* Underlying SP */
@@ -1534,8 +1554,9 @@ static void analyse_vconj(Token *tok)
     /* Store morphemes: prepend NEG morpheme for negative verbs */
     int n = 0;
     if (neg_pfx[0])
-        set_morph(&mb->m[n++], "NEG", neg_pfx, neg_pfx,
-                  "Ubunyagatifu (Negation prefix)");
+        set_morph(&mb->m[n++], "NEG", neg_under, neg_pfx,
+                  neg_elision_rule[0] ? neg_elision_rule
+                                      : "Ubunyagatifu (Negation prefix)");
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
     /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra */
     if (tok->verb_tense == TENSE_NEG_ANTERIOR)
