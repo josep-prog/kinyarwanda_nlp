@@ -489,6 +489,22 @@ static void analyse_noun(Token *tok)
             } else if (kin_starts_with(word, "utu")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "tu", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "tw") && mv(word[2])) {
+                /* Bare RT, D 'u' elided after locative ku/mu; vowel-initial C.
+                 * e.g. "mu twaro" → "twaro" = tw(tu+V) + aro, D=∅ dropped.  */
+                c_start = word + 2;
+                strncpy(rt_surface, "tw", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u→w §1.1 (tu+'%c' vowel → tw)", word[2]);
+                d_elided = true;
+            } else if (kin_starts_with(word, "tu")) {
+                /* Bare RT, D 'u' elided after locative ku/mu; consonant-initial C.
+                 * e.g. "mu tukwavu" → "tukwavu" = tu + kwavu, D=∅ dropped.   */
+                c_start = word + 2;
+                strncpy(rt_surface, "tu", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u\xe2\x86\x92\xe2\x88\x85 (D elided after locative ku/mu)");
+                d_elided = true;
             } else {
                 strncpy(rt_surface, "tu", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -526,6 +542,23 @@ static void analyse_noun(Token *tok)
                 strncpy(d_alt, "i", sizeof(d_alt)-1);
                 snprintf(rule_rt, sizeof(rule_rt),
                          "D u\xe2\x86\x92i (directional compound; standard Nt.14 D='u', cf. uburasirazuba)");
+            } else if (kin_starts_with(word, "bw") && mv(word[2])) {
+                /* Bare RT, D 'u' elided after locative ku/mu; vowel-initial C.
+                 * e.g. "mu bwato" → "bwato" = bw(bu+V) + ato, D=∅ dropped.  */
+                c_start = word + 2;
+                strncpy(rt_surface, "bw", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u→w §1.1 (bu+'%c' vowel → bw)", word[2]);
+                d_elided = true;
+            } else if (kin_starts_with(word, "bu")) {
+                /* Bare RT, D 'u' elided after locative ku/mu; consonant-initial C.
+                 * e.g. "mu butaka" → "butaka" = bu + taka, D=∅ dropped.
+                 * §locative: D elides when ku/mu provides the locative function. */
+                c_start = word + 2;
+                strncpy(rt_surface, "bu", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u\xe2\x86\x92\xe2\x88\x85 (D elided after locative ku/mu)");
+                d_elided = true;
             } else {
                 strncpy(rt_surface, "bu", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -542,6 +575,22 @@ static void analyse_noun(Token *tok)
             } else if (kin_starts_with(word, "uku")) {
                 c_start = word + 3;
                 strncpy(rt_surface, "ku", sizeof(rt_surface)-1);
+            } else if (kin_starts_with(word, "kw") && mv(word[2])) {
+                /* Bare RT, D 'u' elided after locative ku/mu; vowel-initial C.
+                 * e.g. "ku kwinjira" → "kwinjira" = kw(ku+V) + injira, D=∅ dropped. */
+                c_start = word + 2;
+                strncpy(rt_surface, "kw", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u→w §1.1 (ku+'%c' vowel → kw)", word[2]);
+                d_elided = true;
+            } else if (kin_starts_with(word, "ku")) {
+                /* Bare RT, D 'u' elided after locative ku/mu; consonant-initial C.
+                 * e.g. "mu kugenda" → "kugenda" = ku + genda, D=∅ dropped.   */
+                c_start = word + 2;
+                strncpy(rt_surface, "ku", sizeof(rt_surface)-1);
+                snprintf(rule_rt, sizeof(rule_rt),
+                         "u\xe2\x86\x92\xe2\x88\x85 (D elided after locative ku/mu)");
+                d_elided = true;
             } else {
                 strncpy(rt_surface, "ku", sizeof(rt_surface)-1);
                 c_start = NULL;
@@ -586,6 +635,19 @@ static void analyse_noun(Token *tok)
     }
 
     if (!c_form[0]) return;
+
+    /* ── Class 2 post-hoc RT correction for consonant-initial C ───────────────
+     * The switch checks "ab"+vowel before "aba", so words like "abatunzi" where
+     * C is consonant-initial (D='a', RT='ba', C='tunzi') wrongly trigger the
+     * elision branch (rt_surface="b", c_start="atunzi").
+     * When kin_lookup_igicumbi returns the true C and it starts with a consonant,
+     * the elision rule was not needed: restore rt_surface to "ba" and clear rule. */
+    if (cls == 2 && !mv(c_form[0])
+        && strcmp(rt_surface, "b") == 0
+        && rule_rt[0] != '\0') {
+        strncpy(rt_surface, "ba", sizeof(rt_surface)-1);
+        rule_rt[0] = '\0';
+    }
 
     /* ── Class 12 post-hoc RT correction for vowel-initial C ─────────────────
      * When the lookup returns a vowel-initial igicumbi (e.g. "atsi") for a
@@ -647,6 +709,12 @@ static void analyse_noun(Token *tok)
     set_morph(&mb->m[1], "RT", rt_under,  rt_surface, rule_rt);
     set_morph(&mb->m[2], "C",  c_form,    c_form,     "");
     mb->n = 3;
+
+    /* When D was elided, tok->stem holds the bare surface form (e.g. "butaka"
+     * from NOUN_STEMS lookup) rather than the true igicumbi.  Update it so
+     * the summary table column shows the correct C (e.g. "taka").           */
+    if (d_elided && c_form[0])
+        strncpy(tok->stem, c_form, KIN_MAX_STEM - 1);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -983,6 +1051,19 @@ static void analyse_vconj(Token *tok)
             }
         }
     }
+    /* Past-SP allomorph in a non-past tense (past subjunctive):
+     * e.g. Nt.3 subjunctive "wakiriyeho": verb_match_inner found SP="wa"
+     * (cls=3) but tense=TENSE_SUBJUNCTIVE_LOC (non-past), so sp_under was
+     * set to SP_PRES[3]="u".  When the surface starts with SP_PAST[cls]
+     * instead, adopt that allomorph as the monolithic SP form — consistent
+     * with how Nt.3 past tense already uses "wa" without further PA split.
+     * Phonological note: u(Nt.3) + a(past augment) → wa; the 'a' is fused
+     * into the SP allomorph, so no separate PA slot appears.                */
+    if (!past && cls >= 1 && cls <= 16
+            && !kin_starts_with(eff_word, SP_PRES[cls])
+            && kin_starts_with(eff_word, SP_PAST[cls])) {
+        sp_under = SP_PAST[cls];
+    }
     /* For 1sg/2sg/1pl/2pl (class 0) */
     if (cls == 0) {
         if (tok->verb_tense == TENSE_CONDITIONAL) {
@@ -1013,6 +1094,10 @@ static void analyse_vconj(Token *tok)
             else if (kin_starts_with(eff_word, "mp"))   sp_under = "n";
             else if (kin_starts_with(eff_word, "mf"))   sp_under = "n";
             else if (kin_starts_with(eff_word, "mv"))   sp_under = "n";
+            /* ya→y elision (§1.1): ya-SP before vowel-initial root/fused-form.
+             * e.g. ya + it + ye → yise (t+ye→se §3.8; ya→y before resulting 'i')
+             * Only admit in past tense to avoid tagging Nt.9 present forms. */
+            else if (past && eff_word[0] == 'y' && mv(eff_word[1])) sp_under = "ya";
             else sp_under = "?";
         }
     }
@@ -1137,9 +1222,10 @@ static void analyse_vconj(Token *tok)
      *   ng+ye→nze(§1.3): tang+ye=tanze    yatanze ← gutanga
      *   k+ye→tse (§1.3): andik+ye=anditse yanditse ← kwandika
      * The root_surface becomes z/ts-form; FV surface becomes bare 'e'.      */
-    bool past_rye_ze  = false;   /* r/d/g-final root: FV 'ye' → surface 'e', root→z */
+    bool past_rye_ze  = false;   /* r/d/g-final root: FV 'ye' → surface 'e', root→z  */
     bool past_kye_tse = false;   /* k-final root:     FV 'ye' → surface 'e', root→ts */
-    char past_fuse_cons = '\0';  /* which consonant fused ('r','d','g','k')          */
+    bool past_tye_se  = false;   /* t-final root:     FV 'ye' → surface 'e', root→s  */
+    char past_fuse_cons = '\0';  /* which consonant fused ('r','d','g','k','t')       */
     if (is_past_tense(tok->verb_tense) && tok->verb_ext == VEXT_NONE
         && root[0] && !root_surface_rule[0]) {
         size_t rlen = strlen(root);
@@ -1157,6 +1243,11 @@ static void analyse_vconj(Token *tok)
                 snprintf(root_surface_rule, sizeof(root_surface_rule),
                          "r+ye\xe2\x86\x92ze \xc2\xa71.3 (r assimilates past FV: "
                          "%sr+ye\xe2\x86\x92%se)", root, root_surface_buf);
+            else if (last_c == 'g' && (rlen < 2 || root[rlen-2] != 'n'))
+                /* bare g (not prenasalised ng): ig+ye→ize (kwiga past perf) */
+                snprintf(root_surface_rule, sizeof(root_surface_rule),
+                         "g+ye\xe2\x86\x92ze \xc2\xa71.3 (g fuses with past FV 'y': "
+                         "%sg+ye\xe2\x86\x92%se)", root, root_surface_buf);
             else
                 snprintf(root_surface_rule, sizeof(root_surface_rule),
                          "n%c+ye\xe2\x86\x92nze \xc2\xa71.3 (n%c fuses with past FV: "
@@ -1184,6 +1275,20 @@ static void analyse_vconj(Token *tok)
                 past_kye_tse   = true;
                 past_fuse_cons = 'k';
             }
+        } else if (rlen >= 1 && last_c == 't'
+                   && wlen >= 2 && word[wlen-2]=='s' && word[wlen-1]=='e'
+                   && (wlen < 3 || word[wlen-3]!='t')) {
+            /* t+ye→se: root-final 't' palatalizes before FV 'ye' → fuses to 's'
+             * e.g. kwita (root "it") → ya+it+ye → yise  (t+y→s, y absorbed)   */
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = 's';
+            root_surface_buf[rlen]   = '\0';
+            root_surface = root_surface_buf;
+            snprintf(root_surface_rule, sizeof(root_surface_rule),
+                     "t+ye\xe2\x86\x92se \xc2\xa7""3.8 (t palatalized before FV 'y': "
+                     "%s+ye\xe2\x86\x92%se)", root, root_surface_buf);
+            past_tye_se    = true;
+            past_fuse_cons = 't';
         }
     }
 
@@ -1233,27 +1338,83 @@ static void analyse_vconj(Token *tok)
             sp_surface[slen] = '\0';
             snprintf(sp_rule, sizeof(sp_rule),
                      "n\xe2\x86\x92m \xc2\xa7" "3.3 (1sg SP before bilabial '%c')", next_c);
-        } else if (sp_last == 'a' && next_c == 'i') {
-            /* Check whether the surface word uses euphonic-z insertion
-             * (SP 'a' + z(euphonic) + i-initial root, e.g. azitwa) rather
-             * than the standard a+i→e vowel fusion.
-             * Detection: surface word[sp_len] == 'z'.                    */
-            if (eff_word[slen] == 'z') {
-                /* Euphonic-z: SP stays 'a'; no surface change to SP itself.
-                 * The 'z' is a phonological connector, not part of SP.    */
+        } else if (sp_last == 'a' && mv(next_c)) {
+            /* SP ends in 'a', next element is vowel-initial.
+             * Four sub-cases ordered from most specific to most general:
+             *
+             * 1. Word-initial single-char SP 'a' (Nt.1/Nt.6 pres.) before any
+             *    vowel-initial root: 'a' semivocalises to glide 'y' (§1.1).
+             *    No preceding consonant exists to trigger a+i→e fusion.
+             *    a+it+a→yita, a+emer+a→yemera, a+andik+a→yandika,
+             *    a+umv+a→yumva, a+ig+a→yiga, a+oror+a→yorora.
+             *
+             * 2. Two-char SP starting with 'y' ("ya"): glide 'y' anchors, 'a'
+             *    elides before any vowel (§1.1 rule 4a).  Applies to: past
+             *    Nt.1/4/6/9 SP "ya" and Nt.6 present SP "ya".
+             *    ya+it+ye→yise, ya+emer+a→yemera (past), ya+ig+a→yiga (past).
+             *
+             * 3. Euphonic-z (before i-initial root only): 'z' is inserted
+             *    between SP 'a' and the vowel; SP itself stays 'a'.
+             *    Detected by surface word[sp_len] == 'z'.
+             *
+             * 4. a+i→e fusion: SP ends in 'a' preceded by a true consonant
+             *    (ba, ka, ha …) and root starts with 'i'. §1.1 rule 4b.
+             *    ba+it+a→beta, ka+ig+a→kiga? No: ba+i→be, so built="be"+root.
+             *
+             * 5. a→∅ elision: consonant-preceded SP before non-'i' vowel.
+             *    §1.1 rule 4c. ba+emer+a→bemera, ha+ig+a→higa? etc.       */
+
+            if (slen == 1) {
+                /* Case 1: word-initial SP 'a' → glide 'y' before any vowel */
+                sp_surface[0] = 'y';
+                sp_surface[1] = '\0';
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "a\xe2\x86\x92y \xc2\xa7""1.1 (SP 'a' word-initial"
+                         " + '%c'-initial root \xe2\x86\x92 'y': semivocalisation)",
+                         next_c);
+            } else if (slen == 2 && sp_under[0] == 'y') {
+                /* Case 2: SP 'ya' → 'y'; 'a' elides after glide 'y' (§1.1) */
+                sp_surface[1] = '\0';
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "a\xe2\x86\x92\xe2\x88\x85 \xc2\xa7""1.1 (ya\xe2\x86\x92y: "
+                         "SP 'ya' elides 'a' before '%c'-initial root)",
+                         next_c);
+            } else if (next_c == 'i' && eff_word[slen] == 'z') {
+                /* Case 3: euphonic-z before i-initial root; SP stays 'a' */
                 strncpy(sp_surface, sp_under, sizeof(sp_surface) - 1);
                 snprintf(sp_rule, sizeof(sp_rule),
                          "z(euphon.) \xe2\x80\x94 SP '%s' + i-initial root"
                          " \xe2\x86\x92 '%s' + z (euphonic insertion)",
                          sp_under, sp_under);
-            } else {
-                /* Standard a+i→e fusion */
+            } else if (next_c == 'i') {
+                /* Case 4: a+i→e fusion; SP 'a' (C-preceded) + i-initial root */
                 sp_surface[slen - 1] = 'e';
                 snprintf(sp_rule, sizeof(sp_rule),
                          "a+i\xe2\x86\x92""e \xc2\xa71.1 (SP '%s'+i\xe2\x86\x92'%s')",
                          sp_under, sp_surface);
+            } else {
+                /* Case 5: a→∅ elision; C-preceded SP before non-i vowel (§1.1) */
+                sp_surface[slen - 1] = '\0';
+                snprintf(sp_rule, sizeof(sp_rule),
+                         "a\xe2\x86\x92\xe2\x88\x85 \xc2\xa7""1.1 (SP '%s' + '%c'-initial"
+                         " root \xe2\x86\x92 '%.*s': elision)",
+                         sp_under, next_c, (int)(slen - 1), sp_under);
             }
         }
+    }
+
+    /* k→g §3.7.1: SP-initial 'k' voices before consonant-initial root/TM/OM.
+     * Nt.7  ki → gi  (gifite, gikora, gituye, gitangira…)
+     * Nt.12 ka → ga  (gakora, gahinda, gashyaka…)
+     * Condition: no rule already set (vowel-contact rules did not fire), the
+     * underlying SP starts with 'k', the following element is consonant-initial,
+     * and the surface word confirms 'g' at the SP position.                   */
+    if (sp_rule[0] == '\0' && sp_under[0] == 'k' && next_after_sp[0]
+        && !mv((unsigned char)next_after_sp[0]) && eff_word[0] == 'g') {
+        sp_surface[0] = 'g';
+        snprintf(sp_rule, sizeof(sp_rule),
+                 "k\xe2\x86\x92g \xc2\xa7""3.7.1 (SP '%s'\xe2\x86\x92'%s' before consonant '%c')",
+                 sp_under, sp_surface, (unsigned char)next_after_sp[0]);
     }
 
     /* Post-fix: past-tense SPs where u→w + past-augment 'a' are fused into SP.
@@ -1558,7 +1719,7 @@ static void analyse_vconj(Token *tok)
                  nar_voiced       ? nar_tm_surf :
                  tm_contracted    ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
-                 root_surface, ext_surface, (past_rye_ze || past_kye_tse) ? "e" : fv);
+                 root_surface, ext_surface, (past_rye_ze || past_kye_tse || past_tye_se) ? "e" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -1763,6 +1924,11 @@ static void analyse_vconj(Token *tok)
          * The 'k+y' fusion is shown on root as →ts; only 'e' remains as FV. */
         set_morph(&mb->m[n++], "FV", "ye", "e",
                   "y\xe2\x86\x92\xe2\x88\x85 / k_ (y elided: k+ye\xe2\x86\x92tse, \xc2\xa71.3)");
+    } else if (past_tye_se) {
+        /* t+ye→se in past perfect: underlying FV is 'ye', surface 'e'.
+         * The 't+y' palatalization is shown on root as →s; only 'e' remains as FV. */
+        set_morph(&mb->m[n++], "FV", "ye", "e",
+                  "y\xe2\x86\x92\xe2\x88\x85 / t_ (y elided: t+ye\xe2\x86\x92se, \xc2\xa7""3.8)");
     } else if (strcmp(fv, "aye") == 0) {
         /* Monosyllabic root (h, b, z…) + epenthetic 'a' before past perfect FV.
          * The Kinyarwanda verb always ends in a vowel; '-y-' is the perfectivity

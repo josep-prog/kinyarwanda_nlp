@@ -1717,6 +1717,7 @@ static const KnownWord KNOWN_WORDS[] = {
     { "ejo",      0,  ""       },  /* yesterday / tomorrow (context-dep.) */
     /* Nt.5 words whose 'ri' class marker is elided (bare i- prefix) */
     { "ishuri",   5,  "shuri"  },  /* school (also ishule)                */
+    { "itungo",   5,  "tungo"  },  /* domestic animal (sg. of amatungo)   */
     { "isoko",    5,  "soko"   },  /* market                              */
     { "ibuye",    5,  "buye"   },  /* stone / rock                        */
     { "izina",    5,  "zina"   },  /* name                                */
@@ -1770,6 +1771,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "muntu",    1,  "ntu"    },  /* person (= umuntu)                    */
     { "umugore",  1,  "gore"   },  /* woman (full form; guards vs verb subj)*/
     { "umugabo",  1,  "gabo"   },  /* man   (full form; guards vs verb subj)*/
+    { "umutunzi", 1,  "tunzi"  },  /* wealthy person (deverbative of gutunga) */
+    { "abatunzi", 2,  "tunzi"  },  /* wealthy people (pl. of umutunzi)       */
     { "mugore",   1,  "gore"   },  /* woman (= umugore)                    */
     { "mugabo",   1,  "gabo"   },  /* man (= umugabo)                      */
     { "mwana",    1,  "wana"   },  /* child (= umwana)                     */
@@ -2131,6 +2134,7 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "umurimyi",      "abarimyi",        "rimyi",      1,  2  },
     { "umubyeyi",      "ababyeyi",        "byeyi",      1,  2  },
     { "umutegetsi",    "abategetsi",      "tegetsi",    1,  2  },
+    { "umutunzi",      "abatunzi",        "tunzi",      1,  2  },  /* wealthy person; -nzi agentive of gutunga */
     { "umugenzi",      "abagenzi",        "genzi",      1,  2  },
     { "umukuru",       "abakuru",         "kuru",       1,  2  },
     { "umusaza",       "abasaza",         "saza",       1,  2  },
@@ -2158,6 +2162,7 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "umurongo",      "imirongo",        "rongo",      3,  4  },
     { "umutsima",      "imutsima",        "tsima",      3,  4  },
     /* ── Class 5 ↔ 6 (singular / mass-plural) ──────────────────────────────── */
+    { "itungo",        "amatungo",        "tungo",       5,  6  },  /* domestic animal; primary lexical noun */
     { "itegeko",       "amategeko",       "tegeko",     5,  6  },  /* user's main example */
     { "izina",         "amazina",         "zina",       5,  6  },
     { "itara",         "amatara",         "tara",       5,  6  },
@@ -2226,6 +2231,7 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "akazi",         "uduzi",           "zi",        12, 13  },
     /* ── Class 14 (abstract; no plural) ────────────────────────────────────── */
     { "ubutaka",       NULL,              "taka",      14,  0  },
+    { "ubutunzi",      NULL,              "tunzi",     14,  0  },  /* wealth / property; agentive abstract of gutunga */
     { "ubuzima",       NULL,              "zima",      14,  0  },
     { "ubwenge",       NULL,              "enge",      14,  0  },  /* u→w§1.1 */
     { "ubwami",        NULL,              "ami",       14,  0  },

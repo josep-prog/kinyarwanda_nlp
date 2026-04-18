@@ -49,6 +49,9 @@ static const char *PRIMARY_NOUN_STEMS[] = {
                * kugaba (to give lavishly/distribute gifts); independent item */
     "taka",   /* ubutaka – soil/land/earth; primary lexical noun, NOT from
                * gutaka (to shout/cry out); unrelated independent root       */
+    "tungo",  /* itungo/amatungo – domestic animal; primary lexical noun, NOT
+               * deverbative from gutunga (to acquire/possess wealth);
+               * umutunzi/abatunzi are the true deverbatives of gutunga     */
     NULL
 };
 
@@ -73,6 +76,23 @@ static void check_deverbative(Token *tok) {
         tok->is_deverbative = true;
         strncpy(tok->verb_root, root, KIN_MAX_STEM - 1);
         tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+        return;
+    }
+    /* Agentive -nzi suffix: C ends in 'zi' with underlying g→z before -i.
+     * e.g. "tunzi" → strip 'zi' → "tun", reverse z→g on last consonant → "tung"
+     * cf. umutunzi (one who has wealth) ← gutunga (-tung- root, g→z before -i).
+     * Rule: strip 'i' (FV) → "tunz"; final 'z' was 'g' before -i → "tung". */
+    if (slen >= 4 && tok->stem[slen-2] == 'z' && tok->stem[slen-1] == 'i') {
+        /* root = stem minus final 'i', then replace trailing 'z' with 'g' */
+        char root_gz[KIN_MAX_STEM];
+        strncpy(root_gz, tok->stem, slen - 1);
+        root_gz[slen - 1] = '\0';                 /* "tunz"  */
+        root_gz[slen - 2] = 'g';                  /* "tung"  */
+        if (strlen(root_gz) >= 2 && kin_is_known_verb_stem(root_gz)) {
+            tok->is_deverbative = true;
+            strncpy(tok->verb_root, root_gz, KIN_MAX_STEM - 1);
+            tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+        }
     }
 }
 

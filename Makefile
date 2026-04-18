@@ -1,10 +1,10 @@
 CC       = gcc
-CFLAGS   = -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2 -MMD -MP
--include $(SRCS:.c=.d)
+CFLAGS   = -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2 -fPIC -MMD -MP
 TARGET   = kinyarwanda_nlp
 MANPAGE  = man/kinyarwanda_nlp.1
-SRCS     = src/main.c \
-           src/tokenizer.c \
+
+# Library sources (everything except the CLI entry point)
+LIB_SRCS = src/tokenizer.c \
            src/morphology.c \
            src/ortho.c \
            src/lexicon.c \
@@ -13,19 +13,40 @@ SRCS     = src/main.c \
            src/syntax.c \
            src/corrector.c \
            src/analysis.c \
-           src/g2p.c
+           src/g2p.c \
+           src/api.c
+
+# All sources (library + CLI)
+SRCS     = src/main.c $(LIB_SRCS)
 OBJS     = $(SRCS:.c=.o)
+LIB_OBJS = $(LIB_SRCS:.c=.o)
+
+-include $(SRCS:.c=.d)
+
+STATIC_LIB = libkinyarwanda.a
+SHARED_LIB = libkinyarwanda.so
 
 PREFIX   = /usr/local
 BINDIR   = $(PREFIX)/bin
+LIBDIR   = $(PREFIX)/lib
+INCDIR   = $(PREFIX)/include/kinyarwanda
 MANDIR   = $(PREFIX)/share/man/man1
 
-.PHONY: all clean test install uninstall help
+.PHONY: all clean test install install-lib uninstall help
 
-all: $(TARGET)
+all: $(TARGET) $(STATIC_LIB) $(SHARED_LIB)
 
+# CLI binary
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
+
+# Static library
+$(STATIC_LIB): $(LIB_OBJS)
+	ar rcs $@ $^
+
+# Shared library
+$(SHARED_LIB): $(LIB_OBJS)
+	$(CC) -shared -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -40,10 +61,26 @@ install: $(TARGET)
 	@echo "Man page at $(MANDIR)/$(notdir $(MANPAGE))"
 	@echo "Run: man kinyarwanda_nlp"
 
+# Install library + public headers (requires sudo)
+install-lib: $(STATIC_LIB) $(SHARED_LIB)
+	install -d $(LIBDIR)
+	install -m 644 $(STATIC_LIB) $(LIBDIR)/$(STATIC_LIB)
+	install -m 755 $(SHARED_LIB) $(LIBDIR)/$(SHARED_LIB)
+	ldconfig $(LIBDIR)
+	install -d $(INCDIR)
+	install -m 644 include/kinyarwanda_api.h $(INCDIR)/kinyarwanda_api.h
+	install -m 644 include/kinyarwanda.h     $(INCDIR)/kinyarwanda.h
+	install -m 644 include/g2p.h             $(INCDIR)/g2p.h
+	@echo "Library installed to $(LIBDIR)"
+	@echo "Headers installed to $(INCDIR)"
+	@echo "Link with: -I$(INCDIR) -L$(LIBDIR) -lkinyarwanda"
+
 # Uninstall
 uninstall:
 	rm -f $(BINDIR)/$(TARGET)
 	rm -f $(MANDIR)/$(notdir $(MANPAGE))
+	rm -f $(LIBDIR)/$(STATIC_LIB) $(LIBDIR)/$(SHARED_LIB)
+	rm -rf $(INCDIR)
 
 # View man page without installing
 help:

@@ -108,8 +108,12 @@ static void kin_resolve_sp_ambiguity(SentenceAnalysis *sa) {
         /* "u" SP (stored cls 3) is also the 2nd person singular subject prefix.
          * e.g. "ntuzakiryeho" (you shall not eat of it) uses personal "u", not Nt.3.
          * If no Nt.3 noun precedes this verb in the sentence, reclassify to
-         * class 0 (personal/2sg) so the agreement checker does not fire. */
-        if (vc == 3) {
+         * class 0 (personal/2sg) so the agreement checker does not fire.
+         * Guard: only fire when the surface SP is "u" (present allomorph).
+         * "wa" is the Nt.3/2sg PAST allomorph — a different ambiguity and
+         * should NOT be reclassified here (e.g. "wakiriyeho" must stay cls=3
+         * so the past-subjunctive SP is displayed as "wa(Nt.3)" not "?"). */
+        if (vc == 3 && !kin_starts_with(verb->lower, "wa")) {
             static const int u_cls[] = {3};
             const Token *subj = scan_back_noun(sa, i - 1, u_cls, 1);
             if (!subj) verb->noun_class = 0;

@@ -1,0 +1,100 @@
+/*
+ * api.c — Kinyarwanda NLP library: high-level convenience wrappers.
+ *
+ * Implements the two string-returning functions declared in kinyarwanda_api.h:
+ *   kin_correct()  — ASR post-processor (spelling correction)
+ *   kin_g2p()      — G2P phoneme string for TTS
+ *
+ * kin_analyze() is already implemented in analysis.c.
+ */
+
+#include "../include/kinyarwanda_api.h"
+#include <string.h>
+#include <stdio.h>
+
+/* ── kin_correct ─────────────────────────────────────────────────────────────
+ *
+ * Run the full NLP pipeline, collect spelling suggestions, then reconstruct
+ * the sentence substituting corrected forms where available.
+ *
+ * Algorithm:
+ *   1. kin_analyze() → tokenise, tag, morpheme-analyse, syntax-check
+ *   2. kin_suggest_corrections() → fill Error entries with suggestions
+ *   3. For each token, use the suggestion if one exists, else the surface form
+ *   4. Join with spaces; punctuation tokens are appended without a leading space
+ *
+ * Static buffer: 4096 bytes — sufficient for the longest plausible sentence.
+ */
+const char *kin_correct(const char *text)
+{
+    static char buf[4096];
+
+    if (!text || !text[0]) {
+        buf[0] = '\0';
+        return buf;
+    }
+
+    SentenceAnalysis sa = kin_analyze(text);
+    kin_suggest_corrections(&sa);
+
+    buf[0] = '\0';
+    size_t pos = 0;
+
+    for (int i = 0; i < sa.token_count; i++) {
+        Token *tok = &sa.tokens[i];
+
+        /* Determine the word to emit: prefer a correction suggestion */
+        const char *word = tok->surface;
+        for (int e = 0; e < sa.error_count; e++) {
+            if (sa.errors[e].token_index == i
+                && sa.errors[e].type == ERR_SPELLING
+                && sa.errors[e].suggestion[0] != '\0') {
+                word = sa.errors[e].suggestion;
+                break;
+            }
+        }
+
+        /* Spacing: no leading space before punctuation that attaches left */
+        bool attach_left = (tok->pos == POS_PUNCTUATION
+                            && tok->punct_type != PUNCT_QUOTE_OPEN);
+
+        if (pos > 0 && !attach_left) {
+            if (pos < sizeof(buf) - 1)
+                buf[pos++] = ' ';
+        }
+
+        size_t wlen = strlen(word);
+        if (pos + wlen >= sizeof(buf))
+            wlen = sizeof(buf) - pos - 1;   /* truncate rather than overflow */
+
+        memcpy(buf + pos, word, wlen);
+        pos += wlen;
+        buf[pos] = '\0';
+    }
+
+    return buf;
+}
+
+/* ── kin_g2p ─────────────────────────────────────────────────────────────────
+ *
+ * Convert text to a space-separated phoneme string via the G2P engine.
+ * Normalisation (digit expansion, apostrophes, abbreviations) is handled
+ * internally by kin_g2p_sentence().
+ *
+ * Returns a pointer into KinPhonemeSeq::repr — a static buffer.
+ * Returns "" on failure (empty input or non-Kinyarwanda text).
+ */
+const char *kin_g2p(const char *text)
+{
+    static KinPhonemeSeq seq;
+
+    if (!text || !text[0]) {
+        seq.repr[0] = '\0';
+        return seq.repr;
+    }
+
+    if (!kin_g2p_sentence(text, &seq))
+        seq.repr[0] = '\0';
+
+    return seq.repr;
+}

@@ -137,8 +137,12 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             /* Two classes may share the same connector (e.g. Nt.1 and Nt.3
              * both use "wa").  Compare connector strings, not class numbers,
              * to avoid false positives like "umunsi wa mbere".           */
-            if (strcmp(poss_connector[cur->noun_class],
-                       poss_connector[next->noun_class]) != 0) {
+            /* Nt.9 nouns are surface-invariant (sg = pl); their plural uses
+             * Nt.10 agreement. Allow either Nt.9↔Nt.10 direction.          */
+            bool nt9_10_ok = (cur->noun_class == 9 && next->noun_class == 10)
+                          || (cur->noun_class == 10 && next->noun_class == 9);
+            if (!nt9_10_ok && strcmp(poss_connector[cur->noun_class],
+                                     poss_connector[next->noun_class]) != 0) {
                 char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
                 const char *expected = poss_connector[cur->noun_class];
                 snprintf(msg, sizeof(msg),

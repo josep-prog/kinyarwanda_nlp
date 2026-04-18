@@ -1340,13 +1340,30 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 }
             }
         }
-        /* PAST PERFECT: ends in ye */
+        /* PAST PERFECT: ends in ye
+         * Guard: if inner ends in ...y+e AND stripping only 'e' gives a
+         * known y-final root (e.g. "meny" from "menye"), the 'y' belongs
+         * to that root (kumenya), NOT to the FV "ye" (kumena past perf).
+         * In that case skip — the SUBJUNCTIVE check below will handle it
+         * with the correct root and FV='e'.
+         * Example: i+meny+e (kumenya subjunctive "ngo imenye") must not
+         * be parsed as i+men+ye (kumena past perfect).                    */
         if (ilen > 3 && kin_ends_with(inner, "ye")) {
-            size_t sl = ilen - 2;
-            if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
-            if (subj_class) *subj_class = SP[i].cls;
-            if (tense_out)  *tense_out  = TENSE_PAST_PERF;
-            return true;
+            bool y_root_exists = false;
+            if (inner[ilen-2] == 'y') {
+                char cand_y[KIN_MAX_STEM];
+                size_t csl = ilen - 1;
+                strncpy(cand_y, inner, csl); cand_y[csl] = '\0';
+                y_root_exists = kin_is_known_verb_stem(cand_y);
+            }
+            if (!y_root_exists) {
+                size_t sl = ilen - 2;
+                if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                return true;
+            }
+            /* y belongs to a longer root — fall through to SUBJUNCTIVE */
         }
         /* PAST PERFECT with ra tense marker: SP + ra + stem + e               *
          * e.g. murakoze = mu(SP) + ra + koz + e (2pl past perfect)            *
@@ -1464,8 +1481,74 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                             known = kin_is_known_verb_stem(cand_ng);
                         }
                     }
+                    /* g+y→z: bare root-final 'g' (not prenasalised, penult≠'n')  *
+                     * e.g. kwiga (root "ig"): ig+ye→ize; r+y→z already tried above */
+                    if (!known && (sl < 2 || cand[sl-2] != 'n')) {
+                        char cand_g[KIN_MAX_STEM];
+                        strncpy(cand_g, cand, sl - 1);
+                        cand_g[sl-1] = 'g'; cand_g[sl] = '\0';
+                        known = kin_is_known_verb_stem(cand_g);
+                    }
+                }
+                /* t+ye→se rule: root-final 't' palatalizes before FV 'ye', fusing to 's'
+                 * e.g. kwita (root "it") → ya+it+ye → y+ise  (t+y→s, y absorbed)
+                 * Reverse: strip 'e', replace final 's' with 't', verify known stem. */
+                if (!known && sl >= 1 && cand[sl-1] == 's') {
+                    char cand_t[KIN_MAX_STEM];
+                    strncpy(cand_t, cand, sl - 1);
+                    cand_t[sl-1] = 't'; cand_t[sl] = '\0';
+                    known = kin_is_known_verb_stem(cand_t);
                 }
                 if (known) {
+                    if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                    return true;
+                }
+            }
+        }
+        /* Past-perfect fused FV with a-eliding / vowel-initial SPs.            *
+         * These SPs elide their final vowel before a vowel-initial root, so   *
+         * the resulting inner is only 3 chars (e.g. "ise", "ize") — too short *
+         * for the ilen>3 guard on the standard PAST_PERF branch above.        *
+         * Covers all SPs that arise from vowel-contact before vowel roots:    *
+         *   ya→y, ba→b, wa→w, na→n   (a-elision)                             *
+         *   tu→tw, mu→mw             (u→w §1.1)                               *
+         *   ki→cy, bi→by, ri→ry, zi→zy, bu→bw, ru→rw  (high-V→glide §1.1)  *
+         * Two root-final fusions handled:                                      *
+         *   t+ye→se §3.8: kwita (root "it") → y+ise  e.g. yise               *
+         *   g+ye→ze §1.3: kwiga (root "ig") → y+ize  e.g. yize               */
+        if ((strcmp(SP[i].pfx,"y")==0  || strcmp(SP[i].pfx,"w")==0
+             || strcmp(SP[i].pfx,"b")==0  || strcmp(SP[i].pfx,"n")==0
+             || strcmp(SP[i].pfx,"tw")==0 || strcmp(SP[i].pfx,"mw")==0
+             || strcmp(SP[i].pfx,"cy")==0 || strcmp(SP[i].pfx,"by")==0
+             || strcmp(SP[i].pfx,"ry")==0 || strcmp(SP[i].pfx,"zy")==0
+             || strcmp(SP[i].pfx,"bw")==0 || strcmp(SP[i].pfx,"rw")==0)
+            && ilen >= 3 && inner[ilen-1] == 'e') {
+            size_t sl = ilen - 1;
+            char cand_y[KIN_MAX_STEM];
+            strncpy(cand_y, inner, sl); cand_y[sl] = '\0';
+            /* t+ye→se: replace final 's' with 't' */
+            if (sl >= 1 && cand_y[sl-1] == 's') {
+                char cand_yt[KIN_MAX_STEM];
+                strncpy(cand_yt, cand_y, sl - 1);
+                cand_yt[sl-1] = 't'; cand_yt[sl] = '\0';
+                if (kin_is_known_verb_stem(cand_yt)) {
+                    if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                    return true;
+                }
+            }
+            /* g+ye→ze §1.3: replace final 'z' with 'g'                        *
+             * e.g. kwiga (root "ig") → ya+ig+ye → y+ize (ya→y, g+y→z)        *
+             * Guard: penult ≠ 'n' to avoid colliding with nz→ng (prenasalised) */
+            if (sl >= 1 && cand_y[sl-1] == 'z' &&
+                (sl < 2 || cand_y[sl-2] != 'n')) {
+                char cand_yg[KIN_MAX_STEM];
+                strncpy(cand_yg, cand_y, sl - 1);
+                cand_yg[sl-1] = 'g'; cand_yg[sl] = '\0';
+                if (kin_is_known_verb_stem(cand_yg)) {
                     if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl] = '\0'; }
                     if (subj_class) *subj_class = SP[i].cls;
                     if (tense_out)  *tense_out  = TENSE_PAST_PERF;
@@ -1947,6 +2030,38 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
                     strncpy(bare, try_ng, KIN_MAX_STEM - 1);
                     bare[KIN_MAX_STEM - 1] = '\0';
                 }
+            }
+        }
+    }
+
+    /* ── LAYER 3b.8: Past-perfect fused-FV stem recovery ───────────────────── *
+     * Two root-final fusions with FV 'ye' leave a fused consonant in bare:    *
+     *   t+ye→se §3.8: root-final 't' palatalizes with 'y' → 's'              *
+     *     e.g. yise: root "it" + ye → bare="is" → restore 't'                 *
+     *   g+ye→ze §1.3: root-final 'g' fuses with 'y' → 'z'                   *
+     *     e.g. yize: root "ig" + ye → bare="iz" → restore 'g'                */
+    if (tense == TENSE_PAST_PERF && vext == VEXT_NONE) {
+        size_t blen = strlen(bare);
+        /* t+ye→se: replace final 's' with 't' */
+        if (blen >= 1 && bare[blen-1] == 's') {
+            char try_t[KIN_MAX_STEM];
+            strncpy(try_t, bare, blen - 1);
+            try_t[blen-1] = 't'; try_t[blen] = '\0';
+            if (kin_is_known_verb_stem(try_t)) {
+                strncpy(bare, try_t, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+        /* g+ye→ze: replace final 'z' with 'g' (guard: penult≠'n' to avoid   *
+         * collision with nz→ng which is handled in LAYER 3b.7)               */
+        if (blen >= 1 && bare[blen-1] == 'z' &&
+            (blen < 2 || bare[blen-2] != 'n')) {
+            char try_g[KIN_MAX_STEM];
+            strncpy(try_g, bare, blen - 1);
+            try_g[blen-1] = 'g'; try_g[blen] = '\0';
+            if (kin_is_known_verb_stem(try_g)) {
+                strncpy(bare, try_g, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
             }
         }
     }
