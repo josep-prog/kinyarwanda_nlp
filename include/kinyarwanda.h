@@ -271,7 +271,7 @@ typedef enum {
      * 'h' is a consonant and no vowel-contact rule fires: kuba+ho = kubaho.  */
     TENSE_COPULA_PAST,     /* Impitagihe y'inshinga nkene: yariho, wari...   */
     TENSE_COPULA_PRES,     /* Indagihe y'inshinga nkene: ariho, iriho, ndiho */
-    /* ── Negative participial / relative (inshinga nkurikije y'ubunyagatifu) *
+    /* ── Negative participial / relative (inshinga nkurikije y'impakanyi)    *
      * Pattern: SP + ta + stem + FV                                           *
      * The -ta- marker produces a negative participial/relative reading:      *
      *   itagira  = i(SP) + ta + gir + a  → "that which does not have"       *
@@ -282,7 +282,7 @@ typedef enum {
      * The -ta- is distinct from the nt- clausal negation (ntaragenda):      *
      *   nt-: negates a main clause verb (he is NOT going)                   *
      *   ta-: produces a participial / relative clause (who/that does not)   */
-    TENSE_NEG_RELATIVE,    /* Inshinga nkurikije y'ubunyagatifu: itagira...  */
+    TENSE_NEG_RELATIVE,    /* Inshinga nkurikije y'impakanyi: itagira...     */
     /* ── Negative anterior ("not yet"): SP + ta + ra + stem + a ─────────────── *
      * The -ta- negation combined with TM -ra- gives "not yet" meaning.          *
      *   kataraba  = ka(SP12) + ta(NEG) + ra(TM) + b(kuba) + a  → not yet being *
@@ -318,7 +318,7 @@ typedef enum {
     GRAM_ROLE_MAIN_VERB,      /* Inshinga nkuru: the sentence's main predicate  */
     GRAM_ROLE_AUXILIARY,      /* Inshinga nkene / nsangiza: kuba, yari…         */
     GRAM_ROLE_RELATIVE,       /* Inshinga nkurikije: in a relative sub-clause   */
-    GRAM_ROLE_PARTICIPIAL,    /* Inshinga nkurikije y'ubunyagatifu: -ta- form   */
+    GRAM_ROLE_PARTICIPIAL,    /* Inshinga nkurikije y'impakanyi: -ta- form      */
     GRAM_ROLE_COMPLEMENT,     /* After ngo/ko/nuko: reporting / purpose clause  */
     GRAM_ROLE_SEQUENTIAL,     /* Inkurikizo: SP+ka+root+a narrative sequence    */
     GRAM_ROLE_VERBAL_NOUN,    /* Izina ryaturutse ku nshinga: verb form acting  *

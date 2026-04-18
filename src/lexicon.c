@@ -2334,8 +2334,8 @@ const char *kin_verb_tense_name(VerbTense t) {
          * The root is 'b'; final vowel 'a' is retained before consonant 'h'.  */
         case TENSE_COPULA_PAST:  return "Impitagihe y'inshinga nkene (Past copula: yariho, wariho…)";
         case TENSE_COPULA_PRES:  return "Indagihe y'inshinga nkene (Present copula: ariho, ndiho, iriho…)";
-        case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'ubunyagatifu (Neg. participial: itagira, utagira\xe2\x80\xa6)";
-        case TENSE_NEG_ANTERIOR:    return "Inshinga y'ubunyagatifu bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
+        case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'impakanyi (Neg. participial: itagira, utagira\xe2\x80\xa6)";
+        case TENSE_NEG_ANTERIOR:    return "Inshinga y'impakanyi bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
         case TENSE_FUTURE_SUBJ:     return "Inzagihe+Ikigombero (NEG-future prohibitive: SP+za+stem+e)";
         case TENSE_FUTURE_SUBJ_LOC: return "Inzagihe+Ikigombero+ahantu (NEG-future prohibitive+loc: SP+za+stem+e+ho)";
@@ -2364,7 +2364,7 @@ const char *kin_gram_role_name(GramRole r) {
         case GRAM_ROLE_MAIN_VERB:   return "Inshinga nkuru (Main verb)";
         case GRAM_ROLE_AUXILIARY:   return "Inshinga nkene (Auxiliary/Copula)";
         case GRAM_ROLE_RELATIVE:    return "Inshinga nkurikije (Relative clause)";
-        case GRAM_ROLE_PARTICIPIAL: return "Inshinga nkurikije y'ubunyagatifu (Neg. participial)";
+        case GRAM_ROLE_PARTICIPIAL: return "Inshinga nkurikije y'impakanyi (Neg. participial)";
         case GRAM_ROLE_COMPLEMENT:  return "Igisangizo (Complement clause: ngo/ko/nuko)";
         case GRAM_ROLE_SEQUENTIAL:  return "Inkurikizo (Sequential narrative: ka)";
         case GRAM_ROLE_VERBAL_NOUN: return "Izina ryaturutse ku nshinga (Verbal noun)";

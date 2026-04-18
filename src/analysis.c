@@ -397,7 +397,7 @@ static void print_verb_morphemes(const Token *t) {
     if (strcmp(t->lower, "ni") == 0 || strcmp(t->lower, "si") == 0) {
         const char *gloss = (t->lower[0] == 'n')
             ? "Inshinga nkene y'ubwitabire \xe2\x80\x93 invariable equative copula (is/am/are)"
-            : "Inshinga nkene y'ubunyagatifu \xe2\x80\x93 invariable negative copula (is not)";
+            : "Inshinga nkene y'impakanyi \xe2\x80\x93 invariable negative copula (is not)";
         printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): %s (%s)\n",
                t->lower, gloss);
         return;
@@ -1196,7 +1196,7 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
          * positions → reconstruction (verify morphemes → exact surface word). */
         if (t->pos == POS_VERB_CONJ || t->pos == POS_VERB_INF) {
             if (t->is_negative)
-                printf("  └─ INSHINGA Y'UBUNYAGATIFU (Negative verb)\n");
+                printf("  └─ INSHINGA Y'IMPAKANYI (Negative verb)\n");
             if (t->pos == POS_VERB_CONJ) {
                 /* 1. Morphemes first */
                 print_verb_morphemes(t);

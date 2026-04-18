@@ -943,7 +943,7 @@ static void analyse_vconj(Token *tok)
              * This is the iranyura ry'impanvu (vowel-elision/hiatus-avoidance)
              * rule: V₁→∅ /_V₂ when V₁ is the morpheme-final 'i' of "nti".   */
             snprintf(neg_elision_rule, sizeof(neg_elision_rule),
-                     "Ubunyagatifu (NEG nti-); "
+                     "Impakanyi (NEG nti-); "
                      "i\xe2\x86\x92\xe2\x88\x85 /_'%c' "
                      "(iranyura ry'impanvu: nti + '%c'(SP) \xe2\x86\x92 nt + '%c'; "
                      "NEG-final i elides before vowel SP to avoid hiatus)",
@@ -1567,12 +1567,12 @@ static void analyse_vconj(Token *tok)
     if (neg_pfx[0])
         set_morph(&mb->m[n++], "NEG", neg_under, neg_pfx,
                   neg_elision_rule[0] ? neg_elision_rule
-                                      : "Ubunyagatifu (Negation prefix)");
+                                      : "Impakanyi (Negation prefix)");
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
     /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra */
     if (tok->verb_tense == TENSE_NEG_ANTERIOR)
         set_morph(&mb->m[n++], "NEG", "ta", "ta",
-                  "Ubunyagatifu (Neg. anterior: 'not yet'; -ta- before TM -ra-)");
+                  "Impakanyi (Neg. anterior: 'not yet'; -ta- before TM -ra-)");
     /* i-final past SP: insert explicit past-augment slot ya(PA) after SP.
      * form="ya" = surface of a(past augment) after §1.1 bi+a→bya.
      * surface="" so it doesn't double-count "ya" already inside sp_surface.   */

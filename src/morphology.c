@@ -1581,7 +1581,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
             }
         }
 
-        /* NEGATIVE PARTICIPIAL (inshinga nkurikije y'ubunyagatifu):           *
+        /* NEGATIVE PARTICIPIAL (inshinga nkurikije y'impakanyi):              *
          * Pattern: SP + ta + STEM + FV                                       *
          * The -ta- morpheme signals a negative participial / relative clause: *
          *   itagira  = i(SP) + ta + gir + a  → "that which does not have"   *
@@ -1679,7 +1679,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
  * Full conjugated-verb detector with three new layers on top of the SP/tense
  * matching:
  *
- * LAYER 1 – Negation (inshinga y'ubunyagatifu):
+ * LAYER 1 – Negation (inshinga y'impakanyi):
  *   Negative = nt- prepended before the subject prefix.
  *   ntaragenda = nt + a(SP cls1) + ra + gend + a   ← class 1, NOT "nti-"
  *   ntiragenda = nt + i(SP cls4/9) + ra + gend + a ← class 4/9, non-human
