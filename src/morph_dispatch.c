@@ -710,6 +710,84 @@ static void analyse_noun(Token *tok)
     set_morph(&mb->m[2], "C",  c_form,    c_form,     "");
     mb->n = 3;
 
+    /* Privative ti- deverbative noun: full 5-morpheme breakdown
+     *   ubuticura = u(D) + bu(RT) + ti(PRIV) + icur(root) + a(FV)
+     *
+     * The verb kwicura has root "icur" (vowel-initial; kwi- = kw+i epenthesis,
+     * root starts with 'i').  When PRIV ti- (which ends in 'i') precedes it:
+     *   ti + icur  →  VV contact: the two adjacent 'i' vowels →  one drops
+     *   Rule §1.1 iranyura ry'impanvu (vowel-hiatus avoidance):
+     *     ti(ends-in-i) + icur(starts-with-i) → ticur  (root-initial i elides)
+     *   Then FV 'a' appended: ticur + a = ticura
+     *   Full surface: u + bu + ticura = ubuticura
+     *
+     * The privative ti- is a frozen/lexicalized form of clausal negation nti-
+     * found in older abstract Nt.14 nominal derivations (e.g. ubuticura).
+     * Attested: Kinyarwanda Bible Proverbs 19:15 (KBNT).
+     * For productive new coinings the modern form is da- (see block below).   */
+    if (tok->is_deverbative
+            && tok->verb_root[0] == 'i'
+            && tok->stem[0] == 't' && tok->stem[1] == 'i') {
+        /* stem = "ticura"; strip "ti" → "cura"; strip FV 'a' → root_surf "cur"
+         * Underlying root: prepend 'i' → "icur"                               */
+        const char *after_ti = tok->stem + 2;       /* "cura"  */
+        size_t alen = strlen(after_ti);
+        if (alen >= 2) {
+            /* root surface: strip final vowel (FV 'a') from after_ti */
+            char root_surf[KIN_MAX_STEM];
+            strncpy(root_surf, after_ti, alen - 1);
+            root_surf[alen - 1] = '\0';             /* "cur"   */
+
+            /* root underlying: restore elided initial 'i' */
+            char root_under[KIN_MAX_STEM];
+            root_under[0] = 'i';
+            strncpy(root_under + 1, root_surf, sizeof(root_under) - 2);
+            root_under[sizeof(root_under) - 1] = '\0'; /* "icur" */
+
+            /* Rule must fit in KIN_MORPH_RULE_LEN (96 bytes).
+             * §1.1 iranyura ry'impanvu: ti ends in 'i'; root starts with 'i';
+             * VV contact → root-initial 'i' elides: ti+icur → ticur.         */
+            char root_rule[KIN_MORPH_RULE_LEN];
+            snprintf(root_rule, sizeof(root_rule),
+                     "i\xe2\x86\x92\xe2\x88\x85 \xc2\xa71.1 (ti+%s\xe2\x86\x92ti%s:"
+                     " iranyura, root-initial i elides after ti-)",
+                     root_under, root_surf);
+
+            set_morph(&mb->m[2], "PRIV", "ti", "ti",
+                      "Indangakorobo (privative ti-): frozen/archaic nti- prefix; "
+                      "forms abstract Nt.14 noun of absent/negated state "
+                      "(ubuticura=deathlike-sleep, Prov.19:15 KBNT).");
+            set_morph(&mb->m[3], "C", root_under, root_surf, root_rule);
+            set_morph(&mb->m[4], "FV", "a", "a", "");
+            mb->n = 5;
+        }
+    }
+
+    /* Privative da- deverbative noun: full 5-morpheme breakdown
+     *   ubudafatika = u(D) + bu(RT) + da(PRIV) + fatik(root) + a(FV)
+     * da- is the productive dependent-negative privative (Zorc & Nibagwire 2007:
+     * "Dependent Negative: -ta-, -da-, -t-"). Attaches to consonant-initial
+     * verb stems without elision. Attested: ubudahwema, ubudasiba.           */
+    if (tok->is_deverbative
+            && tok->stem[0] == 'd' && tok->stem[1] == 'a') {
+        const char *after_da = tok->stem + 2;
+        size_t alen = strlen(after_da);
+        if (alen >= 2) {
+            char root_surf[KIN_MAX_STEM];
+            strncpy(root_surf, after_da, alen - 1);
+            root_surf[alen - 1] = '\0';
+
+            set_morph(&mb->m[2], "PRIV", "da", "da",
+                      "Indangakorobo (privative da-): dependent-negative prefix; "
+                      "forms abstract Nt.14 noun of absent/negated quality. "
+                      "Attested: ubudahwema/ubudasiba=non-stop, ubudafatika="
+                      "instability. Source: Zorc & Nibagwire 2007.");
+            set_morph(&mb->m[3], "C", root_surf, root_surf, "");
+            set_morph(&mb->m[4], "FV", "a", "a", "");
+            mb->n = 5;
+        }
+    }
+
     /* When D was elided, tok->stem holds the bare surface form (e.g. "butaka"
      * from NOUN_STEMS lookup) rather than the true igicumbi.  Update it so
      * the summary table column shows the correct C (e.g. "taka").           */
@@ -921,6 +999,19 @@ static const char *final_vowel(VerbTense t, const char *word) {
                 if (word[wlen-2]=='y' && word[wlen-1]=='o') return "eyo";
             }
             return "e";
+        case TENSE_PRESENT_NORA:
+        case TENSE_PRESENT:
+            /* Locative suffix appended after FV 'a': detect and include it.  *
+             * e.g. imukuramo → FV = "amo" (a + mo), arakoreraho → "aho".   */
+            if (wlen >= 3) {
+                if (word[wlen-3]=='a' && word[wlen-2]=='h' && word[wlen-1]=='o')
+                    return "aho";
+                if (word[wlen-3]=='a' && word[wlen-2]=='m' && word[wlen-1]=='o')
+                    return "amo";
+                if (word[wlen-3]=='a' && word[wlen-2]=='y' && word[wlen-1]=='o')
+                    return "ayo";
+            }
+            return "a";
         default:                  return "a";
     }
 }
@@ -934,7 +1025,8 @@ static const char *ext_suffix(VerbExtension e) {
         case VEXT_STATIVE:     return "ik";
         case VEXT_REVERSIVE:   return "ur";   /* -ur- is the canonical form;
                                                   -uk- variant also maps here */
-        case VEXT_CAUSATIVE_Y: return "y";    /* surface: r+y→z; citation: -y- */
+        case VEXT_CAUSATIVE_Y:  return "y";    /* surface: r+y→z; citation: -y- */
+        case VEXT_CAUSATIVE_IZ: return "iz";   /* canonical underlying form */
         default:               return "";
     }
 }
@@ -954,8 +1046,9 @@ static bool root_has_mid_vowel(const char *root) {
 
 /* Surface form of harmony-sensitive extensions (causative, stative). */
 static const char *ext_suffix_surface(VerbExtension e, const char *root) {
-    if (e == VEXT_CAUSATIVE) return root_has_mid_vowel(root) ? "esh" : "ish";
-    if (e == VEXT_STATIVE)   return root_has_mid_vowel(root) ? "ek"  : "ik";
+    if (e == VEXT_CAUSATIVE)    return root_has_mid_vowel(root) ? "esh" : "ish";
+    if (e == VEXT_CAUSATIVE_IZ) return root_has_mid_vowel(root) ? "ez"  : "iz";
+    if (e == VEXT_STATIVE)      return root_has_mid_vowel(root) ? "ek"  : "ik";
     return ext_suffix(e);
 }
 
@@ -1102,6 +1195,45 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Fallback for nti + consonant-initial SP: "ntimuzarye" = nti(NEG) + mu(SP) + ...
+     * LAYER 2a retry detected the correct SP from eff_word+1 ("muzarye"), but
+     * eff_word still points to "imuzarye" (word+2 after "nt" strip).
+     * When cls=0 and sp_under="?" and eff_word[0]='i' (negative context):
+     * re-try SP detection on eff_word+1 and fold the 'i' into the NEG surface. */
+    if (cls == 0 && sp_under[0] == '?' && tok->is_negative && eff_word[0] == 'i') {
+        const char *e2 = eff_word + 1;
+        const char *sp2 = "?";
+        if      (kin_starts_with(e2, "twa"))  sp2 = "tu";
+        else if (kin_starts_with(e2, "mwa"))  sp2 = "mu";
+        else if (kin_starts_with(e2, "nda"))  sp2 = "n";
+        else if (kin_starts_with(e2, "n"))    sp2 = "n";
+        else if (kin_starts_with(e2, "tu"))   sp2 = "tu";
+        else if (kin_starts_with(e2, "u"))    sp2 = "u";
+        else if (kin_starts_with(e2, "mu"))   sp2 = "mu";
+        else if (kin_starts_with(e2, "mw"))   sp2 = "mu";
+        else if (kin_starts_with(e2, "mb"))   sp2 = "n";
+        else if (kin_starts_with(e2, "mp"))   sp2 = "n";
+        else if (kin_starts_with(e2, "mf"))   sp2 = "n";
+        else if (kin_starts_with(e2, "mv"))   sp2 = "n";
+        if (sp2[0] != '?') {
+            sp_under = sp2;
+            neg_pfx  = "nti";   /* surface includes the 'i': nti+mu+...=ntimuzarye */
+            eff_word = e2;      /* shift past 'i' so sp_surface computation is correct */
+        }
+    }
+
+    /* General nti + consonant-initial SP: for cls >= 1, sp_under is already
+     * known from the table, but eff_word = "i" + sp_surface (the 'i' tail of
+     * "nti" stays on the surface before a consonant-initial SP).
+     * e.g. ntibakora: eff_word="ibakora", sp_under="ba" → shift → "bakora". */
+    if (cls >= 1 && tok->is_negative && eff_word[0] == 'i'
+            && sp_under[0] != '\0' && sp_under[0] != '?'
+            && sp_under[0] != 'i'   /* 'i' SP (Nt.4) is the real SP, not the nti-tail */
+            && kin_starts_with(eff_word + 1, sp_under)) {
+        neg_pfx  = "nti";
+        eff_word = eff_word + 1;
+    }
+
     const char *tm  = tense_marker(tok->verb_tense);
     /* Special: 1sg immediate present uses "da" as TM (nda = n+da).
      * verb_match_inner stores tense=PRESENT_NORA for "nda" prefix, so
@@ -1158,6 +1290,13 @@ static void analyse_vconj(Token *tok)
             fv = "e";
         }
     }
+    /* Override FV for cy root (gucya) in past perfect.
+     * §11.3: cy + iye → k + eye (i→e palatal harmony; cy→k before 'e').
+     * final_vowel() returns "ye" (word "bukeye" does not end in "iye").
+     * The actual surface FV is "eye", not "ye". */
+    if (tok->verb_tense == TENSE_PAST_PERF && strcmp(root_tmp, "cy") == 0) {
+        fv = "eye";
+    }
     const char *root = tok->stem[0] ? tok->stem : "?";
     /* u+u→u fusion: historically vowel-initial roots (e.g. twakubaka ← *twakwubaka).
      * Remap lexicon stem "bak" → true root "ubak" so morpheme display is correct. */
@@ -1193,6 +1332,26 @@ static void analyse_vconj(Token *tok)
             char appl_v = word[wlen - fvlen - 2]; /* vowel of ext: 'e' or 'i' */
             if (appl_v == 'e') { strncpy(appl_ext_buf, "er", 3); ext = appl_ext_buf; }
             else if (appl_v == 'i') { strncpy(appl_ext_buf, "ir", 3); ext = appl_ext_buf; }
+        }
+    }
+    /* Passive-perfect epenthetic surface: -ejw or -ijw (before FV 'e').       *
+     * When the stem ends in -sh/-esh and takes the passive, Kinyarwanda        *
+     * inserts a epenthetic vowel (e/i by vowel harmony) before -jw-:          *
+     *   pesh + ejw + e = peshejwe   (gupesha passive perfect)                 *
+     * The canonical ext_suffix("VEXT_PASSIVE") = "w", but the surface form    *
+     * visible in the word is "ejw" (3 chars before FV). Read from word.       */
+    static char pass_ext_buf[4];
+    if (tok->verb_ext == VEXT_PASSIVE) {
+        size_t fvlen = strlen(fv), wlen = strlen(word);
+        if (wlen > fvlen + 3) {
+            char v3 = word[wlen - fvlen - 3];   /* 3rd char before FV */
+            char v2 = word[wlen - fvlen - 2];   /* 2nd char before FV */
+            char v1 = word[wlen - fvlen - 1];   /* 1st char before FV */
+            if ((v3 == 'e' || v3 == 'i') && v2 == 'j' && v1 == 'w') {
+                pass_ext_buf[0] = v3; pass_ext_buf[1] = 'j';
+                pass_ext_buf[2] = 'w'; pass_ext_buf[3] = '\0';
+                ext = pass_ext_buf;
+            }
         }
     }
     const char *om   = (tok->obj_class > 0) ? kin_om_str(tok->obj_class) : "";
@@ -1290,6 +1449,17 @@ static void analyse_vconj(Token *tok)
             past_tye_se    = true;
             past_fuse_cons = 't';
         }
+    }
+
+    /* cy→k surface in past perfect (§11.3): cy cannot precede 'e'.
+     * gucya past perf: cy + iye → k + eye. Surface root = "k". */
+    if (is_past_tense(tok->verb_tense) && strcmp(root, "cy") == 0
+        && !root_surface_rule[0]) {
+        strncpy(root_surface_buf, "k", 2);
+        root_surface = root_surface_buf;
+        snprintf(root_surface_rule, sizeof(root_surface_rule),
+                 "cy\xe2\x86\x92k \xc2\xa7""11.3 (cy ntishobora kuba imbere ya 'e': "
+                 "gucya + iye \xe2\x86\x92 cy+eye \xe2\x86\x92 k+eye)");
     }
 
     /* Reflexive -i- present in surface: VEXT_REFLEXIVE with consonant-initial root.
@@ -1613,6 +1783,10 @@ static void analyse_vconj(Token *tok)
      *      root="mer"→ root_surface="mez" (kumera/kumeza pair)
      * Also: EXT 'y' is absorbed into the root surface, so ext_surface = "".  */
     const char *ext_surface = ext_suffix_surface(tok->verb_ext, root);
+    /* Passive-perfect epenthetic: sync ext_surface with ext override.
+     * For normal passive ext="w"; for ejw/ijw variant ext starts with 'e'/'i'. */
+    if (tok->verb_ext == VEXT_PASSIVE && ext[0] != 'w')
+        ext_surface = ext;
     if (tok->verb_ext == VEXT_CAUSATIVE_Y && root[0]) {
         size_t rlen = strlen(root);
         if (rlen >= 2) {
@@ -1693,6 +1867,22 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Detect ra TM for TENSE_PAST_PERF forms like yaravuze (ya+ra+vug+ze).
+     * verb_match_inner strips "ra" silently (line ~1401); restore it here so
+     * TM="ra" appears in the morpheme breakdown and built matches the surface.
+     * Guard: only when root is not r-initial (else eff_word[sp_slen..+1]="ra"
+     * may be the start of the root surface itself, e.g. yaraze ← kuragira). */
+    static char ra_tm_buf[4];
+    if (tok->verb_tense == TENSE_PAST_PERF && !tm[0] &&
+            tok->stem[0] && tok->stem[0] != 'r') {
+        size_t sp_slen = strlen(sp_surface);
+        if (strlen(eff_word) > sp_slen + 2 &&
+            eff_word[sp_slen] == 'r' && eff_word[sp_slen + 1] == 'a') {
+            strncpy(ra_tm_buf, "ra", 3);
+            tm = ra_tm_buf;
+        }
+    }
+
     /* Build expected surface for verification.
      * Include negation prefix in built string so verification works for
      * negative verbs (ntaragenda, sindagenda, etc.).                        */
@@ -1729,6 +1919,15 @@ static void analyse_vconj(Token *tok)
         set_morph(&mb->m[n++], "NEG", neg_under, neg_pfx,
                   neg_elision_rule[0] ? neg_elision_rule
                                       : "Impakanyi (Negation prefix)");
+    /* "pesh" stem: surface bilabial 'p' came from underlying root 'h' (guha)
+     * via two-step: n+h→mh→mp.  Override the sp_rule to show both steps so
+     * the Itegeko line references 'h' (underlying root) rather than 'p'. */
+    if (strcmp(root, "pesh") == 0 && tok->verb_ext == VEXT_PASSIVE) {
+        snprintf(sp_rule, sizeof(sp_rule),
+                 "n+h\xe2\x86\x92mh\xe2\x86\x92mp: n(1sg SP) + h(umuzi wa guha) "
+                 "\xe2\x86\x92 mh \xc2\xa7""3.3 (n\xe2\x86\x92m /_h); "
+                 "mh\xe2\x86\x92mp (h\xe2\x86\x92p inyuma ya m: itegeko ryigenamajwi)");
+    }
     set_morph(&mb->m[n++], "SP", sp_under, sp_surface, sp_rule);
     /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra */
     if (tok->verb_tense == TENSE_NEG_ANTERIOR)
@@ -1853,6 +2052,35 @@ static void analyse_vconj(Token *tok)
              *   3. removing that stop gives a known verb stem (base root)
              * If confirmed, store: base(root) + ruk/rur(REV, with rule) + ext(EXT) */
             bool wrote_deep = false;
+            /* "pesh" stem = 1sg surface of guhesha.
+             * Deep morpheme decomposition: h(root, from guha) + esh(CAUS) + passive.
+             * Phonological derivation: n + h + esh + w + e
+             *   → n+h→mh (n→m /_h §3.3)
+             *   → mh→mp  (h→p after labial nasal m: itegeko ryigenamajwi)
+             *   → mp + esh + ejw + e = mpeshejwe
+             * The passive -ejw- is the allomorph of -w- used after -esh- causative
+             * stems: -esh- + -w- → -eshejw-; epenthetic -ej- breaks the -shw- cluster.
+             * Note: "gupesha" does NOT exist as an independent infinitive. */
+            /* "pesh" = 1sg surface of guhesha: decompose into h(root) + esh(CAUS).
+             * The outer EXT slot (ejw/w passive) is still written by the code below;
+             * we only override root and insert the CAUS morpheme here.              */
+            if (strcmp(root, "pesh") == 0 && tok->verb_ext == VEXT_PASSIVE) {
+                set_morph(&mb->m[n++], "root", "h", "p",
+                          "h\xe2\x86\x92p /_m: mh\xe2\x86\x92mp "
+                          "(umuzi 'h' wa guha usindura 'p' inyuma ya m bilabiale)");
+                set_morph(&mb->m[n++], "CAUS", "esh", "esh",
+                          "Integeko (Causative -esh-: guha + -esh- \xe2\x86\x92 guhesha)");
+                wrote_deep = true;  /* skip the generic root write below */
+            }
+            /* cy root (gucya): §11.3 cy→k before 'e'.
+             * Past perf FV iye triggers palatal harmony i→e: cy+eye→k+eye.
+             * Surface root is "k"; underlying root is "cy". */
+            if (strcmp(root, "cy") == 0 && tok->verb_tense == TENSE_PAST_PERF) {
+                set_morph(&mb->m[n++], "root", "cy", "k",
+                          "cy\xe2\x86\x92k \xc2\xa7""11.3 (cy ntishobora kuba imbere ya 'e': "
+                          "gucya + iye \xe2\x86\x92 cy+eye \xe2\x86\x92 k+eye)");
+                wrote_deep = true;
+            }
             size_t rlen = strlen(root);
             if (rlen > 4 && ext[0] &&
                 ((root[rlen-1]=='k' && root[rlen-2]=='u') ||
@@ -1889,8 +2117,15 @@ static void analyse_vconj(Token *tok)
             if (!wrote_deep)
                 set_morph(&mb->m[n++], "root", root, root_surface,
                           root_surface_rule[0] ? root_surface_rule : "");
-            if (ext[0])
-                set_morph(&mb->m[n++], "EXT", ext, ext_surface, "");
+            if (ext[0]) {
+                /* pesh: passive -ejw- is the allomorph of -w- after causative -esh-. */
+                const char *ext_rule =
+                    (strcmp(root, "pesh") == 0 && tok->verb_ext == VEXT_PASSIVE)
+                    ? "-w-\xe2\x86\x92-ejw- /_-esh-: imbundo -w- isindura -ejw- "
+                      "nyuma ya -esh- (passive allomorph: -esh-+-w-\xe2\x86\x92-eshejw-)"
+                    : "";
+                set_morph(&mb->m[n++], "EXT", ext, ext_surface, ext_rule);
+            }
         }
     }
     /* TENSE_SUBJUNCTIVE_LOC: fv = "eho"/"emo"/"eyo" — split into FV + LOC.
@@ -1929,6 +2164,16 @@ static void analyse_vconj(Token *tok)
          * The 't+y' palatalization is shown on root as →s; only 'e' remains as FV. */
         set_morph(&mb->m[n++], "FV", "ye", "e",
                   "y\xe2\x86\x92\xe2\x88\x85 / t_ (y elided: t+ye\xe2\x86\x92se, \xc2\xa7""3.8)");
+    } else if (strlen(fv) == 3 && fv[0] == 'a' && fv[2] == 'o'
+               && (fv[1] == 'h' || fv[1] == 'm' || fv[1] == 'y')) {
+        /* Locative FV (aho / amo / ayo): split into FV='a' + LOC suffix.
+         * The base final vowel is 'a'; the locative -ho/-mo/-yo is a post-FV
+         * suffix (umugereka w'ahantu) appended after the verbal base.
+         * Rule: -ho = ahantu (place); -mo = imbere/mu (inside); -yo = direction. */
+        set_morph(&mb->m[n++], "FV", "a", "a", "");
+        char loc_s[4]; loc_s[0] = fv[1]; loc_s[1] = 'o'; loc_s[2] = '\0';
+        set_morph(&mb->m[n++], "LOC", loc_s, loc_s,
+                  "Umugereka w'ahantu (Locative suffix: -ho=hanze, -mo=imbere, -yo=inzira)");
     } else if (strcmp(fv, "aye") == 0) {
         /* Monosyllabic root (h, b, z…) + epenthetic 'a' before past perfect FV.
          * The Kinyarwanda verb always ends in a vowel; '-y-' is the perfectivity

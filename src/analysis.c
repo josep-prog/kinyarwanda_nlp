@@ -326,6 +326,23 @@ static bool is_vowel_c(char c) {
     return c=='a'||c=='e'||c=='i'||c=='o'||c=='u';
 }
 
+/* Detect the g→z/_i agentive c_split for -nzi deverbatives.
+ * e.g. umuhinzi ← guhinga: stem "hinzi", verb_root "hing".
+ * Condition: verb_root ends in 'g', stem = verb_root[0..vrl-2] + "zi",
+ * i.e. the root-final 'g' became 'z' before agentive -i.
+ * Returns true and sets *c_fv_out to 'i' when the pattern matches. */
+static bool csplit_nzi(const char *c_form, const char *verb_root, char *c_fv_out) {
+    if (!c_form || !verb_root || !c_fv_out) return false;
+    size_t vrl  = strlen(verb_root);
+    size_t clen = strlen(c_form);
+    if (vrl < 2 || clen != vrl + 1) return false;
+    if (verb_root[vrl-1] != 'g') return false;
+    if (c_form[vrl-1] != 'z' || c_form[vrl] != 'i') return false;
+    if (strncmp(c_form, verb_root, vrl-1) != 0) return false;
+    *c_fv_out = 'i';
+    return true;
+}
+
 /* ── Noun morphophonological reconstruction ─────────────────────────────────
  * Reads tok->morph (filled by kin_morpheme_analyze) and prints the
  * D + RT + C decomposition with any orthographic rules that applied.
@@ -340,7 +357,26 @@ static void print_noun_reconstruction(const Token *t) {
 
     const KinMorpheme *d_m  = &mb->m[0];  /* D  (Indomo)        */
     const KinMorpheme *rt_m = &mb->m[1];  /* RT (Indanganteko)  */
-    const KinMorpheme *c_m  = &mb->m[2];  /* C  (Igicumbi)      */
+    const KinMorpheme *c_m  = &mb->m[2];  /* C  (Igicumbi) or PRIV when n≥4 */
+
+    printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
+
+    /* 5-morpheme noun: D + RT + PRIV(ti/da) + C(root) + FV.
+     * e.g. ubuticura (ti-) or ubudafatika (da-).
+     * c_m = PRIV; mb->m[3] = root; mb->m[4] = FV                            */
+    if (mb->n >= 5 && c_m->label[0] == 'P') { /* label "PRIV" */
+        const KinMorpheme *root_m = &mb->m[3];
+        const KinMorpheme *fv_m   = &mb->m[4];
+        printf("       Ingingo:  [D]%s + [RT]%s + [PRIV]%s + [C\xc2\xb7root]%s + [FV]%s\n",
+               d_m->form, rt_m->form, c_m->form, root_m->form, fv_m->form);
+        if (root_m->rule[0])
+            printf("       Itegeko:  %s\n", root_m->rule);
+        printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s\xC2\xB7%s\xC2\xB7%s  \342\206\222  %s%s\n",
+               d_m->surface, rt_m->surface, c_m->surface,
+               root_m->surface, fv_m->surface,
+               t->lower, mb->verified ? "  \342\234\223" : "");
+        return;
+    }
 
     bool rt_changed = (strcmp(rt_m->form, rt_m->surface) != 0);
     /* Show 3-line (Ingingo + Itegeko + Guhuza) whenever a phonological rule
@@ -356,8 +392,17 @@ static void print_noun_reconstruction(const Token *t) {
                     && strncmp(c_m->form, t->verb_root, vrl) == 0
                     && strlen(c_m->form) > vrl);
     char c_fv = c_split ? c_m->form[vrl] : '\0';
+    /* -nzi agentive: g→z /_i (stem "hinzi", verb_root "hing" → hing+i→hinzi) */
+    bool c_split_nzi = false;
+    if (!c_split && t->is_deverbative) {
+        char nzi_fv = '\0';
+        if (csplit_nzi(c_m->form, t->verb_root, &nzi_fv)) {
+            c_split     = true;
+            c_split_nzi = true;
+            c_fv        = nzi_fv;
+        }
+    }
 
-    printf("  \342\224\224\342\224\200 Gusubiza (Reconstruction):\n");
     if (show_rule) {
         /* Show underlying, rule, then surface */
         if (c_split) {
@@ -368,10 +413,22 @@ static void print_noun_reconstruction(const Token *t) {
                    d_m->form, rt_m->form, c_m->form);
         }
         printf("       Itegeko:  %s\n", rt_m->rule);
+        if (c_split_nzi)
+            printf("       Itegeko:  g+i\xe2\x86\x92zi \xc2\xa7""3.x "
+                   "(g palatalizes before agentive -i: %s+i \xe2\x86\x92 %.*szi)\n",
+                   t->verb_root,
+                   (int)(strlen(t->verb_root) > 0 ? strlen(t->verb_root) - 1 : 0),
+                   t->verb_root);
         if (c_split) {
-            printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s\xC2\xB7%c  \342\206\222  %s%s\n",
-                   d_m->surface, rt_m->surface, t->verb_root, c_fv,
-                   t->lower, mb->verified ? "  \342\234\223" : "");
+            /* For -nzi: Guhuza shows the surface C form (hinzi), not underlying pieces */
+            if (c_split_nzi)
+                printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s  \342\206\222  %s%s\n",
+                       d_m->surface, rt_m->surface, c_m->surface,
+                       t->lower, mb->verified ? "  \342\234\223" : "");
+            else
+                printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s\xC2\xB7%c  \342\206\222  %s%s\n",
+                       d_m->surface, rt_m->surface, t->verb_root, c_fv,
+                       t->lower, mb->verified ? "  \342\234\223" : "");
         } else {
             printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s  \342\206\222  %s%s\n",
                    d_m->surface, rt_m->surface, c_m->surface,
@@ -379,10 +436,24 @@ static void print_noun_reconstruction(const Token *t) {
         }
     } else {
         if (c_split) {
-            printf("       Ingingo:  [D]%s + [RT]%s + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c"
-                   "  \342\206\222  %s%s\n",
-                   d_m->form, rt_m->form, t->verb_root, c_fv,
-                   t->lower, mb->verified ? "  \342\234\223" : "");
+            /* No RT rule fired; for -nzi add Itegeko line and show surface C in Guhuza */
+            if (c_split_nzi) {
+                printf("       Ingingo:  [D]%s + [RT]%s + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c\n",
+                       d_m->form, rt_m->form, t->verb_root, c_fv);
+                printf("       Itegeko:  g+i\xe2\x86\x92zi \xc2\xa7""3.x "
+                       "(g palatalizes before agentive -i: %s+i \xe2\x86\x92 %.*szi)\n",
+                       t->verb_root,
+                       (int)(strlen(t->verb_root) > 0 ? strlen(t->verb_root) - 1 : 0),
+                       t->verb_root);
+                printf("       Guhuza:   %s\xC2\xB7%s\xC2\xB7%s  \342\206\222  %s%s\n",
+                       d_m->surface, rt_m->surface, c_m->surface,
+                       t->lower, mb->verified ? "  \342\234\223" : "");
+            } else {
+                printf("       Ingingo:  [D]%s + [RT]%s + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c"
+                       "  \342\206\222  %s%s\n",
+                       d_m->form, rt_m->form, t->verb_root, c_fv,
+                       t->lower, mb->verified ? "  \342\234\223" : "");
+            }
         } else {
             printf("       Ingingo:  [D]%s + [RT]%s + [C]%s  \342\206\222  %s%s\n",
                    d_m->form, rt_m->form, c_m->form,
@@ -1012,21 +1083,44 @@ static void print_noun_morphemes(const Token *t) {
         const KinMorpheme *d  = &mb->m[0];
         const KinMorpheme *rt = &mb->m[1];
         const KinMorpheme *c  = &mb->m[2];
-        /* For deverbative nouns the igicumbi is verb_root + FV (e.g. sanzur+e).
-         * Show the split as [C·root] + [C·FV] so the verbal origin is explicit. */
-        size_t vrl = t->verb_root[0] ? strlen(t->verb_root) : 0;
-        bool c_split = (t->is_deverbative && vrl > 0
-                        && strncmp(c->form, t->verb_root, vrl) == 0
-                        && strlen(c->form) > vrl);
-        if (c_split) {
-            char c_fv = c->form[vrl];
+        /* 5-morpheme noun: D + RT + PRIV(ti/da) + C(root) + FV
+         * ti-: ubuticura = u+bu+ti+icur(→cur)+a  [archaic, VV-elision]
+         * da-: ubudafatika = u+bu+da+fatik+a      [productive, no elision] */
+        if (mb->n >= 5 && c->label[0] == 'P') { /* label "PRIV" */
+            const KinMorpheme *root_m = &mb->m[3];
+            const KinMorpheme *fv_m   = &mb->m[4];
             printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
-                   "[D]%s + [RT]%s(Nt.%d) + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c\n",
-                   d->form, rt->form, t->noun_class, t->verb_root, c_fv);
+                   "[D]%s + [RT]%s(Nt.%d) + [PRIV]%s + [C\xc2\xb7root]%s\xe2\x86\x92%s + [FV]%s\n",
+                   d->form, rt->form, t->noun_class,
+                   c->form,              /* "ti"   */
+                   root_m->form,         /* "icur" */
+                   root_m->surface,      /* "cur"  */
+                   fv_m->form);          /* "a"    */
         } else {
-            printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
-                   "[D]%s + [RT]%s(Nt.%d) + [C]%s\n",
-                   d->form, rt->form, t->noun_class, c->form);
+            /* For deverbative nouns the igicumbi is verb_root + FV (e.g. sanzur+e).
+             * Show the split as [C·root] + [C·FV] so the verbal origin is explicit.
+             * -nzi case: g→z/_i agentive (e.g. umuhinzi ← guhinga: hing+i→hinzi). */
+            size_t vrl = t->verb_root[0] ? strlen(t->verb_root) : 0;
+            bool c_split = (t->is_deverbative && vrl > 0
+                            && strncmp(c->form, t->verb_root, vrl) == 0
+                            && strlen(c->form) > vrl);
+            char c_fv_m = c_split ? c->form[vrl] : '\0';
+            if (!c_split && t->is_deverbative) {
+                char nzi_fv = '\0';
+                if (csplit_nzi(c->form, t->verb_root, &nzi_fv)) {
+                    c_split  = true;
+                    c_fv_m   = nzi_fv;
+                }
+            }
+            if (c_split) {
+                printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
+                       "[D]%s + [RT]%s(Nt.%d) + [C\xC2\xB7root]%s + [C\xC2\xB7" "FV]%c\n",
+                       d->form, rt->form, t->noun_class, t->verb_root, c_fv_m);
+            } else {
+                printf("  \342\224\224\342\224\200 Uturemajambo (Morphemes): "
+                       "[D]%s + [RT]%s(Nt.%d) + [C]%s\n",
+                       d->form, rt->form, t->noun_class, c->form);
+            }
         }
         print_noun_reconstruction(t);
     } else if (t->detected_prefix[0]) {
@@ -1268,21 +1362,46 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                         static const struct {
                             const char *stem;
                             const char *canonical;  /* full canonical infinitive  */
+                            const char *stem_note;  /* stem shown in parentheses  */
                             const char *note;        /* brief note for the user    */
                         } SUPPLETIVE_CITATIONS[] = {
-                            { "giy", "kugenda",
+                            { "giy", "kugenda", "giy",
                               "umuzi w'indangika (suppletive past stem) wa kugenda" },
-                            { NULL, NULL, NULL }
+                            /* guha (to give) + causative -esh- = guhesha.
+                             * In 1sg context the root 'h' surfaces as 'p' (h→p /_n),
+                             * which triggers nasal assimilation n→m §3.3.
+                             * So 1sg guhesha = m(SP) + p(root) + esh(CAUS) + ...
+                             * "gupesha" does NOT exist as an independent verb.        */
+                            /* pesh = 1sg surface of guhesha:
+                             * underlying: n + h + esh + w + e
+                             * Two phonological rules:
+                             *   (1) n + h → mh: n→m /_h (n takes labial place before h)
+                             *   (2) mh → mp:   h→p after labial nasal m (itegeko ryigenamajwi)
+                             * -ejw- is the legitimate passive allomorph after -esh- causative:
+                             *   -esh- + -w- → -eshejw- (epenthetic -ej- breaks -shw- cluster) */
+                            { "pesh", "guhesha", "hesh",
+                              "guha [to give] + -esh- (indangika/causative: 'gutera umuntu guha') "
+                              "= guhesha [to make/cause to give]; "
+                              "Uturemajambo rw'ibanze: n(SP) + h(root) + esh(CAUS) + ejw(PASS) + e(FV); "
+                              "Itegeko ryigenamajwi rigize inzira ebyiri: "
+                              "(1) n+h\xe2\x86\x92mh: SP ya 1sg 'n' igenwa mbere ya 'h' "
+                              "(n\xe2\x86\x92m /_h: itegeko ry'aho ijwi rivuye); "
+                              "(2) mh\xe2\x86\x92mp: 'h' ihinduka 'p' inyuma ya m bilabiale "
+                              "(h\xe2\x86\x92p /_m: h fortifies to bilabial stop after labial nasal); "
+                              "-ejw- ni indangika igenamajwi y'imbundo -w- nyuma ya -esh- "
+                              "(-esh- + -w- \xe2\x86\x92 -eshejw-: epenthetic -ej- breaks -shw- cluster)" },
+                            { NULL, NULL, NULL, NULL }
                         };
                         bool supp_found = false;
                         for (int si = 0; SUPPLETIVE_CITATIONS[si].stem; si++) {
                             if (strcmp(t->stem, SUPPLETIVE_CITATIONS[si].stem) == 0) {
                                 printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s"
                                        "  (igicumbi -%s-)\n",
-                                       SUPPLETIVE_CITATIONS[si].canonical, t->stem);
-                                printf("  \342\224\224\342\224\200 Icyitonderwa (Suppletive note):"
-                                       " -%s- ni %s\n",
-                                       t->stem, SUPPLETIVE_CITATIONS[si].note);
+                                       SUPPLETIVE_CITATIONS[si].canonical,
+                                       SUPPLETIVE_CITATIONS[si].stem_note);
+                                printf("  \342\224\224\342\224\200 Icyitonderwa (Inkomoko/Derivation):"
+                                       " %s\n",
+                                       SUPPLETIVE_CITATIONS[si].note);
                                 supp_found = true;
                                 break;
                             }

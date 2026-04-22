@@ -2,6 +2,7 @@ CC       = gcc
 CFLAGS   = -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2 -fPIC -MMD -MP
 TARGET   = kinyarwanda_nlp
 MANPAGE  = man/kinyarwanda_nlp.1
+.DEFAULT_GOAL := all
 
 # Library sources (everything except the CLI entry point)
 LIB_SRCS = src/tokenizer.c \

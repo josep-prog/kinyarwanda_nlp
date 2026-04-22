@@ -66,8 +66,15 @@ static int emit_punct(Token *out, int count, int max_tokens,
     out[count].pos             = POS_PUNCTUATION;
     out[count].punct_type      = pt;
     out[count].is_clause_boundary = (pt == PUNCT_COMMA || pt == PUNCT_SEMICOLON);
+    /* A closing quote that immediately follows a sentence terminator ( . ? ! )
+     * also acts as a sentence boundary — the next word begins a new sentence.
+     * e.g. «"Nagiye." Mugabo agira ati.» — "Mugabo" must be sentence-initial.
+     * Propagate is_sent_boundary through the close-quote so the next word's
+     * is_sentence_initial check (which looks one token back) sees it. */
     out[count].is_sent_boundary   = (pt == PUNCT_PERIOD || pt == PUNCT_QUESTION ||
-                                     pt == PUNCT_EXCLAIM);
+                                     pt == PUNCT_EXCLAIM ||
+                                     (pt == PUNCT_QUOTE_CLOSE && count > 0 &&
+                                      out[count-1].is_sent_boundary));
     out[count].is_quote_open      = (pt == PUNCT_QUOTE_OPEN);
     out[count].is_quote_close     = (pt == PUNCT_QUOTE_CLOSE);
     out[count].is_kinyarwanda     = false;
@@ -130,6 +137,19 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
             (unsigned char)p[2]==0x9D) {
             count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_CLOSE); p+=3; continue;
         }
+        /* UTF-8 U+2018 LEFT SINGLE QUOTATION MARK  E2 80 98  ' */
+        if ((unsigned char)p[0]==0xE2 && (unsigned char)p[1]==0x80 &&
+            (unsigned char)p[2]==0x98) {
+            count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_OPEN);  p+=3; continue;
+        }
+        /* UTF-8 U+2019 RIGHT SINGLE QUOTATION MARK E2 80 99  '
+         * Used as closing quotation mark; the apostrophe (elision) use of
+         * U+2019 is handled inside words by find_apostrophe().  At word-start
+         * it can only be a closing quote, so emit it as punctuation here.    */
+        if ((unsigned char)p[0]==0xE2 && (unsigned char)p[1]==0x80 &&
+            (unsigned char)p[2]==0x99) {
+            count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_CLOSE); p+=3; continue;
+        }
 
         /* Find end of current word (whitespace, punctuation, or double quote) */
         const char *word_end = p;
@@ -172,9 +192,47 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         out[count].surface[wlen] = '\0';
         kin_strlower(out[count].surface, out[count].lower, KIN_MAX_WORD);
 
-        /* Detect proper noun: capital letter that is NOT the first token  */
-        if (count > 0 && isupper((unsigned char)out[count].surface[0]))
-            out[count].is_proper_noun = true;
+        /* Detect proper noun (izina bwite): capitalised words.
+         *
+         * Official orthography (Amabwiriza ya Minisitiri no 001/2014 §3a–b)
+         * mandates that the FIRST LETTER OF EVERY SENTENCE is always a capital
+         * regardless of word class.  The same rules separately require that
+         * proper nouns are ALWAYS capitalised wherever they appear.
+         *
+         * This means:
+         *   – Mid-sentence capital  → unambiguous proper name signal.
+         *     Common nouns, verbs, adjectives never capitalise mid-sentence.
+         *
+         *   – Sentence-initial capital (first word, or after . ? ! ") → the
+         *     capitalisation is ORTHOGRAPHIC, not a proper name marker.  The
+         *     word is processed normally through the full NLP pipeline (Steps
+         *     1–9 in kin_tag_token) so that nouns get their correct class and
+         *     verbs get their correct tense; no proper-noun shortcut is taken.
+         *
+         * Single exception: the letter 'l' is explicitly prohibited from
+         * native Kinyarwanda words by the official orthography (§2.3).  The
+         * rules allow 'l' only in the place name "Kigali", "Repubulika",
+         * "Leta", and foreign proper names (Abeli, Filipo, Bibiliya, …).
+         * A sentence-initial word containing 'l' is therefore a proper name
+         * or foreign loanword regardless of position and is flagged here so
+         * that the tagger can assign class 0 (proper noun) rather than
+         * fabricating a spurious noun-class analysis from unrelated segments.*/
+        if (isupper((unsigned char)out[count].surface[0])) {
+            bool is_sentence_initial = (count == 0)
+                                    || out[count-1].is_sent_boundary
+                                    || out[count-1].is_quote_open;
+            if (!is_sentence_initial) {
+                /* Mid-sentence capital → definitive proper name. */
+                out[count].is_proper_noun = true;
+            } else if (strchr(out[count].lower, 'l') != NULL) {
+                /* Sentence-initial but contains 'l' → foreign/proper name;
+                 * 'l' has no place in any native Kinyarwanda root. */
+                out[count].is_proper_noun = true;
+            }
+            /* All other sentence-initial capitals: process normally.
+             * The pipeline correctly handles Inzu→Nt.9 noun, Baragenda→verb,
+             * Mpeshejwe→verb, Mugabo→Nt.1 noun, etc. without the shortcut. */
+        }
 
         count++;
         p = word_end;

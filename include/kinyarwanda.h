@@ -360,6 +360,10 @@ typedef enum {
                           * e.g. kumera (to grow) + -y- → kumeza (to bring forth)*
                           *      mer + y → mez   (r+y→z, textbook §1.3)        *
                           * Citation root keeps 'r'; surface form shows 'z'.  */
+    VEXT_CAUSATIVE_IZ,   /* Integeko -iz-/-ez- allomorph: used when causative  *
+                          * attaches to a stem ending in a consonant cluster or  *
+                          * applicative-base (e.g. sinzir+iz+a = gusinziriza).  *
+                          * Vowel harmony: mid-vowel root → -ez-; else → -iz-. */
 } VerbExtension;
 
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */

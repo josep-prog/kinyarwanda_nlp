@@ -78,6 +78,79 @@ static void check_deverbative(Token *tok) {
         tok->verb_root[KIN_MAX_STEM - 1] = '\0';
         return;
     }
+    /* Privative/completive 'ti-' prefix on vowel-initial verb roots.
+     * In some abstract nouns (Nt.14 ubu- class), the 'ti-' prefix combines
+     * with a vowel-initial verb root: ti + icur → ticura (ubuticura).
+     * The 'ti' is a privative/completive prefix (cf. nti- negation marker);
+     * the underlying root is the vowel-initial verb (kwicura = kwi+icur+a).
+     * Condition: stem starts 'ti' + vowel, remainder minus FV is known root.
+     * e.g. ticura → strip 'ti' → icura → strip 'a' → icur = known (kwicura). */
+    if (slen >= 5 && tok->stem[0] == 't' && tok->stem[1] == 'i') {
+        char ti_fv = tok->stem[slen - 1];
+        bool ti_ends_v = (ti_fv=='a'||ti_fv=='e'||ti_fv=='i'
+                          ||ti_fv=='o'||ti_fv=='u');
+        if (ti_ends_v) {
+            size_t ti_slen = slen - 2;   /* length of part after 'ti' */
+            char _s2 = tok->stem[2];
+            bool _v2 = (_s2=='a'||_s2=='e'||_s2=='i'||_s2=='o'||_s2=='u');
+            /* Case A: ti + vowel-initial root still visible (no elision).
+             * e.g. if root were 'abur' → stem 'tiabura' → after ti: 'abura'
+             * strip FV → 'abur'. */
+            if (_v2 && ti_slen >= 3) {
+                char ti_root[KIN_MAX_STEM];
+                strncpy(ti_root, tok->stem + 2, ti_slen - 1);
+                ti_root[ti_slen - 1] = '\0';
+                if (strlen(ti_root) >= 2 && kin_is_known_verb_stem(ti_root)) {
+                    tok->is_deverbative = true;
+                    strncpy(tok->verb_root, ti_root, KIN_MAX_STEM - 1);
+                    tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+                    return;
+                }
+            }
+            /* Case B: ti + vowel-initial root, but VV contact elided root's
+             * initial 'i': ti + icur + a → ticura (i elides).
+             * Recover: strip 'ti', prepend 'i', strip FV → check lexicon.
+             * e.g. ticura → after ti: cura → strip FV: cur → prepend i: icur */
+            if (!_v2 && ti_slen >= 3) {
+                char ti_root[KIN_MAX_STEM];
+                /* Reconstruct vowel-initial root: prepend 'i', copy (ti_slen-1)
+                 * chars (strips FV), terminate. e.g. ticura: ti_slen=4,
+                 * copy 3 chars "cur" → ti_root = "icur". */
+                ti_root[0] = 'i';
+                strncpy(ti_root + 1, tok->stem + 2, ti_slen - 1);
+                ti_root[ti_slen] = '\0';
+                if (strlen(ti_root) >= 2 && kin_is_known_verb_stem(ti_root)) {
+                    tok->is_deverbative = true;
+                    strncpy(tok->verb_root, ti_root, KIN_MAX_STEM - 1);
+                    tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+                    return;
+                }
+            }
+        }
+    }
+    /* Privative 'da-' prefix (dependent-negative variant -da-, Zorc & Nibagwire
+     * §2007): attaches to consonant-initial verb stems without VV elision.
+     * e.g. dafatika → strip 'da' → fatika → strip FV → fatik (verb root).
+     * Attested: ubudahwema (non-stop), ubudasiba (without-ceasing),
+     *           ubudafatika (instability). Condition: 'da' + consonant. */
+    if (slen >= 5 && tok->stem[0] == 'd' && tok->stem[1] == 'a') {
+        char da_s2 = tok->stem[2];
+        bool da_v2 = (da_s2=='a'||da_s2=='e'||da_s2=='i'||da_s2=='o'||da_s2=='u');
+        if (!da_v2) {
+            size_t da_slen = slen - 2;
+            if (da_slen >= 3) {
+                char da_root[KIN_MAX_STEM];
+                strncpy(da_root, tok->stem + 2, da_slen - 1);
+                da_root[da_slen - 1] = '\0';
+                if (strlen(da_root) >= 2 && kin_is_known_verb_stem(da_root)) {
+                    tok->is_deverbative = true;
+                    strncpy(tok->verb_root, da_root, KIN_MAX_STEM - 1);
+                    tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+                    return;
+                }
+            }
+        }
+    }
     /* Agentive -nzi suffix: C ends in 'zi' with underlying g→z before -i.
      * e.g. "tunzi" → strip 'zi' → "tun", reverse z→g on last consonant → "tung"
      * cf. umutunzi (one who has wealth) ← gutunga (-tung- root, g→z before -i).
@@ -305,9 +378,13 @@ void kin_tag_token(Token *tok) {
 
         if (kin_is_verb_conjugated(w, v_stem, &v_cls, &v_tense,
                                    &v_obj, &v_ext, &v_neg)
-            /* PRESENT_NORA: require known stem OR phon-mutation SP (bare_phon_sp). */
+            /* PRESENT_NORA: require known stem.  Suppress when the stripped OM
+             * class equals the noun class — that means the "OM" is actually the
+             * noun-class prefix, not a real object marker.
+             * e.g. ubu-riganya: v_obj=14, cls=14 → noun prefix, not OM → noun wins.
+             * e.g. bu-riganya (SP=bu, no OM): v_obj=0 → guard doesn't fire → ok. */
             && (v_tense != TENSE_PRESENT_NORA
-                || kin_is_known_verb_stem(v_stem)
+                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))
             /* SUBJUNCTIVE: allow when stem is known OR when bare phon-SP makes
              * the verb reading unambiguous (by/cy/ry/zy can only be verb SPs).

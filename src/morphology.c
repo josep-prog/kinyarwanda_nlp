@@ -994,6 +994,24 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
             return true;
         }
     }
+    /* Passive-perfect epenthetic suffix: -ejw or -ijw                       *
+     * Phonological variant of passive -w- on stems ending in -sh/-esh:     *
+     * epenthetic vowel (e or i by vowel harmony) is inserted before -jw-.  *
+     *   gupesha  (root pesh): pesh + ejw + e = peshejwe                    *
+     *   kwandika (root andik): andik + ijw + e = andikijwe                 *
+     * Must be checked BEFORE the single-char -w passive to prevent -w from *
+     * consuming the 'w' of "ejw", leaving "peshej" as a false root.        *
+     * slen > 4: minimum bare(2) + suffix(3) = 5.                           */
+    if (slen > 4 &&
+        (kin_ends_with(stem, "ejw") || kin_ends_with(stem, "ijw"))) {
+        size_t blen = slen - 3;
+        strncpy(tmp, stem, blen); tmp[blen] = '\0';
+        if (blen >= 2) {
+            if (ext_out)  *ext_out = VEXT_PASSIVE;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
     /* Passive: -w (single char, check last).
      * Guard slen >= 3 (not >3): short passive roots like "it+w" (kwitwa)
      * have slen=3; the inner blen>=2 check already prevents bare stems <2. */
@@ -1002,6 +1020,22 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
         strncpy(tmp, stem, blen); tmp[blen] = '\0';
         if (blen >= 2) {
             if (ext_out)  *ext_out = VEXT_PASSIVE;
+            if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
+            return true;
+        }
+    }
+    /* Causative -iz-/-ez- (allomorph for applicative-base verbs):
+     * When a verb whose root ends in -ir (applicative) takes the causative-y
+     * extension, the sequence -ir + y fuses: r+y→z, giving -iz-.
+     * e.g. gusinziriza: root sinzir + iz(causative-y on applicative) + a
+     *      sinziriz → strip iz → sinzir = known root (gusinzira) ✓
+     * Also handles -ez- (vowel-harmony variant for mid-vowel roots).
+     * Guard: stripped result must be a known verb stem (prevents false splits). */
+    if (slen > 4 && (kin_ends_with(stem, "iz") || kin_ends_with(stem, "ez"))) {
+        size_t blen = slen - 2;
+        strncpy(tmp, stem, blen); tmp[blen] = '\0';
+        if (blen >= 2 && kin_is_known_verb_stem(tmp)) {
+            if (ext_out)  *ext_out = VEXT_CAUSATIVE_IZ;
             if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
             return true;
         }
@@ -1121,8 +1155,20 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         const char *inner = word + plen;
         size_t ilen = strlen(inner);
 
-        /* "ara" has ra already embedded; inner ends in 'a' */
+        /* "ara" has ra already embedded; inner ends in 'a' (or locative) */
         if (strcmp(SP[i].pfx, "ara") == 0) {
+            /* ara + stem + aho/amo/ayo: PRESENT + LOCATIVE suffix */
+            if (ilen >= 5 &&
+                (kin_ends_with(inner, "aho") || kin_ends_with(inner, "amo") ||
+                 kin_ends_with(inner, "ayo"))) {
+                size_t sl = ilen - 3;   /* strip a + 2-char locative */
+                if (sl >= 2) {
+                    if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+                    if (subj_class) *subj_class = 1;
+                    if (tense_out)  *tense_out  = TENSE_PRESENT;
+                    return true;
+                }
+            }
             if (inner[ilen-1] != 'a' || ilen < 2) continue;
             if (stem_buf) { strncpy(stem_buf, inner, ilen-1); stem_buf[ilen-1]='\0'; }
             if (subj_class) *subj_class = 1;
@@ -1133,11 +1179,23 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         /* FUTURE: za + stem + a */
         if (kin_starts_with(inner, "za") && ilen > 3 && inner[ilen-1]=='a') {
             const char *s = inner + 2; size_t sl = ilen - 3;
-            if (sl < 1) continue;
-            if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
-            if (subj_class) *subj_class = SP[i].cls;
-            if (tense_out)  *tense_out  = TENSE_FUTURE;
-            return true;
+            /* Guard: a 1-char root must be a known stem (z=kuza, b=kuba, h=guha,
+             * v=kuva). Rejects "n" from "azana" (which is kuzana, present) so
+             * that the PRESENT_NORA branch below can give the correct reading.
+             * NOTE: do NOT use continue — that would skip to the next SP prefix,
+             * preventing the PRESENT_NORA branches from running for this SP. */
+            bool fut_ok = (sl >= 2);
+            if (!fut_ok && sl == 1) {
+                char tmp[2] = {s[0], '\0'};
+                fut_ok = kin_is_known_verb_stem(tmp);
+            }
+            if (fut_ok) {
+                if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_FUTURE;
+                return true;
+            }
+            /* sl==0 or unknown 1-char root: fall through to other tense checks */
         }
         /* FUTURE + LOCATIVE: za + stem + a + ho/mo/yo                        *
          * e.g. nzabaho = n(1sg) + za + b(kuba) + a + ho                      *
@@ -1340,6 +1398,19 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 }
             }
         }
+        /* PAST PERFECT: gucya surface form — cy→k, iye→eye (§11.3)
+         * §11.3: cy cannot precede i or e; before 'e' it becomes 'k'.
+         * Past perf FV "-iye" triggers palatal harmony: i→e after palatal cy.
+         * Derivation: SP + cy + iye → SP + k + eye.
+         * inner for any SP = "keye" (exactly 4 chars).
+         * Must be checked before the general "ye" branch to prevent
+         * misparse as stem="ke" (unknown root). */
+        if (ilen == 4 && strcmp(inner, "keye") == 0) {
+            if (stem_buf) { strncpy(stem_buf, "cy", KIN_MAX_STEM-1); stem_buf[2] = '\0'; }
+            if (subj_class) *subj_class = SP[i].cls;
+            if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+            return true;
+        }
         /* PAST PERFECT: ends in ye
          * Guard: if inner ends in ...y+e AND stripping only 'e' gives a
          * known y-final root (e.g. "meny" from "menye"), the 'y' belongs
@@ -1357,8 +1428,30 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 y_root_exists = kin_is_known_verb_stem(cand_y);
             }
             if (!y_root_exists) {
-                size_t sl = ilen - 2;
-                if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+                size_t sl = ilen - 2;           /* strip "ye" */
+                const char *stem_src = inner;
+                size_t stem_len = sl;
+                /* ra-TM inside "ye" path: if stripping "ye" gives a
+                 * candidate that starts with "ra" but is not itself a
+                 * known root, and dropping "ra" gives a known root,
+                 * this is SP+ra+root+ye — strip ra-TM here so
+                 * morph_dispatch sees the bare root.
+                 * Guard: only when full candidate is NOT known (prevents
+                 * stripping "ra" from genuine r-initial roots like "raba"
+                 * (kuraba) which ARE in VERB_STEMS). */
+                if (sl >= 3 && inner[0]=='r' && inner[1]=='a') {
+                    char cand[KIN_MAX_STEM];
+                    strncpy(cand, inner, sl); cand[sl] = '\0';
+                    if (!kin_is_known_verb_stem(cand) &&
+                            kin_is_known_verb_stem(cand + 2)) {
+                        stem_src = inner + 2;
+                        stem_len = sl - 2;
+                    }
+                }
+                if (stem_buf && stem_len < KIN_MAX_STEM) {
+                    strncpy(stem_buf, stem_src, stem_len);
+                    stem_buf[stem_len] = '\0';
+                }
                 if (subj_class) *subj_class = SP[i].cls;
                 if (tense_out)  *tense_out  = TENSE_PAST_PERF;
                 return true;
@@ -1742,6 +1835,25 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 }
             }
         }
+        /* PRESENT no-ra + LOCATIVE: inner ends in 'aho', 'amo', or 'ayo'.     *
+         * Pattern: SP + stem + a(FV) + ho/mo/yo(locative suffix).             *
+         * e.g. imukuramo = i(SP·Nt.9) + mu(OM) + kur(root) + a(FV) + mo(LOC)*
+         *      arakoreramo = ara(SP) + korer + a + mo                         *
+         * Strip the 3-char complex 'a+locative' to recover the bare stem.    *
+         * Must be checked BEFORE the plain PRESENT_NORA (which strips only   *
+         * 1 char) to prevent the 'o' of 'mo' being treated as FV alone.      *
+         * Guard: sl >= 2 requires at least a 2-char stem before the locative. */
+        if (ilen >= 5 &&
+            (kin_ends_with(inner, "aho") || kin_ends_with(inner, "amo") ||
+             kin_ends_with(inner, "ayo"))) {
+            size_t sl = ilen - 3;   /* strip a + 2-char locative */
+            if (sl >= 2) {
+                if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_PRESENT_NORA;
+                return true;
+            }
+        }
         /* PRESENT no-ra: ends in a or o */
         if (ilen >= 2 && (inner[ilen-1]=='a' || inner[ilen-1]=='o')) {
             size_t sl = ilen - 1;
@@ -1824,7 +1936,32 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     int  cls   = 0;
     VerbTense tense = TENSE_NONE;
 
-    if (!verb_match_inner(parse_word, raw_stem, &cls, &tense)) {
+    bool first_ok = verb_match_inner(parse_word, raw_stem, &cls, &tense);
+
+    /* ── LAYER 2a: nti + i-elided SP retry ─────────────────────────────── *
+     * "nti" negation leaves parse_word="iXXX". The 'i' can be a vowel that *
+     * belongs to the SP that follows, not an Nt.4 SP itself. Run the retry  *
+     * unconditionally so a spurious first parse can be overridden.          *
+     * e.g. ntimuzarye: first parse → i(SP·Nt.4)+muzar+ye (PAST_PERF, wrong)*
+     *      retry "muzarye" → mu(SP·2pl)+za+ry+e (FUTURE_SUBJ, correct).    *
+     * Override rule: prefer retry when retry_ok AND (first failed OR retry  *
+     * gives a directly-known stem without needing OM processing).           */
+    if (is_neg && parse_word[0] == 'i') {
+        char retry_stem[KIN_MAX_STEM] = "";
+        int  retry_cls  = 0;
+        VerbTense retry_tense = TENSE_NONE;
+        bool retry_ok = verb_match_inner(parse_word + 1, retry_stem,
+                                         &retry_cls, &retry_tense);
+        if (retry_ok && (!first_ok || kin_is_known_verb_stem(retry_stem))) {
+            strncpy(raw_stem, retry_stem, KIN_MAX_STEM - 1);
+            raw_stem[KIN_MAX_STEM - 1] = '\0';
+            cls   = retry_cls;
+            tense = retry_tense;
+            first_ok = true;
+        }
+    }
+
+    if (!first_ok) {
         /* ── LAYER 2b: Imperative fallback (Integeko) ──────────────────── *
          * If no SP was recognized AND the word ends in 'a' AND the word    *
          * (minus final 'a') is a known verb stem → mark as imperative.     *
@@ -1969,6 +2106,36 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     strncpy(after_om, raw_stem, KIN_MAX_STEM - 1);
     after_om[KIN_MAX_STEM - 1] = '\0';
     om_strip(raw_stem, &obj_cls, after_om, sizeof(after_om));
+
+    /* ── LAYER 3a.5: Epenthetic-'i' recovery for past-perfect ─────────────── *
+     * When tense=PAST_PERF, verb_match_inner uses the 'ye' branch (not 'iye') *
+     * whenever an OM precedes the root, because it can't look past the OM to  *
+     * test whether stripping 'iye' yields a known root.  The 'ye' branch      *
+     * leaves the epenthetic 'i' of the '-iye' complex as the final char of    *
+     * after_om.  Strip it to recover the true consonant-final root.           *
+     *                                                                          *
+     * Condition (all must hold):                                               *
+     *   1. tense == TENSE_PAST_PERF                                            *
+     *   2. after_om ends in consonant + 'i'  (the epenthetic 'i')             *
+     *   3. after_om is NOT itself a known verb stem                            *
+     *   4. Stripping the final 'i' yields a known verb stem                   *
+     *                                                                          *
+     * e.g. umukwiriye: after OM strip → after_om="kwiri"                      *
+     *   "kwiri" unknown, strip 'i' → "kwir" = known (gukwira) ✓               */
+    if (tense == TENSE_PAST_PERF) {
+        size_t alen = strlen(after_om);
+        if (alen >= 3 && after_om[alen-1] == 'i'
+                      && !is_vowel((unsigned char)after_om[alen-2])
+                      && !kin_is_known_verb_stem(after_om)) {
+            char try_root[KIN_MAX_STEM];
+            strncpy(try_root, after_om, alen - 1);
+            try_root[alen - 1] = '\0';
+            if (kin_is_known_verb_stem(try_root)) {
+                strncpy(after_om, try_root, KIN_MAX_STEM - 1);
+                after_om[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
 
     /* ── LAYER 3b: Strip verb extension from end of after_om ───────────── */
     VerbExtension vext = VEXT_NONE;

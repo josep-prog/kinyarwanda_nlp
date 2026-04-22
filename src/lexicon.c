@@ -235,6 +235,7 @@ static const PronounEntry PRONOUNS[] = {
     { "bya",   PRON_POSSESSIVE,  8 },
     { "ya",    PRON_POSSESSIVE,  9 },
     { "za",    PRON_POSSESSIVE, 10 },
+    { "z",     PRON_POSSESSIVE, 10 }, /* elided za (Nt.10) before vowel: z'ubutaka */
     { "rwa",   PRON_POSSESSIVE, 11 },
     { "ka",    PRON_POSSESSIVE, 12 },
     { "twa",   PRON_POSSESSIVE, 13 },
@@ -984,7 +985,8 @@ static const InvEntry INVARIABLES[] = {
     { "ryari",      POS_ADVERB }, /* when? (as time adverb)                */
     { "hanyuma",    POS_ADVERB }, /* afterwards / then                     */
     { "mbere",      POS_ADVERB }, /* first / before                        */
-    { "bukeye",     POS_ADVERB }, /* the next day / the following day      */
+    /* "bukeye" removed: it is inshinga itondaguye (conjugated verb, TENSE_PAST_PERF)
+     * deverbative of gucya (to dawn). bu(SP·14)+cy(root)+iye(FV) →bukeye §11.3. */
     { "uyu munsi",  POS_ADVERB }, /* today                                 */
     { "vuba",       POS_ADVERB }, /* soon / quickly                        */
     { "noneho",     POS_ADVERB }, /* right now / just now                  */
@@ -1207,6 +1209,9 @@ static const char *VERB_STEMS[] = {
     "reb",      /* kureba      – to look at                               */
     "tur",      /* gutura      – to live / reside                         */
     "fat",      /* gufata      – to take / hold                           */
+    "fatik",    /* gufatika    – to be firm / hold oneself (neuter of gufata) */
+    "hwem",     /* guhwema     – to pause / pant                          */
+    "sib",      /* gusiba      – to erase / miss / be absent              */
     "vug",      /* kuvuga      – to speak / say                           */
     "baz",      /* kubaza      – to ask                                   */
     "subiz",    /* gusubiza    – to answer                                */
@@ -1268,6 +1273,7 @@ static const char *VERB_STEMS[] = {
     "injir",    /* kwinjira    – to enter / go in                         */
     "ihangan",  /* kwihangana  – to be patient / endure                   */
     "twar",     /* gutwara     – to carry / transport / lead              */
+    "twik",     /* gutwika     – to burn / set fire to                   */
     "mvir",     /* kumvira     – to obey / hear / listen                  */
     "zan",      /* kuzana      – to bring                                 */
     "vuk",      /* kuvuka      – to be born / come out                    */
@@ -1304,7 +1310,7 @@ static const char *VERB_STEMS[] = {
     "irukan",   /* kwirukana   – to chase away                            */
     "inginga",  /* kwinginga   – to beg / plead                           */
     "tonder",   /* kwitondera  – to be careful / pay attention            */
-    "rushy",    /* kurusha     – to surpass / be more than                */
+    "rush",     /* kurusha     – to surpass / be more than                */
     "tabur",    /* gutabara    – to rescue / save                         */
     "ic",       /* kwica       – to kill                                  */
     "jyen",     /* kujyena     – to walk along                            */
@@ -1450,6 +1456,8 @@ static const char *VERB_STEMS[] = {
     "z",        /* kuza        – to come / arrive (very common!)         */
     "b",        /* kuba        – to be / exist (copular: araba, rurabaho)*/
     "h",        /* guha        – to give (e.g. ibiha=i+bi(OM.8)+h+a)    */
+    "hesh",     /* guhesha     – to make/cause to give (caus. of guha) */
+    "pesh",     /* guhesha 1sg – h→p allomorph /_n: n+hesh→mp+pesh    */
     "rakar",    /* gurakarira  – to be angry / furious                   */
     "rakaz",    /* gurakariza  – to make angry / enrage                  */
     "mer",      /* kumera      – to grow / thrive (already "mer" added?) */
@@ -1489,6 +1497,7 @@ static const char *VERB_STEMS[] = {
     "rangir",   /* kurangira   – to finish / complete / end              */
     "berek",    /* kubereka    – to show / demonstrate to               */
     "bimb",     /* kubimba     – to bury / cover with soil               */
+    "hing",     /* guhinga     – to cultivate / farm / plant (agentive: umuhinzi) */
     /* ── Corpus-confirmed high-frequency stems (Bible analysis 2026) ── */
     "hamagal",  /* guhamagara  – to call / summon / name (aramuhamagara) */
     "sobanur",  /* gusobanura  – to explain / clarify (arabisobanurira)  */
@@ -1519,6 +1528,12 @@ static const char *VERB_STEMS[] = {
     "sanzur",   /* gusanzura   – to spread/stretch out (sky, cloth);
                    ALSO kwisanzura – to free oneself (→ ubwisanzure = freedom) */
     "kwir",     /* gukwira     – to fit / be appropriate / suitable (zikwiriye) */
+    "sinzir",   /* gusinzira   – to sleep (applicative base: sinz+ir+a;
+                   causative: sinzir+iz+a = gusinziriza = to cause to sleep)  */
+    "icur",     /* kwicura     – to fall into a death-like / comatose sleep;
+                   vowel-initial: kw+icur+a = kwicura (u→w before V, §1.1)
+                   → ubuticura (Nt.14 abstract noun: the state of such sleep;
+                     ti- = privative/completive prefix + icur root)           */
     /* ── Genesis 1 corpus + Biblical subjunctive forms ─────────────────── */
     "ororok",   /* kororoka    – to be fruitful / reproduce / multiply
                    Infinitive: ku+ororok+a → kororoka (u→∅/_o §1.2)
@@ -1541,6 +1556,10 @@ static const char *VERB_STEMS[] = {
     "kurur",    /* gukurura    – to pull / drag / tow
                    Stative: gukururuka (ki→gi §3.7.1: gikururuka = it is pullable)
                    3sg: akurura (he/she pulls), bakururuka (they are pullable)  */
+    "rigany",   /* kuriganya   – to deceive / be hypocritical (→ uburiganya = hypocrisy) */
+    "ry",       /* kurya       – to eat (y-final root: kurya→ry, yariye, bazarye)
+                   PAST_SP_Y guard: ry+e=rye (y-final root takes bare 'e' FV, not 'ye')
+                   FUTURE_SUBJ: mu+za+ry+e = muzarye (ntimuzarye = don't eat, 2pl) */
     NULL
 };
 
@@ -2073,6 +2092,16 @@ static const KnownWord KNOWN_WORDS[] = {
     /* "ubutaka": u(SP·Nt.3)+bu(OM·Nt.14)+tak(gutaka=shout)+a → misread as verb.
      * Correct reading: D=u + RT=bu (Nt.14) + C=taka → land / soil / earth.  */
     { "ubutaka",  14,  "taka"   }, /* land / soil / earth (Nt.14 abstract)    */
+    /* Nt.5 offerings/sacrificial nouns */
+    { "ituro",     5,  "turo"   }, /* offering / tribute / sacrifice (Nt.5)  */
+    /* Nt.9 seed/fruit nouns — conflict with verb SP+OM pattern */
+    { "imbuto",    9,  "buto"   }, /* seeds / fruits (Nt.9; n+b=mb)           */
+    { "mbuto",     9,  "buto"   }, /* seeds / fruits (Nt.9 dropped-i form)    */
+    /* Nt.14 archaic "last born" noun — misread as bu(SP14)+ri(OM5)+z(kuza)+a.
+     * uburiza: u(D)+bu(RT·Nt.14)+riza(C) = last born (person or animal).
+     * buriza: dropped-D form after locative ku/mu (ku buriza = to/for the lastborn). */
+    { "uburiza",  14,  "riza"   }, /* last born (old Kinyarwanda, Nt.14)       */
+    { "buriza",   14,  "riza"   }, /* last born — dropped-D form of uburiza    */
 
     /* ── Time-expression nouns ──────────────────────────────────────────────── */
     { "saa",       9,  "saa"    }, /* hour / o'clock (Swahili loanword, Nt.9)  */
@@ -2360,7 +2389,8 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_REFLEXIVE:   return "Imbundo yo kwisanzura (Reflexive: i- elided in bare form)";
         case VEXT_STATIVE:     return "Ngirika (Stative/Potential: -ik-/-ek-)";
         case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
-        case VEXT_CAUSATIVE_Y: return "Ngiza (Causative-y: r+y→z, §1.3)";
+        case VEXT_CAUSATIVE_Y:  return "Ngiza (Causative-y: r+y→z, §1.3)";
+        case VEXT_CAUSATIVE_IZ: return "Integeko -iz-/-ez- (Causative allomorph: stem+iz+a, e.g. sinzir+iz+a)";
         default:               return "";
     }
 }
