@@ -33,6 +33,7 @@
  * entries (like "mvura" = rain) override the general verb heuristics.
  */
 
+#include <ctype.h>
 #include <string.h>
 #include "../include/kinyarwanda.h"
 

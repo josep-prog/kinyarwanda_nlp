@@ -24,6 +24,7 @@
  *   Words tagged POS_FOREIGN that are not proper nouns are flagged.
  */
 
+#include <ctype.h>
 #include <string.h>
 #include <stdio.h>
 #include "../include/kinyarwanda.h"
@@ -281,6 +282,29 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                     { has_remote_subject = true; break; }
             }
             if (has_remote_subject) continue;
+
+            /* Sentence-initial capitalised words that the prefix heuristic
+             * assigned a non-human class may be proper names of people.
+             * In Kinyarwanda all human proper nouns take class-1 agreement
+             * (SP "a") regardless of their phonological shape (e.g. Kayini,
+             * Kagome, Rukesha, Butera).  When the noun is sentence-initial,
+             * capitalised, not already confirmed as a proper noun, and the
+             * verb uses human SP (class 1 or 3), suppress the error.      */
+            if (isupper((unsigned char)noun->surface[0]) &&
+                !noun->is_proper_noun && (vc == 1 || vc == 3)) {
+                bool sent_initial = (i == 0);
+                if (!sent_initial) {
+                    for (int k = i - 1; k >= 0; k--) {
+                        if (sa->tokens[k].pos == POS_PUNCTUATION) {
+                            if (sa->tokens[k].is_sent_boundary)
+                                { sent_initial = true; break; }
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                if (sent_initial) continue;
+            }
 
             char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
             snprintf(msg, sizeof(msg),

@@ -1451,6 +1451,29 @@ static void analyse_vconj(Token *tok)
         }
     }
 
+    /* Subjunctive r→j/_e: root-final 'r' is realised as 'j' before the
+     * subjunctive final vowel 'e' (palatalization of root-final coronal).
+     * e.g. kurakara: root "rakar" + FV e → surface "rakaj" + e.
+     * Guard: only apply when the surface word actually has 'j' immediately
+     * before the final 'e' — this avoids falsely annotating verbs like
+     * gukora (root "kor") whose subjunctive surface "akore" has no 'j'.  */
+    if (tok->verb_tense == TENSE_SUBJUNCTIVE && tok->verb_ext == VEXT_NONE
+        && root[0] && !root_surface_rule[0]) {
+        size_t rlen  = strlen(root);
+        size_t wlen  = strlen(word);
+        bool has_j   = (wlen >= 2 && word[wlen-1] == 'e' && word[wlen-2] == 'j');
+        if (rlen >= 2 && root[rlen-1] == 'r' && has_j) {
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = 'j';
+            root_surface_buf[rlen]   = '\0';
+            root_surface = root_surface_buf;
+            snprintf(root_surface_rule, sizeof(root_surface_rule),
+                     "r\xe2\x86\x92j / _e (inzira y'imperuka y'igicumbi imbere ya FV 'e'"
+                     " y'ikigombero: %s+e\xe2\x86\x92%se)",
+                     root, root_surface_buf);
+        }
+    }
+
     /* cy→k surface in past perfect (§11.3): cy cannot precede 'e'.
      * gucya past perf: cy + iye → k + eye. Surface root = "k". */
     if (is_past_tense(tok->verb_tense) && strcmp(root, "cy") == 0

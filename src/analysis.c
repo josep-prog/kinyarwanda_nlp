@@ -214,11 +214,57 @@ void kin_tag_gram_roles(SentenceAnalysis *sa) {
     }
 }
 
+/*
+ * kin_propagate_proper_nouns() — within a single analysed text, a word that
+ * appears as a confirmed proper noun mid-sentence (is_proper_noun set by the
+ * tokenizer for non-sentence-initial capitals) should be treated as a proper
+ * noun everywhere it occurs, including at sentence start.
+ *
+ * The tokenizer cannot flag sentence-initial capitals because it cannot
+ * distinguish proper names (Kayini, Dawidi) from ordinary nouns that happen
+ * to start a sentence (Imana, Inzu).  After pos-tagging we know which surface
+ * forms were confirmed mid-sentence; propagate that flag to any token with the
+ * same lowercased surface that was mis-assigned a concrete noun class.
+ */
+static void kin_propagate_proper_nouns(SentenceAnalysis *sa) {
+    char confirmed[KIN_MAX_TOKENS][KIN_MAX_WORD];
+    int  n_confirmed = 0;
+
+    for (int i = 0; i < sa->token_count; i++) {
+        const Token *t = &sa->tokens[i];
+        if (!t->is_proper_noun) continue;
+        bool dup = false;
+        for (int j = 0; j < n_confirmed; j++) {
+            if (strcmp(confirmed[j], t->lower) == 0) { dup = true; break; }
+        }
+        if (!dup && n_confirmed < KIN_MAX_TOKENS) {
+            strncpy(confirmed[n_confirmed], t->lower, KIN_MAX_WORD - 1);
+            confirmed[n_confirmed][KIN_MAX_WORD - 1] = '\0';
+            n_confirmed++;
+        }
+    }
+    if (n_confirmed == 0) return;
+
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        if (t->is_proper_noun) continue;
+        if (t->pos != POS_NOUN)  continue;
+        for (int j = 0; j < n_confirmed; j++) {
+            if (strcmp(t->lower, confirmed[j]) == 0) {
+                t->is_proper_noun = true;
+                t->noun_class     = 0;
+                break;
+            }
+        }
+    }
+}
+
 SentenceAnalysis kin_analyze(const char *text) {
     SentenceAnalysis sa;
     memset(&sa, 0, sizeof(sa));
     sa.token_count = kin_tokenize(text, sa.tokens, KIN_MAX_TOKENS);
     kin_tag_sentence(&sa);
+    kin_propagate_proper_nouns(&sa);  /* carry proper-noun flag to sentence-initial occurrences */
     kin_resolve_sp_ambiguity(&sa);   /* resolve ya/i SP class before syntax    */
     /* Type-dispatch morpheme analysis: fills tok->morph per word type.
      * Each type gets its own rules (noun→D+RT+C, verb→SP+TM+C+FV, etc.)   */
@@ -499,7 +545,10 @@ static void print_verb_morphemes(const Token *t) {
                 } else
                     printf(" %s(SP)", form);   /* personal pronoun class */
             } else if (strcmp(m->label, "OM") == 0) {
-                printf(" %s(OM\xC2\xB7Nt.%d)", form, t->obj_class);
+                if (t->obj_class == 15)
+                    printf(" %s(OM\xC2\xB7" "2sg / Nt.15)", form);
+                else
+                    printf(" %s(OM\xC2\xB7Nt.%d)", form, t->obj_class);
             } else if (strcmp(m->label, "root") == 0) {
                 printf(" %s(root)", form);
             } else if (strcmp(m->label, "REV") == 0) {
@@ -547,7 +596,12 @@ static void print_verb_morphemes(const Token *t) {
                sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
     }
     if (tm[0])  printf(" + %s(TM)", tm);
-    if (om[0])  printf(" + %s(OM\xC2\xB7Nt.%d)", om, t->obj_class);
+    if (om[0]) {
+        if (t->obj_class == 15)
+            printf(" + %s(OM\xC2\xB7" "2sg / Nt.15)", om);
+        else
+            printf(" + %s(OM\xC2\xB7Nt.%d)", om, t->obj_class);
+    }
     if (t->verb_ext == VEXT_REFLEXIVE) {
         bool refl_i_present = t->stem[0] && !is_vowel_c(t->stem[0]);
         if (refl_i_present) printf(" + i(REFL)");
@@ -776,7 +830,12 @@ static void print_verb_reconstruction(const Token *t) {
                sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
     }
     if (tm[0])      printf(" + [TM]%s", tm);
-    if (om[0])      printf(" + [OM]%s(Nt.%d)", om, t->obj_class);
+    if (om[0]) {
+        if (t->obj_class == 15)
+            printf(" + [OM]%s(2sg / Nt.15)", om);
+        else
+            printf(" + [OM]%s(Nt.%d)", om, t->obj_class);
+    }
     printf(" + [root]%s", root);
     if (ext_sfx[0]) printf(" + [EXT]%s", ext_sfx);
     printf(" + [FV]%s  \342\206\222  %s%s\n", fv, built, matches ? "  \342\234\223" : "");
@@ -1520,10 +1579,17 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                     printf("  \342\224\224\342\224\200 Inshingwa: %s\n",
                            kin_gram_role_name(t->gram_role));
                 /* 4. OM and extension */
-                if (t->obj_class > 0)
-                    printf("  \342\224\224\342\224\200 OM(Nt.%d/-%s-): %s\n",
-                           t->obj_class, kin_om_str(t->obj_class),
-                           kin_class_name(t->obj_class));
+                if (t->obj_class > 0) {
+                    if (t->obj_class == 15)
+                        printf("  \342\224\224\342\224\200 OM(2sg / Nt.15/-%s-): %s / %s\n",
+                               kin_om_str(t->obj_class),
+                               "2nd person sg. object (\"you\")",
+                               kin_class_name(t->obj_class));
+                    else
+                        printf("  \342\224\224\342\224\200 OM(Nt.%d/-%s-): %s\n",
+                               t->obj_class, kin_om_str(t->obj_class),
+                               kin_class_name(t->obj_class));
+                }
                 if (t->verb_ext != VEXT_NONE) {
                     /* For VEXT_REFLEXIVE: distinguish present-i vs elided-i */
                     if (t->verb_ext == VEXT_REFLEXIVE &&
@@ -1537,10 +1603,17 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                 print_verb_reconstruction(t);
             } else {
                 /* POS_VERB_INF: morpheme breakdown + reconstruction */
-                if (t->obj_class > 0)
-                    printf("  └─ OM(Nt.%d/-%s-): %s\n",
-                           t->obj_class, kin_om_str(t->obj_class),
-                           kin_class_name(t->obj_class));
+                if (t->obj_class > 0) {
+                    if (t->obj_class == 15)
+                        printf("  └─ OM(2sg / Nt.15/-%s-): %s / %s\n",
+                               kin_om_str(t->obj_class),
+                               "2nd person sg. object (\"you\")",
+                               kin_class_name(t->obj_class));
+                    else
+                        printf("  └─ OM(Nt.%d/-%s-): %s\n",
+                               t->obj_class, kin_om_str(t->obj_class),
+                               kin_class_name(t->obj_class));
+                }
                 if (t->verb_ext != VEXT_NONE)
                     printf("  └─ %s\n", kin_verb_ext_name(t->verb_ext));
                 print_inf_morphemes(t);

@@ -2233,6 +2233,25 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
         }
     }
 
+    /* ── LAYER 3b.9: Subjunctive j-final stem — root-final r→j/_e reversal ─── *
+     * In the SUBJUNCTIVE (FV='e'), root-final 'r' is realised as 'j' on the   *
+     * surface by a palatalization rule: r → j / _e.                             *
+     * e.g. ki-ku-rakar-e → kikurakaje: -rakar- is the root of kurakara;        *
+     *      rakar+e → rakaje (r becomes j before the subjunctive final vowel).   *
+     * Recover the underlying root by reverting final j → r in the lexicon.      */
+    if (tense == TENSE_SUBJUNCTIVE && vext == VEXT_NONE) {
+        size_t blen = strlen(bare);
+        if (blen >= 2 && bare[blen-1] == 'j') {
+            char try_r[KIN_MAX_STEM];
+            strncpy(try_r, bare, blen - 1);
+            try_r[blen-1] = 'r'; try_r[blen] = '\0';
+            if (kin_is_known_verb_stem(try_r)) {
+                strncpy(bare, try_r, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
+
     /* ── LAYER 3c: Validate OM; revert if bare stem is unknown ──────────── *
      * If an OM was stripped but the resulting stem is not a known verb stem, *
      * check whether the un-stripped raw_stem (or raw_stem after ext-strip)   *
