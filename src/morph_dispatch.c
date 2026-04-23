@@ -1076,6 +1076,46 @@ static void analyse_vconj(Token *tok)
     const char *word = tok->lower;
     bool past = is_past_tense(tok->verb_tense);
 
+    tok->is_reduplicated    = false;
+    tok->redup_surface[0]   = '\0';
+
+    /* ── Verb reduplication detection ─────────────────────────────────────── *
+     * Pattern: root₁ + 'a'(FV₁) + root₂ + (ext+) FV                         *
+     * kin_is_verb_conjugated() ext-strips BEFORE returning stem, so tok->stem *
+     * already has the extension removed.  If the resulting bare stem is not   *
+     * a known root, check whether it is a reduplicated form:                  *
+     *   vowel-initial stem: root₁ + 'a' + root₁_without_initial_vowel         *
+     *     e.g. "itugatug" → prefix="itug", stem[4]='a', rest="tug"="itug"+1 ✓*
+     *   consonant-initial: root₁ + 'a' + root₁                               *
+     *     e.g. "korakor"  → prefix="kor",  stem[3]='a', rest="kor"="kor"    ✓*
+     * If found: shorten tok->stem to root₁; set tok->redup_surface to the    *
+     * connecting 'a' + second copy (= tok->stem[k..]).                        */
+    if (tok->stem[0] && !kin_is_known_verb_stem(tok->stem)) {
+        size_t slen = strlen(tok->stem);
+        for (size_t k = 2; k + 1 < slen && !tok->is_reduplicated; k++) {
+            if (tok->stem[k] != 'a') continue;
+            char prefix[KIN_MAX_STEM];
+            if (k >= KIN_MAX_STEM) break;
+            strncpy(prefix, tok->stem, k);
+            prefix[k] = '\0';
+            const char *rest = tok->stem + k + 1;
+            bool vowel_init  = mv(prefix[0]);
+            bool matches = vowel_init ? (strcmp(rest, prefix + 1) == 0)
+                                      : (strcmp(rest, prefix)     == 0);
+            if (matches && kin_is_known_verb_stem(prefix)) {
+                /* redup_surface = 'a' + second copy (= tok->stem + k) */
+                size_t rslen = strlen(tok->stem + k);
+                if (rslen < KIN_MAX_STEM) {
+                    strncpy(tok->redup_surface, tok->stem + k, KIN_MAX_STEM - 1);
+                    tok->redup_surface[KIN_MAX_STEM - 1] = '\0';
+                    strncpy(tok->stem, prefix, KIN_MAX_STEM - 1);
+                    tok->stem[KIN_MAX_STEM - 1] = '\0';
+                    tok->is_reduplicated = true;
+                }
+            }
+        }
+    }
+
     /* eff_word:    effective SP start after stripping negation prefix.
      * neg_pfx:    surface of the NEG morpheme ("nt" or "si") or "".
      * neg_under:  underlying (canonical) form of the NEG morpheme.
@@ -1938,13 +1978,15 @@ static void analyse_vconj(Token *tok)
         /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra in the surface. */
         const char *neg_mid = (tok->verb_tense == TENSE_NEG_ANTERIOR) ? "ta"
                             : (tok->verb_tense == TENSE_NEG_DA_2SG)  ? "da" : "";
-        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s%s",
+        snprintf(built, sizeof(built), "%s%s%s%s%s%s%s%s%s",
                  neg_pfx,
                  sp_surface, neg_mid,
                  nar_voiced       ? nar_tm_surf :
                  tm_contracted    ? tm_contracted_buf : tm,
                  om[0] ? om_surface : "",
-                 root_surface, ext_surface, (past_rye_ze || past_kye_tse || past_tye_se) ? "e" : fv);
+                 root_surface,
+                 tok->is_reduplicated ? tok->redup_surface : "",
+                 ext_surface, (past_rye_ze || past_kye_tse || past_tye_se) ? "e" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -2080,6 +2122,11 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "root", root, root_surface,
                           root_h_to_s        ? root_hs_rule :
                           root_surface_rule[0] ? root_surface_rule : "");
+                if (tok->is_reduplicated) {
+                    set_morph(&mb->m[n++], "REDUP", tok->redup_surface,
+                              tok->redup_surface,
+                              "Isubiranwa (Verb reduplication: root\xe2\x82\x81 + a(FV\xe2\x82\x81) + root\xe2\x82\x82)");
+                }
             }
         } else {
             /* Deep-root check: when an outer extension exists (e.g. reciprocal
@@ -2159,6 +2206,10 @@ static void analyse_vconj(Token *tok)
             if (!wrote_deep)
                 set_morph(&mb->m[n++], "root", root, root_surface,
                           root_surface_rule[0] ? root_surface_rule : "");
+            if (tok->is_reduplicated) {
+                set_morph(&mb->m[n++], "REDUP", tok->redup_surface, tok->redup_surface,
+                          "Isubiranwa (Verb reduplication: root\xe2\x82\x81 + a(FV\xe2\x82\x81) + root\xe2\x82\x82)");
+            }
             if (ext[0]) {
                 /* pesh: passive -ejw- is the allomorph of -w- after causative -esh-. */
                 const char *ext_rule =

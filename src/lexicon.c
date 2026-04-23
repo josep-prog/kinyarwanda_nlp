@@ -1244,6 +1244,7 @@ static const char *VERB_STEMS[] = {
     "emez",     /* kwemeza     – to confirm                               */
     "erek",     /* kwerekana   – to show / demonstrate                    */
     "itabir",   /* kwitabira   – to attend                                */
+    "itug",     /* kwituga     – to fit / fit in (reduplicates: itugatuga) */
     "yemr",     /* kwiyemera   – to accept / agree                        */
     "bwir",     /* kubwira     – to tell                                  */
     "bw",       /* kubwa       – to fall                                  */

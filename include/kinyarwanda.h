@@ -495,6 +495,8 @@ typedef struct {
     bool is_kinyarwanda;            /* False = likely foreign/unknown       */
     bool is_proper_noun;            /* Capitalised and not at start         */
     bool is_negative;               /* nt- negative prefix detected         */
+    bool is_reduplicated;           /* Stem is a reduplicated verb form      */
+    char redup_surface[KIN_MAX_STEM]; /* Surface of REDUP: 'a' + 2nd copy   */
     int  error_count;               /* Number of errors on this token       */
     /* ── Deverbative noun (izina rivuye mu nshinga) ──────────────────────── */
     bool is_deverbative;            /* Noun derived from a verb stem         */
