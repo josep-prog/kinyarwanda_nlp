@@ -1137,6 +1137,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         { "u",     3  },
         { "i",     4  },
         { "a",     1  },
+        { "nu",    0  },  /* conditional 2sg: n(cond.particle) + u(2sg SP)    */
         { "n",     0  },
         { "w",     3  },  /* Nt.3/2sg u+vowel → w (wera=u+er+a, wemera)  */
         /* Elided SP: ya+V-stem → y+V-stem (a→Ø before vowel, p.7-8)     *
@@ -1789,6 +1790,23 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 return true;
             }
         }
+        /* 2sg CONDITIONAL NEGATIVE: nu/u + da(NEG) + root + a
+         * "da" is the negation particle for 2sg (u/nu) conditional and
+         * participial negative forms in Kinyarwanda:
+         *   nudakora = nu(cond.2sg) + da(NEG) + kor(root) + a = "if you don't do"
+         *   udakora  = u(2sg)       + da(NEG) + kor(root) + a = "you don't do"
+         * Must be checked BEFORE PRESENT_NORA to prevent "dakor" extraction.
+         * Minimum: da(2) + stem(≥2) + FV(1) = ilen >= 5.                    */
+        if ((strcmp(SP[i].pfx, "nu") == 0 || strcmp(SP[i].pfx, "u") == 0)
+            && kin_starts_with(inner, "da") && ilen >= 5 && inner[ilen-1] == 'a') {
+            const char *s = inner + 2; size_t sl = ilen - 3;
+            if (sl >= 2) {
+                if (stem_buf) { strncpy(stem_buf, s, sl); stem_buf[sl]='\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_NEG_DA_2SG;
+                return true;
+            }
+        }
         /* CONDITIONAL (Inziganyo): past-SP + ku/gu (modal particle) + stem + a
          *
          * Structure: SP(+a fused) + ku/gu + stem + a
@@ -1960,6 +1978,12 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
             first_ok = true;
         }
     }
+
+    /* ── LAYER 2a.5: 2sg "da" negation flag ────────────────────────────── *
+     * TENSE_NEG_DA_2SG was detected inside verb_match_inner when SP="nu"   *
+     * or SP="u" was followed by "da" + root + FV.  Mark the overall form   *
+     * as negative so the display and morpheme labelling work correctly.     */
+    if (first_ok && tense == TENSE_NEG_DA_2SG) is_neg = true;
 
     if (!first_ok) {
         /* ── LAYER 2b: Imperative fallback (Integeko) ──────────────────── *

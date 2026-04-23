@@ -288,6 +288,13 @@ typedef enum {
      *   kataraba  = ka(SP12) + ta(NEG) + ra(TM) + b(kuba) + a  → not yet being *
      *   itaravuba = i(SP9)   + ta(NEG) + ra(TM) + vub(kuvuba) + a → not yet rain*/
     TENSE_NEG_ANTERIOR,    /* "Not yet": SP + ta(NEG) + ra(TM) + stem + a       */
+    /* ── 2sg conditional negative ("da" particle): nu/u + da + root + a ────── *
+     * The "da" morpheme is the negation marker specific to 2sg (u/nu SP)       *
+     * in conditional and participial negative constructions.                   *
+     * Formula: SP(nu/u) + da(NEG) + root + a(FV)                              *
+     *   nudakora = nu(cond.2sg) + da(NEG) + kor(root) + a → if you don't do  *
+     *   udakora  = u(2sg)       + da(NEG) + kor(root) + a → you don't do     */
+    TENSE_NEG_DA_2SG,      /* 2sg-da negative: nu/u + da(NEG) + root + a       */
     /* ── Subjunctive + locative (Ikigombero + umugereka w'ahantu) ─────────── *
      * Pattern: SP + stem + e(SUBJ FV) + ho/mo/yo                             *
      *   habeho = ha(SP16) + b + e + ho  → "let there be (there)"            *

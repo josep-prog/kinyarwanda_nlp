@@ -638,6 +638,7 @@ static const char *tense_marker_key(VerbTense t) {
         case TENSE_CONDITIONAL:     return "SP + intera 'a' + root + FV='a'";
         case TENSE_NEG_RELATIVE:    return "NEG='ta' iboneka mu mwanya wa 2";
         case TENSE_NEG_ANTERIOR:    return "NEG='ta' + TM='ra' (ntiraba/kataraba: \"not yet\")";
+        case TENSE_NEG_DA_2SG:      return "SP(nu/u) + da(NEG) + root + FV='a' (impakanyi ya 2sg: udakora, nudakora)";
         case TENSE_COPULA_PAST:     return "SP(impitagihe) + 'ri' + ahantu";
         case TENSE_COPULA_PRES:     return "SP(indagihe) + 'ri' + ahantu";
         case TENSE_STATIVE_POSS:    return "SP + -fite (FV='e', igicumbi cya kugira)";

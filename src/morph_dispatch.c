@@ -1116,6 +1116,10 @@ static void analyse_vconj(Token *tok)
             neg_pfx   = "si";
             neg_under = "si";
         }
+        /* TENSE_NEG_DA_2SG: "da" negation sits AFTER the SP (nu/u), not before
+         * the word.  No prefix is stripped here — eff_word stays at word.
+         * The "da" morpheme is emitted as a mid-verb NEG slot in the morpheme
+         * sequence (SP → da(NEG) → root → FV), handled below via neg_mid.  */
     }
 
     /* Underlying SP */
@@ -1177,6 +1181,7 @@ static void analyse_vconj(Token *tok)
             if      (kin_starts_with(eff_word, "nda"))  sp_under = "n";   /* TM="da" below */
             else if (kin_starts_with(eff_word, "twa"))  sp_under = "tu";  /* 1pl past */
             else if (kin_starts_with(eff_word, "mwa"))  sp_under = "mu";  /* 2pl past */
+            else if (kin_starts_with(eff_word, "nu"))   sp_under = "nu";  /* cond. 2sg (n+u) */
             else if (kin_starts_with(eff_word, "n"))    sp_under = "n";
             else if (kin_starts_with(eff_word, "tu"))   sp_under = "tu";
             else if (kin_starts_with(eff_word, "u"))    sp_under = "u";
@@ -1510,7 +1515,13 @@ static void analyse_vconj(Token *tok)
         char sp_last = sp_under[slen - 1];
         char next_c  = next_after_sp[0];
 
-        if (sp_last == 'u' && mv(next_c)) {
+        if (strcmp(sp_under, "nu") == 0) {
+            /* Conditional 2sg "nu": monolithic morpheme — skip u→w mutation.
+             * n = conditional particle; u = 2sg SP surface. */
+            snprintf(sp_rule, sizeof(sp_rule),
+                     "n(inzira y'inziganyo) + u(SP\xc2\xb7""2sg) \xe2\x86\x92 nu"
+                     " (conditional 2sg: 'if you')");
+        } else if (sp_last == 'u' && mv(next_c)) {
             sp_surface[slen - 1] = 'w';
             snprintf(sp_rule, sizeof(sp_rule),
                      "u→w §1.1 (SP '%s'+'%c'→'%.*sw')", sp_under, next_c,
@@ -1925,7 +1936,8 @@ static void analyse_vconj(Token *tok)
         /* For r/d/g+ye→ze or k+ye→tse: root_surface already has fusion form;
          * FV surfaces as bare 'e' (the 'y' of 'ye' is absorbed by the fusion). */
         /* TENSE_NEG_ANTERIOR: ta(NEG) sits between SP and TM=ra in the surface. */
-        const char *neg_mid = (tok->verb_tense == TENSE_NEG_ANTERIOR) ? "ta" : "";
+        const char *neg_mid = (tok->verb_tense == TENSE_NEG_ANTERIOR) ? "ta"
+                            : (tok->verb_tense == TENSE_NEG_DA_2SG)  ? "da" : "";
         snprintf(built, sizeof(built), "%s%s%s%s%s%s%s%s",
                  neg_pfx,
                  sp_surface, neg_mid,
@@ -1956,6 +1968,10 @@ static void analyse_vconj(Token *tok)
     if (tok->verb_tense == TENSE_NEG_ANTERIOR)
         set_morph(&mb->m[n++], "NEG", "ta", "ta",
                   "Impakanyi (Neg. anterior: 'not yet'; -ta- before TM -ra-)");
+    /* TENSE_NEG_DA_2SG: da(NEG) sits between SP (nu/u) and root */
+    if (tok->verb_tense == TENSE_NEG_DA_2SG)
+        set_morph(&mb->m[n++], "NEG", "da", "da",
+                  "Impakanyi ya 2sg (da-NEG: SP nu/u + da + root; 'if you don't...')");
     /* i-final past SP: insert explicit past-augment slot ya(PA) after SP.
      * form="ya" = surface of a(past augment) after §1.1 bi+a→bya.
      * surface="" so it doesn't double-count "ya" already inside sp_surface.   */
@@ -2019,8 +2035,11 @@ static void analyse_vconj(Token *tok)
             strncpy(root_surface, root, KIN_MAX_STEM - 1);
             root_surface[KIN_MAX_STEM - 1] = '\0';
         }
-        set_morph(&mb->m[n++], "root", root, root_surface,
-                  "r+y\342\206\222z \302\2471.3 (causative-y fuses stem-final r: mer+y\342\206\222mez)");
+        char caus_y_rule[160];
+        snprintf(caus_y_rule, sizeof(caus_y_rule),
+                 "r+y\342\206\222z \302\2471.3 (causative-y fuses stem-final r: %s+y\342\206\222%s)",
+                 root, root_surface);
+        set_morph(&mb->m[n++], "root", root, root_surface, caus_y_rule);
         set_morph(&mb->m[n++], "EXT", "y", "", "");   /* ext absorbed into root surface */
     } else {
         /* When the POS tagger found no extension (VEXT_NONE), try detecting

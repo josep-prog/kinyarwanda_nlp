@@ -1518,7 +1518,10 @@ static const char *VERB_STEMS[] = {
     "kumur",    /* gukumura    – to vaccinate / treat (medical)           */
     "sagamb",   /* gusagamba   – to stride / march / walk proudly        */
     "riber",    /* guribirira  – to wait for eagerly                      */
-    "garagaz",  /* kugaragaza  – to show / demonstrate / reveal          */
+    "garagar",  /* kugaragara  – to be visible / appear / be seen         */
+    /* kugaragaza (to show/reveal) is the causative-y of kugaragara:
+     * garagar + y + a → garagaza (r+y→z rule §1.3); "garagaz" is NOT a bare
+     * stem — it is the z-surface of garagar+y, recognised by ext_strip.      */
     "hangayik", /* guhangayika – to worry / be anxious                   */
     "b",        /* kuba        – to be / to exist (copula; kubaho/kubamo) */
     /* ── Deverbative noun roots (verb stems underlying derived nouns) ─────── */
@@ -2371,6 +2374,7 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_COPULA_PRES:  return "Indagihe y'inshinga nkene (Present copula: ariho, ndiho, iriho…)";
         case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'impakanyi (Neg. participial: itagira, utagira\xe2\x80\xa6)";
         case TENSE_NEG_ANTERIOR:    return "Inshinga y'impakanyi bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
+        case TENSE_NEG_DA_2SG:      return "Impakanyi ya 2sg y'inziganyo (Neg. 2sg conditional: nu/u + da + root; udakora, nudakora\xe2\x80\xa6)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
         case TENSE_FUTURE_SUBJ:     return "Inzagihe+Ikigombero (NEG-future prohibitive: SP+za+stem+e)";
         case TENSE_FUTURE_SUBJ_LOC: return "Inzagihe+Ikigombero+ahantu (NEG-future prohibitive+loc: SP+za+stem+e+ho)";
