@@ -371,6 +371,12 @@ typedef enum {
                           * attaches to a stem ending in a consonant cluster or  *
                           * applicative-base (e.g. sinzir+iz+a = gusinziriza).  *
                           * Vowel harmony: mid-vowel root → -ez-; else → -iz-. */
+    VEXT_DOUBLE_APPLICATIVE, /* Ikirango kabiri: -ir-ir- (double applicative)   *
+                          * Used when an action is done for someone by invoking  *
+                          * another person's name/identity:                      *
+                          *   kwita (to name) + -ir- + -ir- → kwitirira          *
+                          *   awitirira umwana we Henoki: he named it after his  *
+                          *   child Henoki (named for Henoki, via Henoki's name).*/
 } VerbExtension;
 
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */

@@ -1205,6 +1205,8 @@ static const char *VERB_STEMS[] = {
     "ig",       /* kwiga       – to study / learn                         */
     "andik",    /* kwandika    – to write                                 */
     "kund",     /* gukunda     – to love                                  */
+    "ang",      /* kwanga      – to hate / despise                         */
+    "asam",     /* kwasama     – to open (mouth); vowel-initial root: kw+asam+a */
     "end",      /* kugenda     – to go                                    */
     "reb",      /* kureba      – to look at                               */
     "tur",      /* gutura      – to live / reside                         */
@@ -1455,6 +1457,7 @@ static const char *VERB_STEMS[] = {
     /* These were missing and caused verb forms to be mis-tagged or       *
      * flagged with false object-marker errors.                           */
     "z",        /* kuza        – to come / arrive (very common!)         */
+    "j",        /* kuja        – to come (yaje = ya+j+e, past 3sg)       */
     "b",        /* kuba        – to be / exist (copular: araba, rurabaho)*/
     "h",        /* guha        – to give (e.g. ibiha=i+bi(OM.8)+h+a)    */
     "hesh",     /* guhesha     – to make/cause to give (caus. of guha) */
@@ -2396,6 +2399,9 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
         case VEXT_CAUSATIVE_Y:  return "Ngiza (Causative-y: r+y→z, §1.3)";
         case VEXT_CAUSATIVE_IZ: return "Integeko -iz-/-ez- (Causative allomorph: stem+iz+a, e.g. sinzir+iz+a)";
+        case VEXT_DOUBLE_APPLICATIVE:
+            return "Ikirango kabiri (Double applicative: -ir-ir-; "
+                   "naming/acting for someone by invoking another's name)";
         default:               return "";
     }
 }

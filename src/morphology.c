@@ -1068,6 +1068,16 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
     size_t len = strlen(word);
     if (len < 3) return false;
 
+    /* PRESENT_NORA fallback: when the catch-all fires with an unknown stem,
+     * save the first structural match here and continue trying other SPs.
+     * A longer SP tried later may yield a known stem (e.g. "bwa"+"ng"+a gives
+     * unknown stem "ng", but "bw"+"ang"+a gives known "ang" from kwanga).
+     * We return immediately on the first KNOWN stem; the fallback is used only
+     * when no SP produces a known stem.                                        */
+    bool   fb_set  = false;
+    char   fb_stem[KIN_MAX_STEM] = "";
+    int    fb_cls  = 0;
+
     static const struct { const char *pfx; int cls; } SP[] = {
         /* 4-char combined prefixes */
         { "twa",   0  },  /* 1pl past / Nt.13                             */
@@ -1449,6 +1459,94 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                         stem_len = sl - 2;
                     }
                 }
+                /* -uye FV family: past-perfect FV surfaces as '-uye' when the
+                 * root ends in a consonant that does not fuse with 'y' (no r→z,
+                 * k→ts, t→s rule).  The 'u' is epenthetic (inserted between the
+                 * root-final consonant and the 'ye' morpheme).
+                 *
+                 * Two sub-cases:
+                 *   A. m-final root:  sam+ye → samuye  (epenthetic 'u' after 'm')
+                 *      Vowel-initial variant: bwa+asam+ye → bwasamuye
+                 *      (SP's final 'a' absorbs root's leading 'a' by vowel contact)
+                 *   B. Other consonant-final roots: sib+ye → sibuye,
+                 *      hung+ye → hunguye, baz+ye → bazuye, shak+ye → shakuye.
+                 *      Same recovery: strip trailing 'u' from the candidate and
+                 *      check if the result is a known verb stem.
+                 *
+                 * In both cases: after stripping "ye", candidate ends in C+'u';
+                 * strip 'u', look up remainder.  Guard: candidate with 'u' must NOT
+                 * itself be a known stem (protects genuine -u roots).             */
+                if (stem_len >= 3 && stem_len < KIN_MAX_STEM) {
+                    char ep_cand[KIN_MAX_STEM];
+                    strncpy(ep_cand, stem_src, stem_len); ep_cand[stem_len] = '\0';
+                    if (ep_cand[stem_len-1] == 'u' && ep_cand[stem_len-2] == 'm'
+                        && !kin_is_known_verb_stem(ep_cand)) {
+                        /* Sub-case A: m-final root (m+ye→muye epenthesis) */
+                        stem_len--;   /* strip epenthetic 'u': "samu" → "sam" */
+                        /* Try 'a'-prepend to recover vowel-initial root:
+                         * Past SPs ending in 'a' (bwa/ya/wa/kwa…) elide the
+                         * initial 'a' of a vowel-initial root by a+a contact.
+                         * e.g. bwa+asam → bwasam; prepend 'a' → "asam" (known). */
+                        size_t splen = strlen(SP[i].pfx);
+                        if (splen > 0 && SP[i].pfx[splen-1] == 'a'
+                            && stem_len + 2 < KIN_MAX_STEM) {
+                            char a_root[KIN_MAX_STEM];
+                            a_root[0] = 'a';
+                            strncpy(a_root + 1, ep_cand, stem_len);
+                            a_root[stem_len + 1] = '\0';
+                            if (kin_is_known_verb_stem(a_root)) {
+                                if (stem_buf) {
+                                    strncpy(stem_buf, a_root, KIN_MAX_STEM - 1);
+                                    stem_buf[KIN_MAX_STEM - 1] = '\0';
+                                }
+                                if (subj_class) *subj_class = SP[i].cls;
+                                if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                                return true;
+                            }
+                        }
+                        /* m-final, non-vowel-initial: stem_len already decremented;
+                         * fall through — the fallthrough strncpy gives the correct
+                         * root (e.g. "ram" from inner "ramuye", stem_len=3).    */
+                    } else if (ep_cand[stem_len-1] == 'u'
+                               && !is_vowel((unsigned char)ep_cand[stem_len-2])
+                               && ep_cand[stem_len-2] != 'm'
+                               && ep_cand[stem_len-2] != 'z'  /* z-final: uses iye/jiye */
+                               && !kin_is_known_verb_stem(ep_cand)) {
+                        /* Sub-case B: other consonant-final root (C+ye→Cuye).
+                         * Strip trailing 'u' and test the result.               */
+                        char try_stem[KIN_MAX_STEM];
+                        size_t tlen = stem_len - 1;
+                        strncpy(try_stem, ep_cand, tlen); try_stem[tlen] = '\0';
+                        if (kin_is_known_verb_stem(try_stem)) {
+                            if (stem_buf) {
+                                strncpy(stem_buf, try_stem, KIN_MAX_STEM - 1);
+                                stem_buf[KIN_MAX_STEM - 1] = '\0';
+                            }
+                            if (subj_class) *subj_class = SP[i].cls;
+                            if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                            return true;
+                        }
+                        /* Also try 'a'-prepend for vowel-initial roots when SP
+                         * ends in 'a' (e.g. ya+asam+uye: a+a fusion).          */
+                        size_t splen = strlen(SP[i].pfx);
+                        if (splen > 0 && SP[i].pfx[splen-1] == 'a'
+                            && tlen + 2 < KIN_MAX_STEM) {
+                            char a_root[KIN_MAX_STEM];
+                            a_root[0] = 'a';
+                            strncpy(a_root + 1, try_stem, tlen);
+                            a_root[tlen + 1] = '\0';
+                            if (kin_is_known_verb_stem(a_root)) {
+                                if (stem_buf) {
+                                    strncpy(stem_buf, a_root, KIN_MAX_STEM - 1);
+                                    stem_buf[KIN_MAX_STEM - 1] = '\0';
+                                }
+                                if (subj_class) *subj_class = SP[i].cls;
+                                if (tense_out)  *tense_out  = TENSE_PAST_PERF;
+                                return true;
+                            }
+                        }
+                    }
+                }
                 if (stem_buf && stem_len < KIN_MAX_STEM) {
                     strncpy(stem_buf, stem_src, stem_len);
                     stem_buf[stem_len] = '\0';
@@ -1549,7 +1647,7 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 if (strcmp(SP[i].pfx, PAST_SP_LIST[pi]) == 0)
                     { sp_is_past = true; break; }
             }
-            if (sp_is_past && ilen >= 3 && inner[ilen-1] == 'e') {
+            if (sp_is_past && ilen >= 2 && inner[ilen-1] == 'e') {
                 size_t sl = ilen - 1;
                 char cand[KIN_MAX_STEM];
                 strncpy(cand, inner, sl); cand[sl] = '\0';
@@ -1872,14 +1970,37 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 return true;
             }
         }
-        /* PRESENT no-ra: ends in a or o */
+        /* PRESENT no-ra: ends in a or o.
+         * Return immediately when stem is known; otherwise save as fallback
+         * and continue the SP loop — a later (shorter) SP may yield a known
+         * stem for the same surface form (e.g. bwa+ng→unknown vs bw+ang→known). */
         if (ilen >= 2 && (inner[ilen-1]=='a' || inner[ilen-1]=='o')) {
             size_t sl = ilen - 1;
-            if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
-            if (subj_class) *subj_class = SP[i].cls;
-            if (tense_out)  *tense_out  = TENSE_PRESENT_NORA;
-            return true;
+            char cand[KIN_MAX_STEM];
+            if (sl < KIN_MAX_STEM) { strncpy(cand, inner, sl); cand[sl] = '\0'; }
+            else                   { cand[0] = '\0'; }
+            if (kin_is_known_verb_stem(cand)) {
+                if (stem_buf)  { strncpy(stem_buf, cand, KIN_MAX_STEM - 1);
+                                  stem_buf[KIN_MAX_STEM - 1] = '\0'; }
+                if (subj_class) *subj_class = SP[i].cls;
+                if (tense_out)  *tense_out  = TENSE_PRESENT_NORA;
+                return true;
+            }
+            if (!fb_set && sl > 0) {
+                strncpy(fb_stem, cand, KIN_MAX_STEM - 1);
+                fb_stem[KIN_MAX_STEM - 1] = '\0';
+                fb_cls = SP[i].cls;
+                fb_set = true;
+            }
+            continue;
         }
+    }
+    if (fb_set) {
+        if (stem_buf)  { strncpy(stem_buf, fb_stem, KIN_MAX_STEM - 1);
+                          stem_buf[KIN_MAX_STEM - 1] = '\0'; }
+        if (subj_class) *subj_class = fb_cls;
+        if (tense_out)  *tense_out  = TENSE_PRESENT_NORA;
+        return true;
     }
     return false;
 }
@@ -2404,6 +2525,140 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
         if (kin_is_known_verb_stem(mono_root)) {
             bare[1] = '\0';   /* "ha"→"h", "ba"→"b": strip epenthetic 'a' */
             vext = VEXT_NONE;
+        }
+    }
+
+    /* ── LAYER 3c.8: Stative -uk- k-recovery (past perfect) ───────────────── *
+     * Stative verb stems ending in '-uk-' drop 'k' before past FV '-ye',      *
+     * producing a surface like '-uye': zuk+ye → zuye (kuzuka past perf).      *
+     * After OM-strip, bare appears as the k-dropped form ("zu", "byu", etc.). *
+     * Recovery: bare ends in 'u', bare+"k" is a known VERB_STEMS entry,       *
+     * and the word ends in "uye" (the stative past-perfect surface).           *
+     * Guard: PAST_PERF only; bare must not already be a known stem.            */
+    if (tense == TENSE_PAST_PERF && !kin_is_known_verb_stem(bare)) {
+        size_t blen = strlen(bare);
+        if (blen >= 1 && bare[blen-1] == 'u' && blen + 2 < (size_t)KIN_MAX_STEM
+            && len >= 3 && word[len-3]=='u' && word[len-2]=='y' && word[len-1]=='e') {
+            char bare_k[KIN_MAX_STEM];
+            strncpy(bare_k, bare, blen);
+            bare_k[blen]   = 'k';
+            bare_k[blen+1] = '\0';
+            if (kin_is_known_verb_stem(bare_k)) {
+                strncpy(bare, bare_k, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
+
+    /* ── LAYER 3c.9: Nt.3 OM u→w before vowel-initial root ─────────────── *
+     * The Nt.3 (umu-) object marker is "u"; before vowel-initial roots      *
+     * phonological rule §1.1 contracts it to "w":                           *
+     *   SP + u(OM·Nt.3) + root(V) + ext + FV → SP + w + root + ext + FV   *
+     * Example: awitirira = a(SP·Nt.1) + w(OM·Nt.3) + it(kwita) + ir + ir + a
+     *   raw_stem="witirir"; standard om_strip misses the single-char 'w';   *
+     *   ext_strip gives bare="witir" (not known).                           *
+     *                                                                        *
+     * Trigger conditions:                                                    *
+     *   1. No OM was found by standard om_strip (obj_cls == 0)              *
+     *   2. raw_stem starts with 'w' followed by a vowel                     *
+     *   3. Stripping 'w' and at least one ext_strip yields a KNOWN root     *
+     *      → the 'w' must have been an OM, not part of the root             *
+     *                                                                        *
+     * Guard: require w_vext != VEXT_NONE (at least one extension found)     *
+     * to avoid false-positives on bare roots starting with 'w' (e.g. "wit" *
+     * is in VERB_STEMS as the surface form of kwita; "awita" without an     *
+     * extension must NOT be reanalysed as OM + root "it").                  */
+    if (obj_cls == 0 && strlen(raw_stem) >= 3 &&
+        raw_stem[0] == 'w' && is_vowel((unsigned char)raw_stem[1])) {
+        const char *after_w = raw_stem + 1;   /* remainder after stripping OM 'w' */
+        char w_bare[KIN_MAX_STEM];
+        VerbExtension w_vext = VEXT_NONE;
+        strncpy(w_bare, after_w, KIN_MAX_STEM - 1);
+        w_bare[KIN_MAX_STEM - 1] = '\0';
+        /* First ext_strip pass */
+        ext_strip(after_w, &w_vext, w_bare, sizeof(w_bare));
+
+        if (w_vext != VEXT_NONE && kin_is_known_verb_stem(w_bare)) {
+            /* Single extension, known root found after 'w' OM */
+            obj_cls = 3;
+            vext    = w_vext;
+            strncpy(bare, w_bare, KIN_MAX_STEM - 1);
+            bare[KIN_MAX_STEM - 1] = '\0';
+        } else if (w_vext != VEXT_NONE) {
+            /* First ext stripped but root still unknown — try second ext.
+             * e.g. "itirir" = it(root) + ir(APPL1) + ir(APPL2):
+             *   ext_strip("itirir") → w_bare="itir", w_vext=APPL (unknown root)
+             *   ext_strip("itir")   → w_bare2="it",  APPL → KNOWN  ✓
+             *
+             * Note: ext_strip() requires slen > 4 for the applicative check, so
+             * 4-char inputs like "itir" (root 2-char + ext 2-char) are NOT handled
+             * by the general function.  Apply the 4-char applicative manually:
+             * if w_bare is exactly 4 chars and ends in "ir"/"er", peel 2 chars. */
+            char w_bare2[KIN_MAX_STEM];
+            VerbExtension w_vext2 = VEXT_NONE;
+            strncpy(w_bare2, w_bare, KIN_MAX_STEM - 1);
+            w_bare2[KIN_MAX_STEM - 1] = '\0';
+            bool second_found = ext_strip(w_bare, &w_vext2, w_bare2, sizeof(w_bare2));
+            if (!second_found) {
+                /* Manual 4-char applicative fallback for short roots (-it-, etc.) */
+                size_t wblen = strlen(w_bare);
+                if (wblen == 4 &&
+                    (kin_ends_with(w_bare, "ir") || kin_ends_with(w_bare, "er"))) {
+                    strncpy(w_bare2, w_bare, 2);
+                    w_bare2[2]  = '\0';
+                    w_vext2     = VEXT_APPLICATIVE;
+                    second_found = true;
+                }
+            }
+            if (second_found && kin_is_known_verb_stem(w_bare2)) {
+                obj_cls = 3;
+                vext    = (w_vext  == VEXT_APPLICATIVE &&
+                           w_vext2 == VEXT_APPLICATIVE)
+                          ? VEXT_DOUBLE_APPLICATIVE
+                          : w_vext;   /* outer extension; inner is implicit */
+                strncpy(bare, w_bare2, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
+
+    /* ── LAYER 3c.10: General double applicative (-ir-ir-) detection ──────── *
+     * Applies regardless of OM (handles consonant-initial roots such as     *
+     * "kor", "gend", "ganir", etc. that take two stacked applicatives).     *
+     *                                                                        *
+     * Trigger: no OM found (obj_cls==0), first ext_strip gave APPL but the  *
+     * resulting bare root is UNKNOWN.  Try a second ext_strip on that bare. *
+     * When both ext strips are VEXT_APPLICATIVE and the second gives a known *
+     * root → the verb has a double applicative extension.                   *
+     *                                                                        *
+     * This is the general rule; LAYER 3c.9 above handles the special sub-   *
+     * case of Nt.3 OM 'w' + vowel-initial root (which also needs OM tagging  *
+     * in addition to double-ext detection).                                   *
+     *                                                                        *
+     * Manual 4-char fallback: ext_strip requires slen > 4, so 2-char roots  *
+     * give a 4-char bare (root+ir=4) that the function cannot further strip. *
+     * Detect the pattern explicitly: slen==4 && ends in "ir"/"er".          */
+    if (obj_cls == 0 && vext == VEXT_APPLICATIVE && !kin_is_known_verb_stem(bare)) {
+        char g_bare2[KIN_MAX_STEM];
+        VerbExtension g_vext2 = VEXT_NONE;
+        strncpy(g_bare2, bare, KIN_MAX_STEM - 1);
+        g_bare2[KIN_MAX_STEM - 1] = '\0';
+        bool g_ok = ext_strip(bare, &g_vext2, g_bare2, sizeof(g_bare2));
+        if (!g_ok) {
+            /* 4-char applicative fallback for 2-char roots (e.g. it+ir=4) */
+            size_t gblen = strlen(bare);
+            if (gblen == 4 &&
+                (kin_ends_with(bare, "ir") || kin_ends_with(bare, "er"))) {
+                strncpy(g_bare2, bare, 2);
+                g_bare2[2] = '\0';
+                g_vext2    = VEXT_APPLICATIVE;
+                g_ok       = true;
+            }
+        }
+        if (g_ok && g_vext2 == VEXT_APPLICATIVE && kin_is_known_verb_stem(g_bare2)) {
+            vext = VEXT_DOUBLE_APPLICATIVE;
+            strncpy(bare, g_bare2, KIN_MAX_STEM - 1);
+            bare[KIN_MAX_STEM - 1] = '\0';
         }
     }
 

@@ -387,12 +387,25 @@ void kin_tag_token(Token *tok) {
             && (v_tense != TENSE_PRESENT_NORA
                 || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))
-            /* SUBJUNCTIVE: allow when stem is known OR when bare phon-SP makes
-             * the verb reading unambiguous (by/cy/ry/zy can only be verb SPs).
-             * e.g. byororoke = by(Nt.8 SP) + ororok + e(SUBJ) — safe to admit.
-             * mugwire/mwuzure also pass via kin_is_known_verb_stem gate.        */
+            /* SUBJUNCTIVE: allow when stem is known AND the OM is not just the
+             * noun-class prefix in disguise.
+             *
+             * Key guard: !(v_obj > 0 && v_obj == cls)
+             *   When the detected object-marker class equals the noun class from
+             *   kin_strip_noun_prefix, the "OM" is actually the noun's own class
+             *   prefix being misread as an object marker.  The word is a noun.
+             *
+             *   e.g. "abagore" Nt.2: cls=2, verb analysis gives v_obj=2 (ba as OM).
+             *        But 'ba' here IS the Nt.2 noun prefix (aba-gore = women), so
+             *        it cannot also be an OM.  Noun wins.  Without this guard the
+             *        verb reading a(SP)+ba(OM·Nt.2)+gor+e(SUBJ) wins over the noun
+             *        reading, which then gets promoted to a deverbative noun of
+             *        kugora (to be difficult) — a completely wrong analysis.
+             *
+             * bare_phon_sp (cy/by/ry/zy) bypasses the OM guard: those prefixes
+             * can only arise from verb SP i→y mutation, never from a noun prefix. */
             && (v_tense != TENSE_SUBJUNCTIVE
-                || kin_is_known_verb_stem(v_stem)
+                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
                 || is_bare_phon_sp)
             && v_tense != TENSE_IMPERATIVE
             /* Tenses with unambiguous morphological markers bypass stem check:
@@ -400,7 +413,11 @@ void kin_tag_token(Token *tok) {
              * PAST_IMPF  – -aga suffix is highly distinctive
              * NEG_RELATIVE – -ta- marker uniquely identifies this form
              * FUTURE / NARRATIVE / COPULA – markers are unambiguous enough
-             * bare_phon_sp – phonological mutation alone is sufficient signal */
+             * bare_phon_sp – phonological mutation alone is sufficient signal.
+             *
+             * Same OM-equals-noun-class guard applied here for kin_is_known_verb_stem
+             * path: a known stem does not override a noun when the OM matches the
+             * noun class prefix. */
             && (v_tense == TENSE_PAST_PERF
                 || v_tense == TENSE_PAST_IMPF
                 || v_tense == TENSE_NEG_RELATIVE
@@ -410,7 +427,7 @@ void kin_tag_token(Token *tok) {
                 || v_tense == TENSE_COPULA_PRES
                 || v_tense == TENSE_SUBJUNCTIVE_LOC
                 || v_tense == TENSE_SUBJUNCTIVE
-                || kin_is_known_verb_stem(v_stem)
+                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
                 || kin_is_causative_y_surface(v_stem)  /* r+y→z §1.3 surface root */
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))) {
             /* Verb interpretation wins */
@@ -496,12 +513,39 @@ void kin_tag_token(Token *tok) {
         }
     }
 
-    /* Step 8 → Tree 3b (inshinga itondaguye): conjugated verb heuristic. */
+    /* Step 8 → Tree 3b (inshinga itondaguye): conjugated verb heuristic.
+     *
+     * Quality guard: kin_is_verb_conjugated() always succeeds for any word
+     * whose length and ending vowel permit a structural SP+stem+FV parse —
+     * including words with single-char or completely unknown stems (fallback
+     * path in verb_match_inner).  Without a guard, proper names like "Ada"
+     * at sentence start (capital is orthographic, not a proper-noun marker)
+     * would be labelled as conjugated verbs with fabricated roots ("kuda").
+     *
+     * The guard mirrors the one applied in Step 5 (proper-noun path):
+     *   • PRESENT_NORA tense is the most permissive (any word SP+C+a).
+     *     Accept only when the extracted stem is a KNOWN verb root.
+     *   • SUBJUNCTIVE is similarly permissive (SP+C+e).
+     *     Accept only when stem is known.
+     *   • All other tenses carry unambiguous morphological markers (ra, aga,
+     *     za, ye, ta-, ka-) that are strong enough evidence on their own.
+     *
+     * Additionally, single-char stems ("d", "a", "e", etc.) are accepted
+     * only for the small set of confirmed monosyllabic Kinyarwanda verb
+     * roots ("b"=kuba, "h"=guha, "z"=kuza, "v"=kuva) — never for unknown
+     * single chars that arise from a fallback parse of a short name.        */
     int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
     VerbExtension vext = VEXT_NONE;
     bool is_neg = false;
-    if (kin_is_verb_conjugated(w, stem, &scls, &vtense, &obj_cls, &vext, &is_neg)) {
+    if (kin_is_verb_conjugated(w, stem, &scls, &vtense, &obj_cls, &vext, &is_neg)
+        /* PRESENT_NORA: require confirmed stem to avoid naming proper nouns
+         * or short words (e.g. "ada", "izi", "uko") as conjugated verbs. */
+        && (vtense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(stem))
+        /* SUBJUNCTIVE: same gate — prevents "abe", "ize" etc. from being
+         * wrongly labelled as verbs when they are actually names or nouns. */
+        && (vtense != TENSE_SUBJUNCTIVE  || kin_is_known_verb_stem(stem))
+        ) {
         tok->pos            = POS_VERB_CONJ;
         tok->noun_class     = scls;
         tok->verb_tense     = vtense;
@@ -549,7 +593,39 @@ void kin_tag_token(Token *tok) {
         }
     }
 
-    /* Step 9 → No tree matched: foreign or unknown word. */
+    /* Step 9 → No tree matched: foreign or unknown word.
+     *
+     * Proper-noun phonotactics heuristic (RULE before FALLBACK):
+     *   Before declaring the word foreign, check whether it is a capitalised
+     *   word that follows Kinyarwanda phonotactics.  Such a word is almost
+     *   certainly a proper name written in Kinyarwanda orthography — either a
+     *   Kinyarwanda name not yet in the lexicon, or a foreign name adapted to
+     *   Kinyarwanda writing (e.g. Henoki, Iradi, Metushayeli, Nyagasaro).
+     *
+     *   The phonotactics test asks two questions that any genuine Kinyarwanda
+     *   (or Kinyarwanda-adapted) word must pass:
+     *     (a) No vowel hiatus: no two vowels appear adjacent without a
+     *         consonant between them (§4: VV is illegal in Kinyarwanda).
+     *     (b) No invalid consonant cluster: no combination of consonants that
+     *         cannot appear in native or adapted Kinyarwanda words.
+     *
+     *   Truly foreign words that violate these rules (e.g. "Smith" with initial
+     *   sm-cluster, or "idea" with VV "ea") stay POS_FOREIGN so that the
+     *   syntax checker can flag them as genuinely unrecognised.
+     *
+     *   This is NOT memorisation: no lookup table of specific names is used.
+     *   Any capital-letter word that passes the phonotactic filter is accepted
+     *   as a proper noun regardless of whether it is in the lexicon.          */
+    if (isupper((unsigned char)tok->surface[0]) &&
+        !kin_has_vowel_hiatus(tok->lower) &&
+        !kin_has_invalid_cluster(tok->lower)) {
+        tok->pos            = POS_NOUN;
+        tok->noun_class     = 0;       /* class undetermined for proper nouns  */
+        tok->is_proper_noun = true;
+        tok->is_kinyarwanda = true;
+        return;
+    }
+
     tok->pos            = POS_FOREIGN;
     tok->is_kinyarwanda = false;
 }

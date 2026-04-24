@@ -62,6 +62,42 @@ static const char *poss_connector[17] = {
     "kwa", "ha",
 };
 
+/*
+ * elided_connector_class()
+ *
+ * Maps an apostrophe-elided possessive connector fragment to its noun class.
+ * e.g. "rw" (from "rw'iburasirazuba") → 11, because "rw" is the elision of
+ * "rwa" which is the Nt.11 possessive connector.
+ *
+ * Only unambiguous cases are returned (connectors unique to one class).
+ * Ambiguous single-letter fragments ("y","w","b") are omitted because they
+ * are shared across multiple classes and cannot be resolved here.
+ *
+ * Used by RULE 2 to detect chain-head agreement in possessive phrases:
+ *   "ruhande rw'iburasirazuba rwa Edeni"
+ *   → both "rw" and "rwa" are Nt.11; "rwa" agrees with chain head "ruhande"
+ *     not with the immediately preceding "iburasirazuba" (Nt.14).
+ */
+static int elided_connector_class(const char *s) {
+    /* Unambiguous: each connector string belongs to exactly one class */
+    if (strcmp(s, "rw") == 0) return 11; /* rwa → rw  (Nt.11)          */
+    if (strcmp(s, "bw") == 0) return 14; /* bwa → bw  (Nt.14)          */
+    if (strcmp(s, "cy") == 0) return  7; /* cya → cy  (Nt.7)           */
+    if (strcmp(s, "ry") == 0) return  5; /* rya → ry  (Nt.5)           */
+    if (strcmp(s, "by") == 0) return  8; /* bya → by  (Nt.8)           */
+    if (strcmp(s, "tw") == 0) return 13; /* twa → tw  (Nt.13)          */
+    /* Shared connector strings — return a representative class.
+     * The chain-head check compares poss_connector[] STRINGS, not class
+     * numbers, so returning any class that yields the same string is safe:
+     *   "ya" is shared by Nt.4, Nt.6, Nt.9  → return 9 (poss_connector[9]="ya")
+     *   "wa" is shared by Nt.1, Nt.3        → return 1 (poss_connector[1]="wa")
+     *   "ba" is unique to Nt.2              → return 2 */
+    if (strcmp(s, "y")  == 0) return  9; /* ya → y   (Nt.4/6/9 family) */
+    if (strcmp(s, "w")  == 0) return  1; /* wa → w   (Nt.1/3 family)   */
+    if (strcmp(s, "b")  == 0) return  2; /* ba → b   (Nt.2)            */
+    return 0; /* unknown */
+}
+
 static void add_error(SentenceAnalysis *sa, ErrorType type, int idx,
                       const char *msg, const char *suggestion) {
     if (sa->error_count >= KIN_MAX_ERRORS) return;
@@ -144,18 +180,80 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                           || (cur->noun_class == 10 && next->noun_class == 9);
             if (!nt9_10_ok && strcmp(poss_connector[cur->noun_class],
                                      poss_connector[next->noun_class]) != 0) {
-                char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
-                const char *expected = poss_connector[cur->noun_class];
-                snprintf(msg, sizeof(msg),
-                    "Ikinyazina ngenera '%s' ntigishyikira izina '%s' (inteko %d). "
-                    "Possessive '%s' does not agree with noun '%s' (class %d).",
-                    next->surface, cur->surface, cur->noun_class,
-                    next->surface, cur->surface, cur->noun_class);
-                snprintf(sug, sizeof(sug),
-                    "Ikinyazina ngenera gikwiye ni '%s' (inteko %d). "
-                    "The correct possessive connector for class %d is '%s'.",
-                    expected, cur->noun_class, cur->noun_class, expected);
-                add_error(sa, ERR_POSS_AGREEMENT, i + 1, msg, sug);
+                /*
+                 * Chain-head agreement check
+                 *
+                 * In Kinyarwanda a possessive chain can propagate agreement
+                 * from the structural head noun rather than the immediately
+                 * preceding noun.  The pattern is:
+                 *
+                 *   N1(NCa)  CONN1(NCa)  N2(any)  CONN2(NCa)  N3
+                 *
+                 * where CONN1 and CONN2 share the same class NCa (the class
+                 * of N1, the chain head).  Example:
+                 *
+                 *   ruhande(Nt.11) rw'iburasirazuba(Nt.14) rwa Edeni
+                 *   ↑ head (Nt.11)  ↑ CONN1 elided (Nt.11)   ↑ CONN2 (Nt.11)
+                 *
+                 * Here "rwa" before "Edeni" agrees with "ruhande" (Nt.11),
+                 * NOT with "iburasirazuba" (Nt.14), because "Edeni" specifies
+                 * the whole "eastern side" entity, not just the direction.
+                 *
+                 * Detection: when CONN2 mismatches the immediate noun (cur),
+                 * look at the token immediately before cur:
+                 *   • If that token is a connector (full PRON_POSSESSIVE or an
+                 *     elided POS_CONJUNCTION fragment) with the SAME class as
+                 *     CONN2, AND
+                 *   • The noun immediately before that connector also has the
+                 *     same class as CONN2
+                 * then CONN2 is a valid chain-head agreement and is not an error.
+                 */
+                bool chain_head_ok = false;
+                if (i >= 2) {
+                    const Token *prev_conn = &sa->tokens[i - 1];
+                    const Token *prev_noun = &sa->tokens[i - 2];
+
+                    /* Determine the possessive class of the preceding connector.
+                     * Handle both full forms (PRON_POSSESSIVE) and elided
+                     * fragments stored as POS_CONJUNCTION (rw, cy, ry, bw…). */
+                    int prev_conn_class = 0;
+                    if (prev_conn->pos == POS_PRONOUN &&
+                        (prev_conn->pron_type == PRON_POSSESSIVE ||
+                         prev_conn->pron_type == PRON_REFLEXIVE)) {
+                        prev_conn_class = prev_conn->noun_class;
+                    } else if (prev_conn->pos == POS_CONJUNCTION) {
+                        prev_conn_class = elided_connector_class(prev_conn->lower);
+                    }
+
+                    /* Chain head agreement holds when:
+                     *  (a) CONN1 and CONN2 share the same connector string
+                     *  (b) the noun before CONN1 also uses that connector */
+                    if (prev_conn_class > 0 &&
+                        strcmp(poss_connector[prev_conn_class],
+                               poss_connector[next->noun_class]) == 0 &&
+                        prev_noun->pos == POS_NOUN &&
+                        prev_noun->noun_class > 0 &&
+                        strcmp(poss_connector[prev_noun->noun_class],
+                               poss_connector[next->noun_class]) == 0) {
+                        chain_head_ok = true;
+                    }
+                }
+
+                if (!chain_head_ok) {
+                    char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+                    const char *expected = poss_connector[cur->noun_class];
+                    snprintf(msg, sizeof(msg),
+                        "Ikinyazina ngenera '%s' ntigishyikira izina '%s' (inteko %d). "
+                        "Possessive '%s' does not agree with noun '%s' (class %d).",
+                        next->surface, cur->surface, cur->noun_class,
+                        next->surface, cur->surface, cur->noun_class);
+                    snprintf(sug, sizeof(sug),
+                        "Hindura '%s' ugakoresheje '%s...' (ikinyazina ngenera cy'inteko %d). "
+                        "Replace '%s' with '%s...' (possessive for class %d).",
+                        next->surface, expected, cur->noun_class,
+                        next->surface, expected, cur->noun_class);
+                    add_error(sa, ERR_POSS_AGREEMENT, i + 1, msg, sug);
+                }
             }
         }
     }

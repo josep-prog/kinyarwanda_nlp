@@ -980,6 +980,10 @@ static const char *final_vowel(VerbTense t, const char *word) {
     size_t wlen = word ? strlen(word) : 0;
     switch (t) {
         case TENSE_PAST_PERF:
+            /* Epenthetic 'u' before 'ye': m-final roots insert 'u' before
+             * past-perf FV '-ye': sam+ye → samuye (not samye).              */
+            if (wlen >= 4 && word[wlen-3]=='u' && word[wlen-2]=='y' && word[wlen-1]=='e')
+                return "uye";
             /* Epenthetic 'i' before 'ye' (consonant-final root + past perf):
              * -ir + ye → -iriye (e.g. zikwiriye = zi+kwir+iye)              */
             if (wlen >= 4 && word[wlen-3]=='i' && word[wlen-2]=='y' && word[wlen-1]=='e')
@@ -1027,6 +1031,7 @@ static const char *ext_suffix(VerbExtension e) {
                                                   -uk- variant also maps here */
         case VEXT_CAUSATIVE_Y:  return "y";    /* surface: r+y→z; citation: -y- */
         case VEXT_CAUSATIVE_IZ: return "iz";   /* canonical underlying form */
+        case VEXT_DOUBLE_APPLICATIVE: return "ir"; /* outer -ir- (inner also "ir") */
         default:               return "";
     }
 }
@@ -1429,6 +1434,9 @@ static void analyse_vconj(Token *tok)
     bool past_rye_ze  = false;   /* r/d/g-final root: FV 'ye' → surface 'e', root→z  */
     bool past_kye_tse = false;   /* k-final root:     FV 'ye' → surface 'e', root→ts */
     bool past_tye_se  = false;   /* t-final root:     FV 'ye' → surface 'e', root→s  */
+    bool past_mye_uye  = false;   /* m-final root: epenthetic 'u' inserted → FV 'uye' */
+    bool past_uk_kdrop = false;   /* stative -uk-: k drops before 'ye' → FV 'uye'    */
+    bool past_cuye     = false;   /* other consonant-final: epenthetic 'u' → FV 'uye' */
     char past_fuse_cons = '\0';  /* which consonant fused ('r','d','g','k','t')       */
     if (is_past_tense(tok->verb_tense) && tok->verb_ext == VEXT_NONE
         && root[0] && !root_surface_rule[0]) {
@@ -1493,6 +1501,54 @@ static void analyse_vconj(Token *tok)
                      "%s+ye\xe2\x86\x92%se)", root, root_surface_buf);
             past_tye_se    = true;
             past_fuse_cons = 't';
+        } else if (rlen >= 2 && last_c == 'm'
+                   && wlen >= 4 && word[wlen-3]=='u' && word[wlen-2]=='y' && word[wlen-1]=='e') {
+            /* m+ye→muye: m-final roots insert epenthetic 'u' before '-ye':
+             * sam+ye→samuye (root stays "sam", FV surfaces as "uye").
+             * Vowel-initial roots (asam): the past-augment SP's final 'a' absorbs
+             * the root's leading 'a' by vowel contact (bwa+asam→bwasam).
+             * Detection: if root starts with 'a' and the surface char immediately
+             * before root[1..] is itself 'a' (the SP's augment), the leading 'a'
+             * of the root was absorbed; strip it from root_surface for reconstruction. */
+            if (root[0] == 'a' && rlen > 1) {
+                const char *root_tail = root + 1;   /* "sam" from "asam" */
+                const char *pos = strstr(eff_word, root_tail);
+                if (pos && pos > eff_word && *(pos - 1) == 'a'
+                    && (size_t)(rlen - 1) < KIN_MAX_STEM) {
+                    strncpy(root_surface_buf, root_tail, rlen - 1);
+                    root_surface_buf[rlen - 1] = '\0';
+                    root_surface = root_surface_buf;
+                }
+            }
+            past_mye_uye = true;
+        } else if (rlen >= 2 && last_c == 'k' && root[rlen-2] == 'u'
+                   && wlen >= 4 && word[wlen-3]=='u' && word[wlen-2]=='y' && word[wlen-1]=='e') {
+            /* Stative -uk- k-drop: the 'k' of the stative suffix drops before
+             * past FV '-ye'; the root surface loses 'k' (zuk→zu) and the FV
+             * remains plain 'ye'.  The 'u' visible before 'ye' in the word is
+             * the stative suffix vowel in the root, NOT an epenthetic FV prefix.
+             * Override fv (final_vowel() returned "uye" from the word ending)
+             * back to plain "ye" so: root_surface("zu") + fv("ye") = word ✓.
+             * Distinct from past_kye_tse (k+ye→tse) which fires when word ends 'tse'. */
+            strncpy(root_surface_buf, root, rlen - 1);
+            root_surface_buf[rlen-1] = '\0';
+            root_surface = root_surface_buf;
+            snprintf(root_surface_rule, sizeof(root_surface_rule),
+                     "k\xe2\x86\x92\xe2\x88\x85 / _ye (stative -uk-: k drops before "
+                     "past FV '-ye': %s+ye\xe2\x86\x92%sye)",
+                     root, root_surface_buf);
+            fv = "ye";   /* override: 'u' in surface belongs to -uk- root, not FV */
+            past_uk_kdrop = true;
+        } else if (rlen >= 1
+                   && last_c != 'a' && last_c != 'e' && last_c != 'i'
+                   && last_c != 'o' && last_c != 'u'
+                   && last_c != 'm'
+                   && wlen >= 4 && word[wlen-3]=='u' && word[wlen-2]=='y' && word[wlen-1]=='e') {
+            /* General C+ye→Cuye epenthesis: other consonant-final roots not
+             * covered by the r/k/t/m rules above (e.g. 'b', 'ng', 'sh', 'z').
+             * e.g. sib+ye→sibuye, hung+ye→hunguye, baz+ye→bazuye.
+             * Root itself is unchanged; epenthetic 'u' is inserted before 'ye'. */
+            past_cuye = true;
         }
     }
 
@@ -1756,7 +1812,15 @@ static void analyse_vconj(Token *tok)
         size_t olen = strlen(om);
         char om_last = om[olen-1];
         if (root[0] && mv(root[0])) {
-            if (om_last == 'u') {
+            /* Nt.3 OM "wu" before vowel-initial root contracts to "w".
+             * The regular u→w rule (om_surface[olen-1]='w') would produce
+             * "ww" for "wu", which is wrong.  Handle this specifically. */
+            if (strcmp(om, "wu") == 0) {
+                strncpy(om_surface, "w", sizeof(om_surface) - 1);
+                snprintf(om_rule, sizeof(om_rule),
+                         "wu\xe2\x86\x92w \xc2\xa71.1 (Nt.3 OM 'wu'+'%c'\xe2\x86\x92'w': "
+                         "u elided before vowel)", root[0]);
+            } else if (om_last == 'u') {
                 om_surface[olen-1] = 'w';
                 snprintf(om_rule, sizeof(om_rule),
                          "u→w §1.1 (OM '%s'+'%c'→'%.*sw')", om, root[0],
@@ -1986,7 +2050,8 @@ static void analyse_vconj(Token *tok)
                  om[0] ? om_surface : "",
                  root_surface,
                  tok->is_reduplicated ? tok->redup_surface : "",
-                 ext_surface, (past_rye_ze || past_kye_tse || past_tye_se) ? "e" : fv);
+                 ext_surface, (past_rye_ze || past_kye_tse || past_tye_se) ? "e"
+                             : past_mye_uye ? "uye" : fv);
     }
     mb->verified = (strcmp(built, word) == 0);
 
@@ -2210,7 +2275,14 @@ static void analyse_vconj(Token *tok)
                 set_morph(&mb->m[n++], "REDUP", tok->redup_surface, tok->redup_surface,
                           "Isubiranwa (Verb reduplication: root\xe2\x82\x81 + a(FV\xe2\x82\x81) + root\xe2\x82\x82)");
             }
-            if (ext[0]) {
+            if (tok->verb_ext == VEXT_DOUBLE_APPLICATIVE) {
+                /* Double applicative: two stacked -ir- extensions.
+                 * First (inner, closer to root) + second (outer) both shown. */
+                set_morph(&mb->m[n++], "EXT", "ir", "ir",
+                          "Ikirango 1 (Applicative -ir-: benefactive base)");
+                set_morph(&mb->m[n++], "EXT", "ir", "ir",
+                          "Ikirango 2 (Applicative -ir-: naming/invoking via)");
+            } else if (ext[0]) {
                 /* pesh: passive -ejw- is the allomorph of -w- after causative -esh-. */
                 const char *ext_rule =
                     (strcmp(root, "pesh") == 0 && tok->verb_ext == VEXT_PASSIVE)
@@ -2257,6 +2329,25 @@ static void analyse_vconj(Token *tok)
          * The 't+y' palatalization is shown on root as →s; only 'e' remains as FV. */
         set_morph(&mb->m[n++], "FV", "ye", "e",
                   "y\xe2\x86\x92\xe2\x88\x85 / t_ (y elided: t+ye\xe2\x86\x92se, \xc2\xa7""3.8)");
+    } else if (past_mye_uye) {
+        /* m+ye→muye: m-final root inserts epenthetic 'u' before past-perf FV.
+         * The FV is displayed as "uye" where 'u' is the epenthetic buffer.   */
+        set_morph(&mb->m[n++], "FV", "ye", "uye",
+                  "m+ye\xe2\x86\x92muye (icyungo cy'ijwi 'u' gishyizwe imbere "
+                  "ya 'ye' nyuma ya 'm': m+ye\xe2\x86\x92muye)");
+    } else if (past_uk_kdrop) {
+        /* Stative -uk- k-drop: the 'k' of -uk- drops before past FV '-ye';
+         * the surface FV is '-uye' (root surface already has 'k' removed).  */
+        set_morph(&mb->m[n++], "FV", "ye", "uye",
+                  "k\xe2\x86\x92\xe2\x88\x85 + icyungo 'u' (stative -uk-: k drops "
+                  "before past FV, surface -uk+ye\xe2\x86\x92-uye)");
+    } else if (past_cuye) {
+        /* C+ye→Cuye: general epenthetic 'u' for other consonant-final roots.
+         * e.g. sib+ye→sibuye, hung+ye→hunguye, baz+ye→bazuye.
+         * The underlying FV is 'ye'; 'u' is epenthetic before 'ye'.          */
+        set_morph(&mb->m[n++], "FV", "ye", "uye",
+                  "C+ye\xe2\x86\x92""Cuye (icyungo cy'ijwi 'u' gishyizwe imbere "
+                  "ya 'ye' nyuma y'umuvugasemi: X+ye\xe2\x86\x92Xuye)");
     } else if (strlen(fv) == 3 && fv[0] == 'a' && fv[2] == 'o'
                && (fv[1] == 'h' || fv[1] == 'm' || fv[1] == 'y')) {
         /* Locative FV (aho / amo / ayo): split into FV='a' + LOC suffix.

@@ -587,8 +587,18 @@ static void print_verb_morphemes(const Token *t) {
         case VEXT_APPLICATIVE: ext = "-ir-";      break;
         case VEXT_RECIPROCAL:  ext = "-an-";      break;
         case VEXT_STATIVE:     ext = "-ik-";      break;
-        case VEXT_REVERSIVE:   ext = "-ur-/-uk-"; break;
+        case VEXT_REVERSIVE:           ext = "-ur-/-uk-"; break;
+        case VEXT_DOUBLE_APPLICATIVE:  ext = "-ir-ir-";   break;
         default: break;
+    }
+    /* Nt.3 OM "wu" contracts to "w" before a vowel-initial root (u→w §1.1).
+     * Show the surface form "w" in the one-liner rather than canonical "wu". */
+    const char *om_disp = om;
+    char om_disp_buf[8];
+    if (strcmp(om, "wu") == 0 && t->stem[0] && is_vowel_c(t->stem[0])) {
+        strncpy(om_disp_buf, "w", sizeof(om_disp_buf) - 1);
+        om_disp_buf[sizeof(om_disp_buf) - 1] = '\0';
+        om_disp = om_disp_buf;
     }
     {
         char nc_buf[16];
@@ -596,11 +606,11 @@ static void print_verb_morphemes(const Token *t) {
                sp_nc_label(t->noun_class, t->verb_tense, nc_buf, sizeof(nc_buf)));
     }
     if (tm[0])  printf(" + %s(TM)", tm);
-    if (om[0]) {
+    if (om_disp[0]) {
         if (t->obj_class == 15)
-            printf(" + %s(OM\xC2\xB7" "2sg / Nt.15)", om);
+            printf(" + %s(OM\xC2\xB7" "2sg / Nt.15)", om_disp);
         else
-            printf(" + %s(OM\xC2\xB7Nt.%d)", om, t->obj_class);
+            printf(" + %s(OM\xC2\xB7Nt.%d)", om_disp, t->obj_class);
     }
     if (t->verb_ext == VEXT_REFLEXIVE) {
         bool refl_i_present = t->stem[0] && !is_vowel_c(t->stem[0]);
@@ -608,7 +618,11 @@ static void print_verb_morphemes(const Token *t) {
         else                printf(" + [i-(imbundo, elided from kwi-)]");
     }
     printf(" + %s(root)", t->stem[0] ? t->stem : "?");
-    if (ext[0]) printf(" + %s(EXT)", ext);
+    if (t->verb_ext == VEXT_DOUBLE_APPLICATIVE) {
+        printf(" + ir(EXT\xC2\xB71) + ir(EXT\xC2\xB72)");
+    } else if (ext[0]) {
+        printf(" + %s(EXT)", ext);
+    }
     printf(" + %s(FV)\n", fv);
 }
 
@@ -801,7 +815,8 @@ static void print_verb_reconstruction(const Token *t) {
             ext_sfx = (llen >= 2 && lword[llen-3] == 'u' && lword[llen-2] == 'k')
                       ? "uk" : "ur";
             break;
-        case VEXT_CAUSATIVE_Y: ext_sfx = "y"; break;
+        case VEXT_CAUSATIVE_Y:        ext_sfx = "y";      break;
+        case VEXT_DOUBLE_APPLICATIVE: ext_sfx = "irir";   break;
         default: break;
     }
     /* For VEXT_CAUSATIVE_Y the reconstruction must apply r+y→z:
@@ -1466,10 +1481,18 @@ void kin_print_analysis(const SentenceAnalysis *sa, bool verbose) {
                                 break;
                             }
                         }
-                        if (!supp_found)
+                        if (!supp_found) {
+                    /* Double applicative: cite the fully extended form
+                     * (e.g. kw+it+ir+ir+a = kwitirira, not just kwita). */
+                    if (t->verb_ext == VEXT_DOUBLE_APPLICATIVE)
+                        printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s%sirira%s"
+                               "  (igicumbi -%s- + ikirango kabiri -ir-ir-)\n",
+                               ci_pfx, t->stem, ci_loc, t->stem);
+                    else
                     printf("  \342\224\224\342\224\200 Imbundo (Citation verb): %s%sa%s"
                            "  (igicumbi -%s-)\n",
                            ci_pfx, t->stem, ci_loc, t->stem);
+                        }
                     }
 
                     /* Homograph disambiguation: some roots correspond to two
