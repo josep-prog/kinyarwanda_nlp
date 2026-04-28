@@ -301,6 +301,7 @@ typedef enum {
      *   abeho  = a(SP1)   + b + e + ho  → "that he/she be there"            *
      *   mubemo = mu(SP2)  + b + e + mo  → "let you all be inside"           */
     TENSE_SUBJUNCTIVE_LOC, /* Ikigombero + ahantu: SP+stem+e+ho/mo/yo  habeho*/
+    TENSE_PAST_PERF_LOC,  /* Impitakare + ahantu: past-SP+stem+e+ho/mo/yo   */
     TENSE_FUTURE_SUBJ,     /* NEG-future subj: SP+za+stem+e  ntuzakore       */
     TENSE_FUTURE_SUBJ_LOC, /* NEG-future subj+loc: SP+za+stem+e+ho/mo/yo     */
     TENSE_NARRATIVE_SUBJ,  /* NEG-narrative subj: SP+ka+stem+e  ntukabone    */
@@ -371,12 +372,32 @@ typedef enum {
                           * attaches to a stem ending in a consonant cluster or  *
                           * applicative-base (e.g. sinzir+iz+a = gusinziriza).  *
                           * Vowel harmony: mid-vowel root → -ez-; else → -iz-. */
+    VEXT_CAUSATIVE_PASSIVE,  /* Integeko+Imbundo: -esh-/-ish- + -w-             *
+                          * Causative followed by passive: the instrument/actor  *
+                          * that causes is itself acted upon.                    *
+                          * e.g. gukebeshwa: keb+esh+w+a (to be cut by sth)     *
+                          *      gikebeshwa cy'umuringa = cut by bronze          */
     VEXT_DOUBLE_APPLICATIVE, /* Ikirango kabiri: -ir-ir- (double applicative)   *
                           * Used when an action is done for someone by invoking  *
                           * another person's name/identity:                      *
                           *   kwita (to name) + -ir- + -ir- → kwitirira          *
                           *   awitirira umwana we Henoki: he named it after his  *
                           *   child Henoki (named for Henoki, via Henoki's name).*/
+    VEXT_APPLIC_CAUSATIVE,   /* Ikirango+Integeko: -er-/-ir- (applic) + -ez-/-iz- (caus) *
+                          * Applicative base + causative: root+er+ez+a          *
+                          * e.g. gutegereza: teg+er(APPLIC)+ez(CAUS)            *
+                          *      = to make (s.o.) wait for / to cause (s.o.) to  *
+                          *        pay attention to                              */
+    VEXT_APPLIC_PASSIVE, /* Ikirango+Imbundo: -er-/-ir- (applic) + -w- (passive)     *
+                          * e.g. guhorerwa: hor+er(APPLIC)+w(PASS)+a                  *
+                          * The applicative 'r' is retained before passive 'w':       *
+                          * -er+w- → -erwa (NOT -ewa; r does NOT drop before -w-).    */
+    VEXT_CAUS_NEUTER,    /* Integeko y'Ingirika: neuter-causative fusion -ek-→-ets- *
+                          * When a neuter/stative verb (-eka) takes the causative, *
+                          * the final -k- fuses with the causative to give -ts-:  *
+                          * -ek- + CAUS → -ets- on the surface.                  *
+                          * e.g. gukomereka (komerek) → gukomeretsa              *
+                          *      komerek + CAUS → komerets+a (k→ts fusion)       */
 } VerbExtension;
 
 /* ─── Pronoun sub-types (amoko y'ibinyazina) ─────────────────────────────── */
@@ -500,7 +521,8 @@ typedef struct {
     char detected_prefix[KIN_MAX_PREFIX]; /* D+RT detected                  */
     bool is_kinyarwanda;            /* False = likely foreign/unknown       */
     bool is_proper_noun;            /* Capitalised and not at start         */
-    bool is_negative;               /* nt- negative prefix detected         */
+    bool is_negative;               /* nt- / si- negative prefix detected   */
+    bool is_hortative;              /* ni- hortative particle detected       */
     bool is_reduplicated;           /* Stem is a reduplicated verb form      */
     char redup_surface[KIN_MAX_STEM]; /* Surface of REDUP: 'a' + 2nd copy   */
     int  error_count;               /* Number of errors on this token       */
@@ -583,6 +605,7 @@ bool kin_is_adj_stem(const char *stem);
 bool kin_is_reflexive_verb_stem(const char *stem); /* kwi- reflexive forms */
 bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out);
 bool kin_is_known_verb_stem(const char *stem);
+int  kin_numerical_value(const char *lower); /* 1-7 for basic numerals; 0 otherwise */
 bool kin_is_causative_y_surface(const char *stem); /* stem ends in z, z→r is a known stem */
 bool kin_is_known_noun_stem(const char *stem, int *class_out);
 bool kin_is_known_full_word(const char *word, int *class_out, char *stem_out);

@@ -498,59 +498,88 @@ static const PronounEntry PRONOUNS[] = {
     { "bane",    PRON_NUMERICAL,  2 }, { "batanu",   PRON_NUMERICAL,  2 },
     { "batandatu",PRON_NUMERICAL, 2 }, { "barindwi", PRON_NUMERICAL,  2 },
     { "bamwe",   PRON_NUMERICAL,  2 },
-    /* Nt.4 (imiti pl) */
+    /* Nt.2 (aba- pl) — 8: ba+nani=banani */
+    { "banani",  PRON_NUMERICAL,  2 },
+    /* Nt.4 (imiti pl) — 8: i+nani=inani; 9: icyenda (ici- prefix, used across cls) */
     { "imwe",    PRON_NUMERICAL,  4 }, { "ibiri",    PRON_NUMERICAL,  4 },
     { "itatu",   PRON_NUMERICAL,  4 }, { "ine",      PRON_NUMERICAL,  4 },
     { "itanu",   PRON_NUMERICAL,  4 }, { "itandatu", PRON_NUMERICAL,  4 },
     { "irindwi", PRON_NUMERICAL,  4 },
+    { "inani",   PRON_NUMERICAL,  4 }, /* 8 – mirongo inani = 80              */
+    { "icyenda", PRON_NUMERICAL,  4 }, /* 9 – mirongo icyenda = 90            */
     /* Nt.5 singular */
     { "rimwe",   PRON_NUMERICAL,  5 },
-    /* Nt.6 (ama- pl) */
+    /* Nt.6 (ama- pl) — 8: a+nani=anani; 9: icyenda */
     { "amwe",    PRON_NUMERICAL,  6 }, { "abiri",    PRON_NUMERICAL,  6 },
     { "atatu",   PRON_NUMERICAL,  6 }, { "ane",      PRON_NUMERICAL,  6 },
     { "atanu",   PRON_NUMERICAL,  6 }, { "atandatu", PRON_NUMERICAL,  6 },
     { "arindwi", PRON_NUMERICAL,  6 },
-    /* Nt.7 singular */
+    { "anani",   PRON_NUMERICAL,  6 }, /* 8 – magana anani = 800              */
+    { "icyenda", PRON_NUMERICAL,  6 }, /* 9 – magana icyenda = 900            */
+    /* Nt.7 singular — 9: icyenda (ici- = Nt.7 prefix) */
     { "kimwe",   PRON_NUMERICAL,  7 },
-    /* Nt.8 (ibi- pl) */
+    { "icyenda", PRON_NUMERICAL,  7 }, /* 9 (ici-yenda, Nt.7 natural form)    */
+    /* Nt.8 (ibi- pl) — 8: bi+nani=binani */
     { "bimwe",   PRON_NUMERICAL,  8 }, { "bibiri",   PRON_NUMERICAL,  8 },
     { "bitatu",  PRON_NUMERICAL,  8 }, { "bine",     PRON_NUMERICAL,  8 },
     { "bitanu",  PRON_NUMERICAL,  8 }, { "bitandatu",PRON_NUMERICAL,  8 },
     { "birindwi",PRON_NUMERICAL,  8 },
-    /* Nt.9 singular */
+    { "binani",  PRON_NUMERICAL,  8 }, /* 8                                   */
+    /* Nt.9 singular — 8: i+nani=inani (same prefix as Nt.4) */
     { "imwe",    PRON_NUMERICAL,  9 },
-    /* Nt.10 (zi- pl) – special forms: ebyiri/eshatu/enye/eshanu/esheshatu */
+    { "inani",   PRON_NUMERICAL,  9 }, /* 8                                   */
+    /* Nt.10 (zi- pl) – special forms: ebyiri/eshatu/enye/eshanu/esheshatu; 8: zinani */
     { "zimwe",   PRON_NUMERICAL, 10 }, { "ebyiri",   PRON_NUMERICAL, 10 },
     { "eshatu",  PRON_NUMERICAL, 10 }, { "enye",     PRON_NUMERICAL, 10 },
     { "eshanu",  PRON_NUMERICAL, 10 }, { "esheshatu",PRON_NUMERICAL, 10 },
     { "zirindwi",PRON_NUMERICAL, 10 },
+    { "zinani",  PRON_NUMERICAL, 10 }, /* 8                                   */
     /* Nt.11 singular ONLY — Nt.11 nouns (uru-) have no plural number forms; */
     /* their plural class is Nt.10, which uses ebyiri/eshatu/zirindwi etc.  */
-    { "rumwe",   PRON_NUMERICAL, 11 },
+    { "rumwe",    PRON_NUMERICAL, 11 },
+    { "runani",   PRON_NUMERICAL, 11 }, /* 8                                   */
+    { "urwenda",  PRON_NUMERICAL, 11 }, /* 9 – uru+wenda (u→w §1.1); mirongo urwenda = 90 */
     /* Nt.12 singular ONLY — Nt.12 nouns (aka-) have no plural number forms;*/
     /* their plural class is Nt.13, which uses tubiri/dutatu etc.           */
-    { "kamwe",   PRON_NUMERICAL, 12 },
-    /* Nt.13 (utu- pl) — note: 3/5/6 use du- prefix (u→voiced before GR)  */
+    /* ga-/ka- forms are the standalone counting words (imibare y'umurongo) */
+    /* used for units in compound numbers: mirongo itanu na gatanu = 55.    */
+    { "kamwe",    PRON_NUMERICAL, 12 }, /* 1 */
+    { "kabiri",   PRON_NUMERICAL, 12 }, /* 2 – also used as "twice"        */
+    { "gatatu",   PRON_NUMERICAL, 12 }, /* 3 – counting form               */
+    { "kane",     PRON_NUMERICAL, 12 }, /* 4 – counting form               */
+    { "gatanu",   PRON_NUMERICAL, 12 }, /* 5 – mirongo itanu na gatanu = 55*/
+    { "gatandatu",PRON_NUMERICAL, 12 }, /* 6 – counting form               */
+    { "karindwi", PRON_NUMERICAL, 12 }, /* 7 – mirongo irindwi na karindwi = 77 */
+    { "kanani",   PRON_NUMERICAL, 12 }, /* 8 */
+    /* umunani = Nt.1 form of 8, used as standalone counting word "eight"  */
+    { "umunani",  PRON_NUMERICAL,  1 }, /* 8 – standalone form (umu-nani)  */
+    /* Nt.13 (utu- pl) — note: 3/5/6 use du- prefix (u→voiced before GR); 8: tunani */
     { "tumwe",   PRON_NUMERICAL, 13 }, { "tubiri",   PRON_NUMERICAL, 13 },
     { "dutatu",  PRON_NUMERICAL, 13 }, { "tune",     PRON_NUMERICAL, 13 },
     { "dutanu",  PRON_NUMERICAL, 13 }, { "dutandatu",PRON_NUMERICAL, 13 },
     { "turindwi",PRON_NUMERICAL, 13 },
-    /* Nt.14 (ubu-) */
+    { "tunani",  PRON_NUMERICAL, 13 }, /* 8                                   */
+    /* Nt.14 (ubu-) — 8: bunani */
     { "bumwe",   PRON_NUMERICAL, 14 }, { "bubiri",   PRON_NUMERICAL, 14 },
     { "butatu",  PRON_NUMERICAL, 14 }, { "bune",     PRON_NUMERICAL, 14 },
     { "butanu",  PRON_NUMERICAL, 14 }, { "butandatu",PRON_NUMERICAL, 14 },
     { "burindwi",PRON_NUMERICAL, 14 },
-    /* Nt.15 singular ONLY — infinitive/verbal noun class                   */
+    { "bunani",  PRON_NUMERICAL, 14 }, /* 8                                   */
+    /* Nt.15 singular ONLY — infinitive/verbal noun class */
     { "kumwe",   PRON_NUMERICAL, 15 },
-    /* Nt.16 (aha- locative) */
+    /* Nt.16 (aha- locative) — 8: hanani */
     { "hamwe",   PRON_NUMERICAL, 16 }, { "habiri",   PRON_NUMERICAL, 16 },
     { "hatatu",  PRON_NUMERICAL, 16 }, { "hane",     PRON_NUMERICAL, 16 },
     { "hatanu",  PRON_NUMERICAL, 16 }, { "hatandatu",PRON_NUMERICAL, 16 },
     { "harindwi",PRON_NUMERICAL, 16 },
-    /* Plural-form numerical nouns (>7) – these behave like amazina nyamubaro */
-    { "icumi",   PRON_NUMERICAL,  0 }, /* ten                               */
-    { "ijana",   PRON_NUMERICAL,  0 }, /* hundred                           */
-    { "igihumbi",PRON_NUMERICAL,  0 }, /* thousand                          */
+    { "hanani",  PRON_NUMERICAL, 16 }, /* 8                                   */
+    /* ── Large-number numerals (class-invariable) ──────────────────────── */
+    { "icumi",      PRON_NUMERICAL,  0 }, /* 10                              */
+    { "makumyabiri",PRON_NUMERICAL,  0 }, /* 20 (special: makumya+abiri)     */
+    { "ijana",      PRON_NUMERICAL,  0 }, /* 100                             */
+    { "maganabiri", PRON_NUMERICAL,  0 }, /* 200 (magana+abiri, merged form) */
+    { "igihumbi",   PRON_NUMERICAL,  0 }, /* 1,000                           */
+    { "ibihumbi",   PRON_NUMERICAL,  0 }, /* thousands (pl of igihumbi)      */
 
     /* ── Ikinyazina mbanziriza (relative pronouns) p.114 ──────────────  */
     /* These carry circumflex accent (isaku nyejuru -ô) vs demonstrative -o */
@@ -1133,14 +1162,16 @@ static const InvEntry INVARIABLES[] = {
     { "ni meza",    POS_INTERJECTION }, /* it's fine / I'm well                    */
     { "nimeza",     POS_INTERJECTION }, /* it's fine (contracted)                  */
 
-    /* ── Stative "kuba na" (to have) conjugations ──────────────────────────── *
-     * Formed from kuba (to be) + na (with) contracted: SP + -fite / -fit-.     *
-     * Surface form: SP + fit + e.  Stem "fit" is not in VERB_STEMS so the verb *
-     * heuristic misses it.  Listed here so has_verb is set correctly.          */
+    /* ── Stative possessive "-fite" conjugations ────────────────────────────── *
+     * Derived from gufata (fat-) via stative vowel shift fat→fit: SP + fit + e. *
+     * Stem "fit" is not in VERB_STEMS so the verb heuristic misses it.         *
+     * Listed here so has_verb is set correctly.                                 *
+     * "abafite" is the augmented/participial Nt.2 form ("those who have").     */
     { "nfite",   POS_VERB_CONJ }, /* 1sg: I have (n + fite)                       */
     { "ufite",   POS_VERB_CONJ }, /* 2sg/Nt.3: you have / it has                  */
     { "afite",   POS_VERB_CONJ }, /* Nt.1 3sg: he/she has                         */
-    { "bafite",  POS_VERB_CONJ }, /* Nt.2: they (human) have                      */
+    { "bafite",  POS_VERB_CONJ }, /* Nt.2: they have                              */
+    { "abafite", POS_VERB_CONJ }, /* Nt.2 augmented: those who have (a+ba+fit+e)  */
     { "gifite",  POS_VERB_CONJ }, /* Nt.7: it has                                 */
     { "bifite",  POS_VERB_CONJ }, /* Nt.8: they have                              */
     { "ifite",   POS_VERB_CONJ }, /* Nt.4/9: it has                               */
@@ -1160,15 +1191,10 @@ static const InvEntry INVARIABLES[] = {
     { "nabi",    POS_ADVERB },    /* badly / poorly (manner adverb)              */
 
     /* ── Standalone numerals (used with saa / temporal / quantifier phrases) ─ */
-    { "tatu",      POS_ADVERB }, /* three (also in "saa tatu" = 9 AM)            */
-    { "kane",      POS_ADVERB }, /* four                                         */
-    { "gatanu",    POS_ADVERB }, /* five                                         */
-    { "gatandatu", POS_ADVERB }, /* six                                          */
-    { "karindwi",  POS_ADVERB }, /* seven                                        */
-    { "umunani",   POS_ADVERB }, /* eight                                        */
-    { "icyenda",   POS_ADVERB }, /* nine                                         */
+    /* NOTE: gatanu/gatandatu/karindwi/umunani/kabiri/kane are in PRON_NUMERICAL  */
+    /* (Nt.12 counting forms); moved there so step-2 pronoun check catches them. */
+    { "tatu",      POS_ADVERB }, /* three bare stem (saa tatu = 9 AM)            */
     { "icumi",     POS_ADVERB }, /* ten                                          */
-    { "kabiri",    POS_ADVERB }, /* two / twice (also used with saa)             */
 
     { NULL, POS_UNKNOWN }
 };
@@ -1215,6 +1241,11 @@ static const char *VERB_STEMS[] = {
     "hwem",     /* guhwema     – to pause / pant                          */
     "sib",      /* gusiba      – to erase / miss / be absent              */
     "vug",      /* kuvuga      – to speak / say                           */
+    "vuz",      /* kuvuza      – to play (wind instrument) / make sound   */
+    "cur",      /* gucura      – to forge / smith (any forging/reshaping) */
+    "keb",      /* gukeba      – to cut by slicing (razor-style cut)      */
+    "tem",      /* gutema      – to cut by striking downward (panga/axe)  */
+    "kat",      /* gukata      – to cut through a splitter (scissors)     */
     "baz",      /* kubaza      – to ask                                   */
     "subiz",    /* gusubiza    – to answer                                */
     "kor",      /* gukora      – to work / do; gukoresha (kor+esh) = to use */
@@ -1262,10 +1293,14 @@ static const char *VERB_STEMS[] = {
     "meny",     /* kumenya     – to know / understand                     */
     "seng",     /* gusenga     – to pray / worship                        */
     "komer",    /* gukomera    – to be strong / difficult                  */
+    "komerek",  /* gukomereka  – to be wounded / injured (neuter/stative)
+                   Causative → gukomeretsa: komerek+CAUS → komerets+a
+                   kunkomeretsa = ku+n(1sg OM)+komerets+a = to wound me */
     "rwan",     /* kurwana     – to fight / wage war                      */
     "rut",      /* kuruta      – to surpass / exceed                      */
     "rimbuk",   /* kurimbuka   – to perish / be destroyed                 */
     "tang",     /* gutanga     – to give / offer / present                */
+    "tangir",   /* gutangira   – to begin / start (lexical entry; also applicative of gutanga) */
     "kiz",      /* gukiza      – to save / heal / rescue                  */
     "bah",      /* kubaha      – to respect / honor                       */
     "hamya",    /* guhamya     – to testify / witness                      */
@@ -1348,7 +1383,7 @@ static const char *VERB_STEMS[] = {
     "zam",      /* kuzamura    – to lift / raise up                      */
     "vunik",    /* guvunika    – to break / fracture                     */
     "hur",      /* guhura      – to meet / encounter                     */
-    "rong",     /* gurongora   – to marry (male perspective)             */
+    "rongor",   /* kurongora   – to marry (traditional/biblical); modern: have sex */
     "ron",      /* gurona      – to find / discover                      */
     "fung",     /* gufungura   – to open (a door/bottle/etc.)            */
     "hem",      /* guhema      – to breathe with difficulty              */
@@ -1399,6 +1434,14 @@ static const char *VERB_STEMS[] = {
     "sab",      /* gusaba      – to ask / request / pray                 */
     "pf",       /* gupfa       – to die (very short stem form)           */
     "sim",      /* gusimba     – to replace / substitute                 */
+    "shumbush", /* gushumbusha – to give a replacement (classical/biblical):
+                   root shumbush; sh+ye→shije in past perfect.
+                   e.g. inshumbushije = i(SP·Nt.9)+n(OM·1sg)+shumbush+ije */
+    "simbur",   /* gusimbura   – to replace / substitute (modern, preferred):
+                   root simbur; modern equivalent of gushumbusha.
+                   → causative: gusimbuza (simbur+iz+a = simbuz+a) */
+    "simbuz",   /* gusimbuza   – to cause to replace (causative of gusimbura):
+                   simbur → simbuz+a via -r→-z causative alternation */
     "rob",      /* kuroha      – to sink / drown                        */
     "boh",      /* guboha      – to tie / bind                          */
     "hug",      /* guhuga – to be busy/occupied; guhugurika – to be destroyed */
@@ -1418,7 +1461,9 @@ static const char *VERB_STEMS[] = {
     "ter",      /* gutera      – to plant / cause / do to (very common)  */
     "tek",      /* guteka      – to cook                                 */
     "men",      /* kumena      – to break / shatter                      */
-    "teger",    /* gutegera    – to wait for / expect                    */
+    /* "teger" removed: gutegera is the applicative of gutega (teg+er+a).
+     * ext_strip now correctly peels -er- → root "teg" (gutega).
+     * Forms like gutegereza go through VEXT_APPLIC_CAUSATIVE chain. */
     "tekerez",  /* gutekereza  – to think / reflect / meditate           */
     "tonderez", /* gutondereza – to be careful / attend to               */
     "tondek",   /* gutondeka   – to arrange / organize                   */
@@ -1440,9 +1485,12 @@ static const char *VERB_STEMS[] = {
     "pir",      /* kupira      – to blow / puff / breathe out            */
     "zaner",    /* guzanirira  – to bring for (applicative of kuzana)   */
     "bam",      /* kubama      – to be flat / spread out                 */
+    "us",       /* kusa        – to resemble / look like (a+us+a→usa; SP a elides before vowel) */
+    "gus",      /* kugusa      – to resemble / be similar (adv. gusa = only, cf. kugusa) */
     "gur",      /* kugura      – to buy / purchase                       */
     "sig",      /* gusiga      – to leave / abandon / anoint             */
-    "ragir",    /* kuragira    – to advise / counsel / guide             */
+    "ragir",    /* kuragira    – to shepherd / tend cattle; also: to advise/guide */
+    "curang",   /* gucuranga   – to play a musical instrument            */
     "sezer",    /* gusezerera  – to say goodbye / dismiss                */
     "ror",      /* kurora      – to look at / watch / examine            */
     "konger",   /* gukongerera – to add more / give more to (applic.)   */
@@ -1491,6 +1539,7 @@ static const char *VERB_STEMS[] = {
     "boher",    /* gubohereza  – to tighten / bind up                    */
     "kub",      /* gukuba      – to fold / multiply                      */
     "gob",      /* kugoba      – to surround / encircle                  */
+    "gom",      /* kugoma      – to moan / groan / growl (→ urugomo)      */
     "koter",    /* gukotera    – to work for / towards (applicative)      */
     "witer",    /* kwitera     – to cause oneself / self-initiate        */
     "yemrer",   /* kwiyemera   – already: yemr; add extended form        */
@@ -1567,6 +1616,16 @@ static const char *VERB_STEMS[] = {
     "ry",       /* kurya       – to eat (y-final root: kurya→ry, yariye, bazarye)
                    PAST_SP_Y guard: ry+e=rye (y-final root takes bare 'e' FV, not 'ye')
                    FUTURE_SUBJ: mu+za+ry+e = muzarye (ntimuzarye = don't eat, 2pl) */
+    "umv",      /* kumva       – to hear / listen / understand / feel
+                   Hortative: ni+mw+umv+e = nimwumve (2pl hort: "you all, hear!")
+                   Present:   a+ra+umv+a → aramva (Nt.1 SP "a" + euph-z? or direct)
+                   Causative: umv+ish+a = kumvisha (to make understand) */
+    "byimb",    /* kubyimba    – to swell / become swollen
+                   imibyimba (Nt.4) = swellings (deverbal noun from kubyimba) */
+    "hor",      /* guhora      – to keep doing / be accustomed to / do habitually
+                   2pl present: mu+hor+a = muhora (you keep doing…)
+                   e.g. muhora kunkomeretsa = "you keep wounding me" (Gen 4:23)
+                   Takes an infinitive complement (ku/gu+root+a) */
     NULL
 };
 
@@ -1574,6 +1633,40 @@ bool kin_is_known_verb_stem(const char *stem) {
     for (int i = 0; VERB_STEMS[i]; i++)
         if (strcmp(stem, VERB_STEMS[i]) == 0) return true;
     return false;
+}
+
+/*
+ * kin_numerical_value() — cardinal integer for a PRON_NUMERICAL surface form.
+ *
+ * Returns 1–7 for the basic numerals across all noun classes, or 0 if the
+ * surface is not a simple 1–7 numeral (e.g. icumi/ijana/igihumbi return 0).
+ *
+ * Class-concordant endings used as keys (RALC p.119-121):
+ *   1 → -mwe   (umwe/imwe/rimwe/amwe/kimwe/zimwe/rumwe/kamwe/tumwe/bumwe/kumwe/hamwe)
+ *   2 → -biri  (ibiri/babiri/abiri/bibiri/ebyiri/tubiri/bubiri/habiri)
+ *   3 → -tatu  (itatu/batatu/atatu/bitatu/eshatu/dutatu/butatu/hatatu)
+ *   4 → -ne / "enye" for Nt.10 (ine/bane/ane/bine/enye/tune/bune/hane)
+ *   5 → -tanu  (itanu/batanu/atanu/bitanu/eshanu/dutanu/butanu/hatanu)
+ *   6 → -tandatu (itandatu/batandatu/atandatu/bitandatu/esheshatu/dutandatu/…)
+ *   7 → -rindwi (irindwi/barindwi/arindwi/birindwi/zirindwi/turindwi/…)
+ */
+int kin_numerical_value(const char *lower) {
+    if (!lower || !lower[0]) return 0;
+    size_t n = strlen(lower);
+#define _NV_EW(s) (n >= sizeof(s)-1 && strcmp(lower + n - (sizeof(s)-1), (s)) == 0)
+    if (_NV_EW("mwe"))     return 1;
+    if (_NV_EW("biri"))    return 2;
+    if (_NV_EW("tandatu")) return 6;   /* before "tatu" so "itandatu" ≠ 3 */
+    if (_NV_EW("tatu"))    return 3;
+    if (_NV_EW("tanu"))    return 5;
+    if (_NV_EW("rindwi"))  return 7;
+    if (_NV_EW("nani"))    return 8;   /* inani/anani/binani/runani/… */
+    if (_NV_EW("yenda"))   return 9;   /* icyenda (ci-yenda→cy+yenda) */
+    if (_NV_EW("wenda"))   return 9;   /* urwenda = uru+wenda (Nt.11: u→w §1.1) */
+    if (strcmp(lower, "enye") == 0) return 4;   /* Nt.10 form of 4        */
+    if (_NV_EW("ne"))      return 4;
+#undef _NV_EW
+    return 0;
 }
 
 /*
@@ -2379,6 +2472,7 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_NEG_RELATIVE:    return "Inshinga nkurikije y'impakanyi (Neg. participial: itagira, utagira\xe2\x80\xa6)";
         case TENSE_NEG_ANTERIOR:    return "Inshinga y'impakanyi bw'imbere (Neg. anterior \xe2\x80\x93 \"not yet\": kataraba, itaravuba\xe2\x80\xa6)";
         case TENSE_NEG_DA_2SG:      return "Impakanyi ya 2sg y'inziganyo (Neg. 2sg conditional: nu/u + da + root; udakora, nudakora\xe2\x80\xa6)";
+        case TENSE_PAST_PERF_LOC:   return "Impitakare + ahantu (Past perfect+locative: SP+stem+ye+mo/ho/yo)";
         case TENSE_SUBJUNCTIVE_LOC: return "Ikigombero + ahantu (Subjunctive+locative: habeho, abeho, mubemo…)";
         case TENSE_FUTURE_SUBJ:     return "Inzagihe+Ikigombero (NEG-future prohibitive: SP+za+stem+e)";
         case TENSE_FUTURE_SUBJ_LOC: return "Inzagihe+Ikigombero+ahantu (NEG-future prohibitive+loc: SP+za+stem+e+ho)";
@@ -2399,9 +2493,19 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_REVERSIVE:   return "Ngiruka/Ngirura (Reversive: -uk-/-ur-)";
         case VEXT_CAUSATIVE_Y:  return "Ngiza (Causative-y: r+y→z, §1.3)";
         case VEXT_CAUSATIVE_IZ: return "Integeko -iz-/-ez- (Causative allomorph: stem+iz+a, e.g. sinzir+iz+a)";
+        case VEXT_CAUSATIVE_PASSIVE:
+            return "Integeko+Imbundo (Causative-passive: -esh-/-ish- + -w-)";
         case VEXT_DOUBLE_APPLICATIVE:
             return "Ikirango kabiri (Double applicative: -ir-ir-; "
                    "naming/acting for someone by invoking another's name)";
+        case VEXT_APPLIC_CAUSATIVE:
+            return "Ikirango+Integeko (Applicative+Causative: -er-/-ir- + -ez-/-iz-)";
+        case VEXT_APPLIC_PASSIVE:
+            return "Ikirango+Imbundo (Applicative+Passive: -er-/-ir- + -w-; "
+                   "e.g. guhora \xe2\x86\x92 guhorera \xe2\x86\x92 guhorerwa)";
+        case VEXT_CAUS_NEUTER:
+            return "Integeko y'Ingirika (Neuter-Causative: -ek-+-CAUS \xe2\x86\x92 -ets-; "
+                   "e.g. gukomereka \xe2\x86\x92 gukomeretsa)";
         default:               return "";
     }
 }
@@ -2425,7 +2529,7 @@ const char *kin_gram_role_name(GramRole r) {
 const char *kin_om_str(int cls) {
     switch (cls) {
         case  1: return "mu";   case  2: return "ba";
-        case  3: return "wu";   case  4: return "yi";
+        case  3: return "u";    case  4: return "yi";
         case  5: return "ri";   case  6: return "ya";
         case  7: return "ki";   case  8: return "bi";
         case  9: return "n";    case 10: return "zi";

@@ -53,6 +53,9 @@ static const char *PRIMARY_NOUN_STEMS[] = {
     "tungo",  /* itungo/amatungo – domestic animal; primary lexical noun, NOT
                * deverbative from gutunga (to acquire/possess wealth);
                * umutunzi/abatunzi are the true deverbatives of gutunga     */
+    "hungu",  /* umuhungu – boy; primary lexical noun meaning 'boy/son',
+               * NOT deverbative from guhunga (to flee); independent root   */
+    "kuru",   /* agakuru/impamvu – reason/matter; NOT from gukura (to grow) */
     NULL
 };
 
@@ -166,6 +169,19 @@ static void check_deverbative(Token *tok) {
             tok->is_deverbative = true;
             strncpy(tok->verb_root, root_gz, KIN_MAX_STEM - 1);
             tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
+        /* r→z before agentive -i: root-final 'r' palatalizes to 'z' before -i.
+         * e.g. "cuzi" → "cuz" → z was 'r': "cur" ← gucura (to forge).
+         * Try same -zi stem with z reverted to 'r' instead of 'g'. */
+        char root_rz[KIN_MAX_STEM];
+        strncpy(root_rz, tok->stem, slen - 1);
+        root_rz[slen - 1] = '\0';                 /* "cuz"   */
+        root_rz[slen - 2] = 'r';                  /* "cur"   */
+        if (strlen(root_rz) >= 2 && kin_is_known_verb_stem(root_rz)) {
+            tok->is_deverbative = true;
+            strncpy(tok->verb_root, root_rz, KIN_MAX_STEM - 1);
+            tok->verb_root[KIN_MAX_STEM - 1] = '\0';
         }
     }
 }
@@ -184,16 +200,17 @@ void kin_tag_token(Token *tok) {
         tok->is_kinyarwanda = true;
         /* ── -fite stative possessive: set class + stem so morph display is right.
          * Forms: bifite(Nt.8), afite(Nt.1), bafite(Nt.2), gifite(Nt.7), etc.
-         * Structure: SP + -fite  (stative of "to have", not a regular tense). */
+         * "abafite" = a(AUG) + ba(SP·Nt.2) + fit + e: participial "those who have".
+         * Structure: SP + -fite  (stative of gufata, fat→fit vowel shift). */
         if (inv_pos == POS_VERB_CONJ && kin_ends_with(w, "fite")) {
             strncpy(tok->stem, "fit", KIN_MAX_STEM - 1);
             tok->verb_tense = TENSE_STATIVE_POSS;  /* -fite stative possessive */
             size_t wlen = strlen(w);
             static const struct { const char *sp; int cls; } FITE_SP[] = {
-                { "bi",  8  }, { "ba",  2  }, { "gi",  7  }, { "zi", 10  },
-                { "ru", 11  }, { "ga", 12  }, { "du",  1  }, { "mu",  2  },
-                { "bu", 14  }, { "u",   1  }, { "a",   1  }, { "n",   1  },
-                { "i",   9  }, { NULL,  0  }
+                { "bi",  8  }, { "aba", 2  }, { "ba",  2  }, { "gi",  7  },
+                { "zi", 10  }, { "ru", 11  }, { "ga", 12  }, { "du",  1  },
+                { "mu",  2  }, { "bu", 14  }, { "u",   1  }, { "a",   1  },
+                { "n",   1  }, { "i",   9  }, { NULL,  0  }
             };
             for (int fi = 0; FITE_SP[fi].sp; fi++) {
                 size_t slen = strlen(FITE_SP[fi].sp);
@@ -534,11 +551,40 @@ void kin_tag_token(Token *tok) {
      * only for the small set of confirmed monosyllabic Kinyarwanda verb
      * roots ("b"=kuba, "h"=guha, "z"=kuza, "v"=kuva) — never for unknown
      * single chars that arise from a fallback parse of a short name.        */
+    /* ── Hortative ni- pre-check ────────────────────────────────────────── *
+     * nimutegere = ni(HORT) + mu(2pl SP) + teg + er + e                    *
+     * nimwumve   = ni(HORT) + mw(2pl SP) + umv + e                         *
+     * The particle 'ni' precedes the full conjugated form (SP+TM+root+FV). *
+     * Guard: len > 4, starts "ni", third char is a consonant (not vowel),  *
+     * and the suffix starting at +2 is itself a valid conjugated verb.     */
+    bool is_hort = false;
+    const char *verb_w = w;
+    {
+        size_t hlen = strlen(w);
+        unsigned char c3 = (unsigned char)(hlen > 2 ? w[2] : '\0');
+        bool c3_vowel = (c3=='a'||c3=='e'||c3=='i'||c3=='o'||c3=='u');
+        if (hlen > 4 && w[0]=='n' && w[1]=='i' && !c3_vowel) {
+            char hort_stem[KIN_MAX_STEM] = "";
+            int hort_cls = 0;
+            VerbTense hort_tense = TENSE_NONE;
+            int hort_obj = 0;
+            VerbExtension hort_ext = VEXT_NONE;
+            bool hort_neg = false;
+            if (kin_is_verb_conjugated(w + 2, hort_stem, &hort_cls, &hort_tense,
+                                       &hort_obj, &hort_ext, &hort_neg)
+                && (hort_tense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(hort_stem))
+                && (hort_tense != TENSE_SUBJUNCTIVE   || kin_is_known_verb_stem(hort_stem))) {
+                is_hort = true;
+                verb_w  = w + 2;
+            }
+        }
+    }
+
     int scls = 0, obj_cls = 0;
     VerbTense vtense = TENSE_NONE;
     VerbExtension vext = VEXT_NONE;
     bool is_neg = false;
-    if (kin_is_verb_conjugated(w, stem, &scls, &vtense, &obj_cls, &vext, &is_neg)
+    if (kin_is_verb_conjugated(verb_w, stem, &scls, &vtense, &obj_cls, &vext, &is_neg)
         /* PRESENT_NORA: require confirmed stem to avoid naming proper nouns
          * or short words (e.g. "ada", "izi", "uko") as conjugated verbs. */
         && (vtense != TENSE_PRESENT_NORA || kin_is_known_verb_stem(stem))
@@ -552,6 +598,7 @@ void kin_tag_token(Token *tok) {
         tok->verb_ext       = vext;
         tok->obj_class      = obj_cls;
         tok->is_negative    = is_neg;
+        tok->is_hortative   = is_hort;
         tok->is_kinyarwanda = true;
         strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
         return;
@@ -724,6 +771,40 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
         curr->stem[KIN_MAX_STEM - 1] = '\0';
         curr->detected_prefix[0] = '\0';   /* indomo elided after locative */
         check_deverbative(curr);
+    }
+
+    /* ── Context Pass A3: Numeral after mirongo/magana ──────────────────── *
+     * When mirongo or magana is followed by a word that was tagged as verb  *
+     * or foreign but whose surface matches a numeral pattern, retag it as   *
+     * PRON_NUMERICAL.  This handles the phonological form where the class   *
+     * prefix vowel 'i-' is elided after the preceding vowel:               *
+     *   magana cyenda = 900  (icyenda with i- elided after magana -a)      *
+     *   magana nani   = 800  (inani with i-/a- form variant)               *
+     * kin_numerical_value() returns > 0 for these surface forms.           */
+    for (int i = 1; i < sa->token_count; i++) {
+        Token *curr = &sa->tokens[i];
+        if (curr->pos == POS_PUNCTUATION) continue;
+        if (curr->pos == POS_PRONOUN && curr->pron_type == PRON_NUMERICAL)
+            continue;  /* already correct */
+        /* Find previous non-punct token */
+        int pi = i - 1;
+        while (pi >= 0 && sa->tokens[pi].pos == POS_PUNCTUATION) pi--;
+        if (pi < 0) continue;
+        Token *prev = &sa->tokens[pi];
+        if (strcmp(prev->lower, "mirongo") != 0 && strcmp(prev->lower, "magana") != 0)
+            continue;
+        int v = kin_numerical_value(curr->lower);
+        if (v <= 0) continue;
+        /* Retag as numeral */
+        curr->pos         = POS_PRONOUN;
+        curr->pron_type   = PRON_NUMERICAL;
+        curr->noun_class  = 0;   /* class undetermined for elided form */
+        curr->verb_tense  = TENSE_NONE;
+        curr->verb_ext    = VEXT_NONE;
+        curr->obj_class   = 0;
+        curr->is_negative = false;
+        curr->is_kinyarwanda = true;
+        curr->stem[0] = '\0';
     }
 
     /* ── Context Pass B: Izina ntera (POS_RELATIVE_NOUN) detection ──────── *
