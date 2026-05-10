@@ -212,9 +212,11 @@ typedef enum {
     POS_PREPOSITION,       /* Umugereka / Ingera                           */
     POS_CONJUNCTION,       /* Icyungo                                      */
     POS_INTERJECTION,      /* Irangamutima                                 */
-    POS_ADVERB,            /* Akamamo                                      */
+    POS_ADVERB,            /* Akamamo (general adverb)                     */
+    POS_ADVERB_TIME,       /* Akamamo k'igihe (Temporal adverb)            */
     POS_LOCATIVE,          /* Indangahantu                                 */
     POS_VERB_PARTICLE,     /* Ikegeranshinga: ngo, ko                      */
+    POS_NUMBER,            /* Inomero – Arabic numeral (1, 2, 3 …)         */
     POS_FOREIGN,           /* Word not matching any Kinyarwanda pattern    */
     POS_PUNCTUATION,       /* Punctuation mark (comma, period, quote, etc.)*/
 } POS;
@@ -257,6 +259,13 @@ typedef enum {
     TENSE_NARRATIVE,       /* Inkurikizo: SP+ka+stem+a              akagenda */
     TENSE_OPTATIVE,        /* Inyifurizo: SP+ra+ka+stem+a           urakabyara*/
     TENSE_IMPERATIVE,      /* Integeko: bare stem+a                 genda    */
+    /* ── Negative imperative / Prohibitive (Impakanyi y'integeko) ──────────── *
+     * SP(u/mu/tu) + prohibitive-i → surface wi-/mwi-/twi- + stem + a          *
+     * u→w §1.1 merges the SP's trailing 'u' with prohibitive marker 'i':      *
+     *   wi  + tiny + a = witinya  (don't fear, 2SG; u+i→wi)                  *
+     *   mwi + tiny + a = mwitinya (don't fear, 2PL; mu+i→mwi)                *
+     *   twi + tiny + a = twitinya (let's not fear, 1PL; tu+i→twi)            */
+    TENSE_NEG_IMPERATIVE,  /* Impakanyi y'integeko: mwi/wi/twi + stem + a      */
     TENSE_CONDITIONAL,     /* Inziganyo: SP+a+Ø+stem+a              twatsinda*/
     /* ── Copula forms of kuba (inshinga nkene) ───────────────────────────── *
      * The verb kuba (to be/exist) has suppletive copula paradigm with -ri-   *
@@ -392,6 +401,10 @@ typedef enum {
                           * e.g. guhorerwa: hor+er(APPLIC)+w(PASS)+a                  *
                           * The applicative 'r' is retained before passive 'w':       *
                           * -er+w- → -erwa (NOT -ewa; r does NOT drop before -w-).    */
+    VEXT_CAUS_Y_PASSIVE, /* Ngiza+Imbundo: causative-y (r+y→z) + -w- (passive)      *
+                          * e.g. ibagezwaho: ger(root)+y(CAUS-y→z)+w(PASS)+a+ho    *
+                          *      kugera (to reach) → kugeza (to deliver)            *
+                          *                        → kugezwa (to be delivered)      */
     VEXT_CAUS_NEUTER,    /* Integeko y'Ingirika: neuter-causative fusion -ek-→-ets- *
                           * When a neuter/stative verb (-eka) takes the causative, *
                           * the final -k- fuses with the causative to give -ts-:  *
@@ -471,12 +484,14 @@ typedef struct {
 #define KIN_MORPH_LABEL_LEN 12   /* "D","RT","C","SP","TM","OM","EXT","FV","RS","PREF" */
 #define KIN_MORPH_FORM_LEN  20   /* max length of a single morpheme surface/underlying */
 #define KIN_MORPH_RULE_LEN  96   /* rule citation, e.g. "u→w §1.1 (SP 'tu'+'a'→'tw')" */
+#define KIN_MORPH_GLOSS_LEN 48   /* English gloss for this morpheme slot             */
 
 typedef struct {
-    char label   [KIN_MORPH_LABEL_LEN]; /* component name                   */
-    char form    [KIN_MORPH_FORM_LEN];  /* underlying (canonical) form      */
-    char surface [KIN_MORPH_FORM_LEN];  /* surface form (after ortho rules) */
-    char rule    [KIN_MORPH_RULE_LEN];  /* rule applied, or "" if none      */
+    char label        [KIN_MORPH_LABEL_LEN]; /* component name                   */
+    char form         [KIN_MORPH_FORM_LEN];  /* underlying (canonical) form      */
+    char surface      [KIN_MORPH_FORM_LEN];  /* surface form (after ortho rules) */
+    char rule         [KIN_MORPH_RULE_LEN];  /* rule applied, or "" if none      */
+    char english_gloss[KIN_MORPH_GLOSS_LEN]; /* Leipzig-style English gloss      */
 } KinMorpheme;
 
 typedef struct {
@@ -529,6 +544,7 @@ typedef struct {
     /* ── Deverbative noun (izina rivuye mu nshinga) ──────────────────────── */
     bool is_deverbative;            /* Noun derived from a verb stem         */
     char verb_root[KIN_MAX_STEM];   /* Verb root the noun was derived from   */
+    bool is_conditional_clause;     /* Verb inside conditional clause (niba/iyo) */
     /* ── Grammatical sentence role (filled by kin_tag_gram_roles) ─────────── */
     GramRole  gram_role;            /* Role in the sentence (main/aux/rel/…) */
     /* ── Punctuation (filled when pos == POS_PUNCTUATION) ──────────────── */
@@ -681,6 +697,32 @@ const char *kin_ortho_rule_name(OrthoViolationType t);
 /* analysis.c  (main pipeline) */
 SentenceAnalysis kin_analyze(const char *text);
 void kin_print_analysis(const SentenceAnalysis *sa, bool verbose);
+
+/* gloss.c  (morpheme English gloss + interlinear display)
+ *
+ * kin_fill_morpheme_glosses() — called automatically by kin_analyze() after
+ *   kin_morpheme_analyze(). Fills KinMorpheme.english_gloss for each morpheme
+ *   using Leipzig Glossing Rules (LGR) abbreviations:
+ *     SP  →  pronoun (3SG.HUM, 1SG, 2PL …)
+ *     TM  →  tense marker (PRES, FUT, SEQ, NEG …)
+ *     OM  →  object marker (OM.CL1, OM.CL8 …)
+ *     root→  English verb meaning (from internal stem gloss table)
+ *     EXT →  extension type (PASS, CAUS, APPL, RECP, STAT, REV …)
+ *     FV  →  aspect/mood (IND, PRF, IMPF, SUBJ, IMP …)
+ *     D   →  noun class slot (CL1.SG, CL9.SG …)
+ *     RT  →  class marker label (Nt.1, Nt.9 …)
+ *     C   →  noun/adj stem meaning where known
+ *     RS  →  adjective concordance (AGR.CL1 …)
+ *     PREF→  infinitive marker (INF)
+ *
+ * kin_get_verb_gloss()  — look up English gloss for a verb stem.
+ * kin_word_gloss()      — quick gloss for invariable words (prep/conj/adv).
+ * kin_print_interlinear() — Leipzig-style formatted display for a sentence.
+ */
+void        kin_fill_morpheme_glosses(Token *tok);
+bool        kin_get_verb_gloss(const char *stem, char *out, size_t outsize);
+const char *kin_word_gloss(const char *word, POS pos);
+void        kin_print_interlinear(const SentenceAnalysis *sa);
 
 /* Assign GramRole to each token using sentence context.
  * Must be called after kin_tag_sentence() and kin_morpheme_analyze(). */

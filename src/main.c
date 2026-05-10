@@ -86,11 +86,14 @@ static void print_help(const char *prog) {
 }
 
 static void analyse_line(const char *line, bool verbose) {
-    /* Skip empty lines and comments */
     if (line[0] == '\0' || line[0] == '#') return;
+    char buf[MAX_LINE];
+    snprintf(buf, sizeof(buf), "%s", line);
+    kin_str_trim(buf);
+    if (!buf[0]) return;
 
-    SentenceAnalysis sa = kin_analyze(line);
-    printf("\nInput: %s\n", line);
+    SentenceAnalysis sa = kin_analyze(buf);
+    printf("\nInput: %s\n", buf);
     kin_print_analysis(&sa, verbose);
 }
 
@@ -158,7 +161,8 @@ static void analyse_stream(FILE *fp, bool verbose) {
         size_t l = strlen(line);
         if (l > 0 && line[l-1] == '\n') line[--l] = '\0';
         if (l > 0 && line[l-1] == '\r') line[--l] = '\0';
-        /* Skip blank lines and chapter headings (all-caps / digits only) */
+        kin_str_trim(line);
+        l = strlen(line);
         if (l == 0 || line[0] == '#') continue;
         printf("\n[Umurongo %d / Line %d]\n", lineno, lineno);
         analyse_line(line, verbose);
@@ -200,8 +204,9 @@ static int analyse_pdf(const char *pdfpath, bool verbose) {
 }
 
 int main(int argc, char *argv[]) {
-    bool verbose  = false;
-    bool g2p_mode = false;
+    bool verbose     = false;
+    bool g2p_mode    = false;
+    bool gloss_mode  = false;
     const char *sentence = NULL;
     const char *filename = NULL;
     const char *pdffile  = NULL;
@@ -219,6 +224,8 @@ int main(int argc, char *argv[]) {
             verbose = true;
         } else if (strcmp(argv[i], "--g2p") == 0) {
             g2p_mode = true;
+        } else if (strcmp(argv[i], "--gloss") == 0) {
+            gloss_mode = true;
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             sentence = argv[++i];
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -246,6 +253,15 @@ int main(int argc, char *argv[]) {
         } else {
             printf("G2P failed: no phonemes produced.\n");
         }
+        return 0;
+    }
+
+    /* Interlinear gloss mode: --gloss -s "text" */
+    if (gloss_mode && sentence) {
+        SentenceAnalysis sa = kin_analyze(sentence);
+        printf("\nInput: %s\n", sentence);
+        kin_print_analysis(&sa, verbose);
+        kin_print_interlinear(&sa);
         return 0;
     }
 
@@ -296,7 +312,12 @@ int main(int argc, char *argv[]) {
             print_help(argv[0]);
             continue;
         }
-        if (l == 0) continue;
+        kin_str_trim(line);
+        l = strlen(line);
+        if (l == 0) {
+            printf("  [Ntandike na gato / No input — andika interuro maze ugaragaze Enter.]\n\n");
+            continue;
+        }
         analyse_text(line, verbose);
     }
     printf("Murakoze! / Thank you.\n");

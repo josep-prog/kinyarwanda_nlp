@@ -97,8 +97,20 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
     const char *p = text;
 
     while (*p && count < max_tokens) {
-        /* Skip whitespace */
-        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+        /* Skip all whitespace:
+         *   ASCII:  space \t \n \r \v \f
+         *   UTF-8:  U+00A0 NO-BREAK SPACE      (0xC2 0xA0)
+         *           U+200B ZERO-WIDTH SPACE     (0xE2 0x80 0x8B)  */
+        while (*p) {
+            unsigned char b0 = (unsigned char)p[0];
+            unsigned char b1 = (unsigned char)p[1];
+            unsigned char b2 = (unsigned char)p[2];
+            if (b0 == ' ' || b0 == '\t' || b0 == '\n' || b0 == '\r' ||
+                b0 == '\v' || b0 == '\f') { p++; continue; }
+            if (b0 == 0xC2 && b1 == 0xA0)           { p += 2; continue; } /* U+00A0 */
+            if (b0 == 0xE2 && b1 == 0x80 && b2 == 0x8B) { p += 3; continue; } /* U+200B */
+            break;
+        }
         if (!*p) break;
 
         /* ── Punctuation tokens ──────────────────────────────────────────── *

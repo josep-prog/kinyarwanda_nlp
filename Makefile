@@ -15,6 +15,7 @@ LIB_SRCS = src/tokenizer.c \
            src/corrector.c \
            src/analysis.c \
            src/g2p.c \
+           src/gloss.c \
            src/api.c
 
 # All sources (library + CLI)

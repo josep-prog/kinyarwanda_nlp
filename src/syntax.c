@@ -106,7 +106,8 @@ static void add_error(SentenceAnalysis *sa, ErrorType type, int idx,
     e->token_index  = idx;
     strncpy(e->message,    msg,        KIN_MAX_MSG - 1);
     strncpy(e->suggestion, suggestion, KIN_MAX_MSG - 1);
-    sa->tokens[idx].error_count++;
+    if (idx >= 0 && idx < sa->token_count)
+        sa->tokens[idx].error_count++;
 }
 
 void kin_check_syntax(SentenceAnalysis *sa) {
@@ -116,17 +117,24 @@ void kin_check_syntax(SentenceAnalysis *sa) {
      * "Amakuru", "Murakoze", "Yego", "Oya").  Do not flag these as errors. */
     if (!sa->has_verb && sa->token_count > 0) {
         bool all_interj = true;
+        int  content_count = 0;   /* non-punctuation, non-number tokens */
         for (int ii = 0; ii < sa->token_count; ii++) {
             POS p = sa->tokens[ii].pos;
+            if (p != POS_PUNCTUATION && p != POS_NUMBER)
+                content_count++;
             if (p != POS_INTERJECTION && p != POS_ADVERB &&
+                p != POS_ADVERB_TIME &&
                 p != POS_VERB_PARTICLE && p != POS_CONJUNCTION &&
                 p != POS_PUNCTUATION) {
                 all_interj = false;
-                break;
             }
         }
-        if (!all_interj) {
-            add_error(sa, ERR_NO_VERB, 0,
+        /* Suppress the error for fragments: a single-word input (noun,
+         * number-label, quoted word…) without a verb is a list item or
+         * continuation fragment, not a grammatical mistake.                 */
+        bool is_fragment = (content_count <= 1);
+        if (!all_interj && !is_fragment) {
+            add_error(sa, ERR_NO_VERB, -1,
                 "Iri nteruro ntirigira inshinga (umuvugo) / "
                 "This sentence has no verb.",
                 "Ongeraho inshinga (Add a verb).");
@@ -535,11 +543,16 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
     }
 
-    /* RULE 8: Conditional tense marking (Inziganyo)                           *
+    /* RULE 8: Conditional clause marking (Inziganyo)                          *
      *                                                                           *
      * When a conditional conjunction ("niba", "nibyo") precedes a conjugated   *
-     * verb, that verb is inside a conditional clause.  We upgrade its tense    *
-     * to TENSE_CONDITIONAL so the output names the clause type correctly.      *
+     * verb, that verb is inside a conditional clause.  We set the               *
+     * is_conditional_clause flag so the output labels the clause correctly      *
+     * WITHOUT overriding the verb's actual tense (past/present/future).        *
+     * The verb keeps its own tense; the clause type is shown separately.       *
+     *                                                                           *
+     * Verbs already detected as TENSE_CONDITIONAL by the morphology engine     *
+     * (SP+a+[ku]+stem+a pattern) keep their tense tag — only the flag is set.  *
      *                                                                           *
      * The verb is not necessarily the immediately next token — a subject noun  *
      * may intervene ("niba umwana aragenda"). We look up to 3 tokens ahead.    *
@@ -547,7 +560,8 @@ void kin_check_syntax(SentenceAnalysis *sa) {
      * "iyo" as conditional connector (sentence-initial): handled when it       *
      * appears as the first token or immediately after a conjunction.  In all   *
      * other positions it is a demonstrative/relative pronoun and is left alone.*/
-    static const char *COND_MARKERS[] = { "niba", "nibyo", NULL };
+    /* "nibyo" = ni+byo = "that's right / indeed" (Nt.8 copula) — NOT conditional */
+    static const char *COND_MARKERS[] = { "niba", NULL };
 
     for (int i = 0; i < sa->token_count; i++) {
         Token *t = &sa->tokens[i];
@@ -569,10 +583,11 @@ void kin_check_syntax(SentenceAnalysis *sa) {
 
         if (!is_cond) continue;
 
-        /* Find the first conjugated verb within the next 3 tokens and mark it */
+        /* Mark the first conjugated verb within the next 3 tokens as being
+         * inside a conditional clause.  Preserve its actual verb_tense. */
         for (int j = i + 1; j < sa->token_count && j <= i + 3; j++) {
             if (sa->tokens[j].pos == POS_VERB_CONJ) {
-                sa->tokens[j].verb_tense = TENSE_CONDITIONAL;
+                sa->tokens[j].is_conditional_clause = true;
                 break;
             }
         }

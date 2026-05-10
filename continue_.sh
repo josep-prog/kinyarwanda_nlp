@@ -1,25 +1,33 @@
-nzabarimbura is deverbated from kurimbuka not kurimbura becuase this is [kurimbuka + 
-                                                                                             
-    umugereka ngirura ur] :  nzabarimburana       Inshinga-conjugated (Verb conj.)         
-                                                                                             
-      rimbur                                                                                 
-                                                                                             
-      └─ Uturemajambo (Morphemes): n(SP) + za(TM) + ba(OM·Nt.2) + rimbur(root) + an(EXT) +   
-                                                                                             
-    a(FV)                                                                                    
-                                                                                             
-      └─ Imbundo (Citation verb): kurimbura  (igicumbi -rimbur-)                             
-                                                                                             
-      └─ Inzagihe (Future)                                                                   
-                                                                                             
-           [Igenanzira: TM='za' iboneka mu mwanya wa 2]                                      
-                                                                                             
-      └─ OM(Nt.2/-ba-): Nt.2 – human plural (abantu)                                         
-                                                                                             
-      └─ Igisubizo (Reciprocal: -an-)                                                        
-                                                                                             
-      └─ Gusubiza (Reconstruction):                                                          
-                                                                                             
-           Ingingo: [SP]n(Pers.) + [TM]za + [OM]ba(Nt.2) + [root]rimbur + [EXT]an + [FV]a  → 
-                                                                                             
-    nzabarimburana  ✓     
+mushatse is deverbated from gushaka[to find],
+   Mwitinya             Izina mbonera (Noun)            Nt.1      itinya
+    └─ Uturemajambo (Morphemes): [D]∅ + [RT]mu(Nt.1) + [C]itinya
+    └─ Gusubiza (Reconstruction):
+         Ingingo:  [D]∅ + [RT]mu + [C]itinya
+         Itegeko:  u→w §1.1 (mu+'i' vowel → mw)
+         Guhuza:   ∅·mw·itinya  →  mwitinya  ✓
+
+   .input was : Ku bwanyu mwari mushatse kungirira nabi, ariko Imana yo
+  yashakaga
+   . mu cyimbo is indicating the place it's not verb , fix this :  cyimbo
+  Inshinga-conjugated (Verb conj.)  Nt.7      imb
+    └─ Uturemajambo (Morphemes): ki(SP·Nt.7) + ∅(TM) + imb(root) + a(FV)
+    └─ Imbundo (Citation verb): kwimba  (igicumbi -imb-)
+    └─ Indagihe y'ubusanzwe (Present – habitual)
+         [Igenanzira: TM=∅ (nta ntera y'igihe), FV='a']
+    └─ Gusubiza (Reconstruction):
+         Ingingo: [SP]ki(Nt.7) + [TM]∅ + [root]imb + [FV]a
+         Itegeko:  i→y §1.1 (SP 'ki'+'i'→'ky')
+         Guhuza:  ki + ∅ + imb + a  →  cyimbo
+   . mwitinya[don't be afraid] , mwitinya is dverbated from gutinya[to fear]
+  .
+   Mwitinya             Izina mbonera (Noun)            Nt.1      itinya
+    └─ Uturemajambo (Morphemes): [D]∅ + [RT]mu(Nt.1) + [C]itinya
+    └─ Gusubiza (Reconstruction):
+         Ingingo:  [D]∅ + [RT]mu + [C]itinya
+         Itegeko:  u→w §1.1 (mu+'i' vowel → mw)
+         Guhuza:   ∅·mw·itinya  →  mwitinya  ✓
+
+   . can you fix this (Yosefu arababwira ati “ Mwitinya. Mbese ndi mu cyimbo
+  cy’Imana? input was : Yosefu arababwira ati “ Mwitinya. Mbese ndi mu
+  cyimbo cy’Imana? . bamwikubita is deverbated from gukubita , mwi[is
+  showing that "they"] , 

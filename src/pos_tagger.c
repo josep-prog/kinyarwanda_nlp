@@ -56,6 +56,10 @@ static const char *PRIMARY_NOUN_STEMS[] = {
     "hungu",  /* umuhungu – boy; primary lexical noun meaning 'boy/son',
                * NOT deverbative from guhunga (to flee); independent root   */
     "kuru",   /* agakuru/impamvu – reason/matter; NOT from gukura (to grow) */
+    "ryo",    /* uburyo – strategy/way/method; NOT from kurya (to eat);
+               * independent Nt.14 abstract noun unrelated to eating      */
+    "nywa",   /* amanywa – daytime/by day; primary lexical noun, NOT from
+               * kunywa (to drink); unrelated independent temporal noun   */
     NULL
 };
 
@@ -73,14 +77,71 @@ static void check_deverbative(Token *tok) {
     /* Guard: skip known primary nouns that collide with verb roots */
     for (int pi = 0; PRIMARY_NOUN_STEMS[pi]; pi++)
         if (strcmp(tok->stem, PRIMARY_NOUN_STEMS[pi]) == 0) return;
+    /* Lexicalized locative deverbative: ibirimo (contents/what is inside).
+     * "-rimo" = kuba (to be) + locative suffix -mo; the Nt.8 class locks
+     * this to "ibirimo" specifically — other classes with stem "rimo"
+     * (e.g. umurimo Nt.3 = work) have separate etymology. */
+    if (tok->noun_class == 8 && strcmp(tok->stem, "rimo") == 0) {
+        tok->is_deverbative = true;
+        strncpy(tok->verb_root, "b", KIN_MAX_STEM - 1);
+        tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+        return;
+    }
     char root[KIN_MAX_STEM];
     strncpy(root, tok->stem, slen - 1);
     root[slen - 1] = '\0';
-    if (strlen(root) >= 2 && kin_is_known_verb_stem(root)) {
+    size_t rlen = strlen(root);
+    /* r→z / __e rule: root-final 'z' before FV 'e' may be underlying 'r'.
+     * e.g. abagize ← kugira (root "gir"): gir+e → gize. Reverse z→r first
+     * so that kugira is cited instead of kugiza when both roots are known. */
+    if (last == 'e' && rlen >= 2 && root[rlen - 1] == 'z') {
+        char root_re[KIN_MAX_STEM];
+        memcpy(root_re, root, rlen + 1);
+        root_re[rlen - 1] = 'r';
+        if (kin_is_known_verb_stem(root_re)) {
+            tok->is_deverbative = true;
+            strncpy(tok->verb_root, root_re, KIN_MAX_STEM - 1);
+            tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
+    }
+    /* -ano nominalizer: stem ends in 'an' + FV 'o' (e.g. isezerano ← gusezera).
+     * Strip 'an' to recover the base verb root before falling through to the
+     * full-root check which would incorrectly cite the reciprocal gusezerana. */
+    if (last == 'o' && rlen >= 5 && root[rlen - 2] == 'a' && root[rlen - 1] == 'n') {
+        char root_ano[KIN_MAX_STEM];
+        memcpy(root_ano, root, rlen - 2);
+        root_ano[rlen - 2] = '\0';
+        if (strlen(root_ano) >= 3 && kin_is_known_verb_stem(root_ano)) {
+            tok->is_deverbative = true;
+            strncpy(tok->verb_root, root_ano, KIN_MAX_STEM - 1);
+            tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
+    }
+    if (rlen >= 2 && kin_is_known_verb_stem(root)) {
         tok->is_deverbative = true;
         strncpy(tok->verb_root, root, KIN_MAX_STEM - 1);
         tok->verb_root[KIN_MAX_STEM - 1] = '\0';
         return;
+    }
+    /* Vowel-initial verb root (kw-class): the lexicon stores the w-glide
+     * surface form instead of the underlying i-initial root.
+     * e.g. kwijima → lexicon entry "wijim"; noun stem "ijima" → root "ijim".
+     * When the stripped root starts with 'i', try prepending 'w' to match the
+     * lexicon key.  Store the underlying i-initial form in verb_root so that
+     * the citation displays correctly: pfx="kw" + "ijim" + "a" = "kwijima".  */
+    if (rlen >= 2 && root[0] == 'i') {
+        char w_root[KIN_MAX_STEM];
+        w_root[0] = 'w';
+        strncpy(w_root + 1, root, rlen);
+        w_root[rlen + 1] = '\0';
+        if (kin_is_known_verb_stem(w_root)) {
+            tok->is_deverbative = true;
+            strncpy(tok->verb_root, root, KIN_MAX_STEM - 1);
+            tok->verb_root[KIN_MAX_STEM - 1] = '\0';
+            return;
+        }
     }
     /* Privative/completive 'ti-' prefix on vowel-initial verb roots.
      * In some abstract nouns (Nt.14 ubu- class), the 'ti-' prefix combines
@@ -192,6 +253,18 @@ void kin_tag_token(Token *tok) {
     if (tok->pos == POS_PUNCTUATION) return;
 
     const char *w = tok->lower;
+
+    /* Arabic numerals (1, 2, 42, …): all-digit surface → Inomero. */
+    {
+        const char *d = tok->surface;
+        bool all_digits = (*d != '\0');
+        while (*d) { if (*d < '0' || *d > '9') { all_digits = false; break; } d++; }
+        if (all_digits) {
+            tok->pos            = POS_NUMBER;
+            tok->is_kinyarwanda = true;
+            return;
+        }
+    }
 
     /* Step 1 → Tree 5 (amagambo adahinduka): invariable word? */
     POS inv_pos;
@@ -308,6 +381,7 @@ void kin_tag_token(Token *tok) {
                 || pn_tense == TENSE_COPULA_PAST
                 || pn_tense == TENSE_COPULA_PRES
                 || pn_tense == TENSE_SUBJUNCTIVE
+                || pn_tense == TENSE_NEG_IMPERATIVE
                 || kin_is_known_verb_stem(pn_stem))) {
             tok->pos            = POS_VERB_CONJ;
             tok->noun_class     = pn_cls;
@@ -349,6 +423,12 @@ void kin_tag_token(Token *tok) {
         VerbTense v_tense = TENSE_NONE;
         VerbExtension v_ext = VEXT_NONE;
         bool      v_neg  = false;
+        /* Guard: if the full word is a lexically-known noun (singular or plural
+         * in NOUN_PLURAL_PAIRS), noun always beats a PRESENT_NORA verb reading.
+         * e.g. "abana" (children, plural of umwana) must not be parsed as
+         * a(SP·Nt.1)+ban(root)+a(FV) of kubana, even though "ban" is a known
+         * verb stem — the whole word is a primary lexical noun, not deverbative. */
+        bool is_known_noun_pair = kin_lookup_igicumbi(w, NULL, NULL);
 
         /* Bare phonological-mutation SPs (cy/by/ry/zy without leading vowel
          * D-prefix) are VERB markers — they arise only from the i→y rule on
@@ -400,9 +480,14 @@ void kin_tag_token(Token *tok) {
              * class equals the noun class — that means the "OM" is actually the
              * noun-class prefix, not a real object marker.
              * e.g. ubu-riganya: v_obj=14, cls=14 → noun prefix, not OM → noun wins.
-             * e.g. bu-riganya (SP=bu, no OM): v_obj=0 → guard doesn't fire → ok. */
+             * e.g. bu-riganya (SP=bu, no OM): v_obj=0 → guard doesn't fire → ok.
+             * Additional guard: if the full word is a lexically-known noun pair
+             * (kin_lookup_igicumbi returns true), noun always wins over PRESENT_NORA.
+             * e.g. "abana" (children, plural of umwana): "ban" is a known verb stem
+             * but "abana" is a primary lexical noun — verb reading must not win. */
             && (v_tense != TENSE_PRESENT_NORA
-                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
+                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls)
+                    && !is_known_noun_pair)
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))
             /* SUBJUNCTIVE: allow when stem is known AND the OM is not just the
              * noun-class prefix in disguise.
@@ -430,6 +515,7 @@ void kin_tag_token(Token *tok) {
              * PAST_IMPF  – -aga suffix is highly distinctive
              * NEG_RELATIVE – -ta- marker uniquely identifies this form
              * FUTURE / NARRATIVE / COPULA – markers are unambiguous enough
+             * NEG_IMPERATIVE – prohibitive prefix mwi/wi/twi is unambiguous
              * bare_phon_sp – phonological mutation alone is sufficient signal.
              *
              * Same OM-equals-noun-class guard applied here for kin_is_known_verb_stem
@@ -444,7 +530,9 @@ void kin_tag_token(Token *tok) {
                 || v_tense == TENSE_COPULA_PRES
                 || v_tense == TENSE_SUBJUNCTIVE_LOC
                 || v_tense == TENSE_SUBJUNCTIVE
-                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls))
+                || v_tense == TENSE_NEG_IMPERATIVE
+                || (kin_is_known_verb_stem(v_stem) && !(v_obj > 0 && v_obj == cls)
+                    && !is_known_noun_pair)
                 || kin_is_causative_y_surface(v_stem)  /* r+y→z §1.3 surface root */
                 || (is_bare_phon_sp && kin_is_valid_verb_stem_shape(v_stem)))) {
             /* Verb interpretation wins */
@@ -837,6 +925,11 @@ void kin_tag_sentence(SentenceAnalysis *sa) {
             continue;
         /* Qualifier must currently be a plain noun */
         if (qual->pos != POS_NOUN)
+            continue;
+        /* Proper names keep their POS_NOUN / is_proper_noun label even in
+         * possessive position (e.g. "abana ba Makiri" → Makiri stays a
+         * proper name, not "izina ntera").                               */
+        if (qual->is_proper_noun)
             continue;
         /* Possessive connector class must agree with head noun class.
          * Class 0 on the connector means it applies to multiple classes

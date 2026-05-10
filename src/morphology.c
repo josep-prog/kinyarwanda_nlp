@@ -82,10 +82,10 @@ bool kin_ends_with(const char *s, const char *suffix) {
 
 void kin_str_trim(char *s) {
     char *p = s;
-    while (*p == ' ' || *p == '\t') p++;
+    while (*p && (unsigned char)*p <= 0x7F && isspace((unsigned char)*p)) p++;
     if (p != s) memmove(s, p, strlen(p) + 1);
     size_t l = strlen(s);
-    while (l > 0 && (s[l-1] == ' ' || s[l-1] == '\t' || s[l-1] == '\n'))
+    while (l > 0 && (unsigned char)s[l-1] <= 0x7F && isspace((unsigned char)s[l-1]))
         s[--l] = '\0';
 }
 
@@ -1000,11 +1000,16 @@ static bool ext_strip(const char *stem, VerbExtension *ext_out,
             return true;
         }
     }
-    /* Reciprocal: -an */
-    if (slen > 4 && kin_ends_with(stem, "an")) {
+    /* Reciprocal: -an
+     * Guard relaxed from slen > 4 to slen >= 4 to catch 4-char stems like
+     * "jyan" (kujyana = kujya + -an-) and "rwan" (kurwana = kurwa + -an-).
+     * For minimum-length 2-char bases (blen == 2) we additionally require
+     * the base to be a known verb root to prevent false splits on opaque
+     * 4-char roots that happen to end in "-an".                             */
+    if (slen >= 4 && kin_ends_with(stem, "an")) {
         size_t blen = slen - 2;
         strncpy(tmp, stem, blen); tmp[blen] = '\0';
-        if (blen >= 2) {
+        if (blen >= 2 && (blen > 2 || kin_is_known_verb_stem(tmp))) {
             if (ext_out)  *ext_out = VEXT_RECIPROCAL;
             if (bare_out) { strncpy(bare_out, tmp, bare_sz-1); bare_out[bare_sz-1]='\0'; }
             return true;
@@ -1138,6 +1143,11 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
         /* i→y before vowel-initial stems (phonological rule p.7-8)       */
         { "cy",    7  },  /* Nt.7  ki+vowel → cy  (cyatumye, cyemera, cyari)  */
         { "by",    8  },  /* Nt.8  bi+vowel → by  (byari, byemera, byibutse)  */
+        /* Orthographic variant: bi+y+vowel (explicit glide) instead of by+vowel.
+         * Some writers spell biyemeje/biyemera instead of byemeje/byemera.
+         * The glide 'y' is written out, making inner appear as "vowel…" after
+         * stripping prefix "biy" — identical parse path to SP "by".           */
+        { "biy",   8  },  /* Nt.8 variant: bi+y explicit glide (biyemeja, biyemeje) */
         { "ry",    5  },  /* Nt.5  ri+vowel → ry  (ryari, ryibutse)           */
         { "zy",   10  },  /* Nt.10 zi+vowel → zy  (zyari etc.)                */
         { "zu",   10  },  /* Nt.10 zi+u-initial verb → zu  (zumva, zubaka)    */
@@ -2075,6 +2085,35 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
                 }
             }
         }
+        /* CONDITIONAL SIMPLE (Inziganyo y'inkomero): past-SP + stem + a        *
+         * For SPs that appear ONLY as past/conditional forms (never as present  *
+         * SPs), FV='a' unambiguously signals the conditional mood.              *
+         * Structure: SP(+a absorbed) + stem + a(FV).                           *
+         * Unambiguous past-only SPs: twa (1pl), bya (Nt.8), cya (Nt.7),       *
+         *   rya (Nt.5), rwa (Nt.11), zya (Nt.10), bwa (Nt.14), kwa (Nt.15),   *
+         *   mwa (2pl).                                                           *
+         * SP "ya" (Nt.1/4/6/9) and "wa" (Nt.3/2sg) excluded: they also serve  *
+         * as present SPs (Nt.6 present, 2sg present, Nt.3 present).            *
+         * Minimum: stem(≥2) + FV(1) → ilen ≥ 3.                                *
+         * Must be checked BEFORE the plain PRESENT_NORA catch.                 */
+        {
+            static const char *UNAMB_COND_SPS[] = {
+                "twa","bya","cya","rya","rwa","zya","bwa","kwa","mwa", NULL
+            };
+            bool is_unamb = false;
+            for (int pi = 0; UNAMB_COND_SPS[pi]; pi++) {
+                if (strcmp(SP[i].pfx, UNAMB_COND_SPS[pi]) == 0) { is_unamb = true; break; }
+            }
+            if (is_unamb && ilen >= 3 && inner[ilen-1] == 'a') {
+                size_t sl = ilen - 1;
+                if (sl >= 2) {
+                    if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl] = '\0'; }
+                    if (subj_class) *subj_class = SP[i].cls;
+                    if (tense_out)  *tense_out  = TENSE_CONDITIONAL;
+                    return true;
+                }
+            }
+        }
         /* PRESENT no-ra + LOCATIVE: inner ends in 'aho', 'amo', or 'ayo'.     *
          * Pattern: SP + stem + a(FV) + ho/mo/yo(locative suffix).             *
          * e.g. imukuramo = i(SP·Nt.9) + mu(OM) + kur(root) + a(FV) + mo(LOC)*
@@ -2082,13 +2121,17 @@ static bool verb_match_inner(const char *word, char *stem_buf, int *subj_class,
          * Strip the 3-char complex 'a+locative' to recover the bare stem.    *
          * Must be checked BEFORE the plain PRESENT_NORA (which strips only   *
          * 1 char) to prevent the 'o' of 'mo' being treated as FV alone.      *
-         * Guard: sl >= 2 requires at least a 2-char stem before the locative. */
-        if (ilen >= 5 &&
+         * Guard: sl >= 2 requires at least a 2-char stem; sl == 1 allowed    *
+         * when the single-char root is a known verb stem (e.g. "b" = kuba).  */
+        if (ilen >= 4 &&
             (kin_ends_with(inner, "aho") || kin_ends_with(inner, "amo") ||
              kin_ends_with(inner, "ayo"))) {
             size_t sl = ilen - 3;   /* strip a + 2-char locative */
-            if (sl >= 2) {
-                if (stem_buf) { strncpy(stem_buf, inner, sl); stem_buf[sl]='\0'; }
+            char loc_stem[KIN_MAX_STEM];
+            if (sl > 0 && sl < KIN_MAX_STEM) { strncpy(loc_stem, inner, sl); loc_stem[sl] = '\0'; }
+            else { loc_stem[0] = '\0'; }
+            if (sl >= 2 || (sl == 1 && kin_is_known_verb_stem(loc_stem))) {
+                if (stem_buf) { strncpy(stem_buf, loc_stem, KIN_MAX_STEM - 1); stem_buf[KIN_MAX_STEM-1] = '\0'; }
                 if (subj_class) *subj_class = SP[i].cls;
                 if (tense_out)  *tense_out  = TENSE_PRESENT_NORA;
                 return true;
@@ -2161,6 +2204,58 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     size_t len = strlen(word);
     /* Minimum 3: allows short imperatives like "jya" (go!), "iga" (learn!) */
     if (len < 3) return false;
+
+    /* ── LAYER 0: Negative imperative / Prohibitive (Impakanyi y'integeko) ─ *
+     * The prohibitive is formed by fusing the subject prefix with the         *
+     * prohibitive marker 'i', then appending the verb stem + FV 'a':         *
+     *   mwi + stem + a = mwitinya  (2PL mu+i→mwi §1.1; don't fear, you pl) *
+     *   wi  + stem + a = witinya   (2SG u+i →wi  §1.1; don't fear, you sg) *
+     *   twi + stem + a = twitinya  (1PL tu+i→twi §1.1; let's not fear)     *
+     * Must run before LAYER 1 (nt-/si-) since these forms are self-contained *
+     * negatives — no external negation prefix is present.                    */
+    {
+        static const struct { const char *pfx; } NEG_IMP[] = {
+            { "mwi" }, { "twi" }, { "wi" }, { NULL }
+        };
+        for (int ni = 0; NEG_IMP[ni].pfx; ni++) {
+            const char *pfx  = NEG_IMP[ni].pfx;
+            size_t      plen = strlen(pfx);
+            if (len <= plen + 1) continue;
+            if (!kin_starts_with(word, pfx)) continue;
+            const char *after = word + plen;
+            size_t alen = strlen(after);
+            if (alen < 2 || after[alen - 1] != 'a') continue;  /* FV must be 'a' */
+            char cand[KIN_MAX_STEM];
+            strncpy(cand, after, alen - 1);
+            cand[alen - 1] = '\0';
+            if (strlen(cand) < 2) continue;
+            char bare[KIN_MAX_STEM] = "";
+            VerbExtension ex = VEXT_NONE;
+            bool found = false;
+            if (kin_is_known_verb_stem(cand)) {
+                strncpy(bare, cand, KIN_MAX_STEM - 1);
+                found = true;
+            } else {
+                char ext_bare[KIN_MAX_STEM];
+                VerbExtension ext_ex = VEXT_NONE;
+                if (ext_strip(cand, &ext_ex, ext_bare, sizeof(ext_bare))
+                    && kin_is_known_verb_stem(ext_bare)) {
+                    strncpy(bare, ext_bare, KIN_MAX_STEM - 1);
+                    ex = ext_ex;
+                    found = true;
+                }
+            }
+            if (!found) continue;
+            if (stem_out)      { strncpy(stem_out, bare, KIN_MAX_STEM - 1);
+                                 stem_out[KIN_MAX_STEM - 1] = '\0'; }
+            if (subj_class)    *subj_class    = 0;
+            if (tense_out)     *tense_out     = TENSE_NEG_IMPERATIVE;
+            if (obj_class_out) *obj_class_out = 0;
+            if (ext_out)       *ext_out       = ex;
+            if (neg_out)       *neg_out       = true;
+            return true;
+        }
+    }
 
     /* ── LAYER 1: Detect and strip nt- negation prefix ─────────────────── *
      * The negative particle "nt-" is ALWAYS followed by a vowel-initial SP: *
@@ -2455,11 +2550,21 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     /* Prefer the longest known stem: if after_om itself is a known root,
      * the extension match is a false split — revert it.
      * Covers both: bare=unknown (e.g. "ruhuk"→"ruh") and the trickier case
-     * where bare is ALSO known (e.g. "tegek"→"teg"/"tegek" both known).  */
+     * where bare is ALSO known (e.g. "tegek"→"teg"/"tegek" both known).
+     *
+     * Exception: lexicalized reciprocal derivatives whose base is ALSO a
+     * known verb root (e.g. "jyan" = "jy"+"-an-", "rwan" = "rw"+"-an-").
+     * These are stored as independent entries for recognition purposes but
+     * their derivational structure (base + -an-) should still be shown.
+     * When vext==RECIPROCAL and bare is a known verb root, trust the split. */
     if (vext != VEXT_NONE && kin_is_known_verb_stem(after_om)) {
-        vext = VEXT_NONE;
-        strncpy(bare, after_om, KIN_MAX_STEM - 1);
-        bare[KIN_MAX_STEM - 1] = '\0';
+        bool keep_recip = (vext == VEXT_RECIPROCAL
+                           && kin_is_known_verb_stem(bare));
+        if (!keep_recip) {
+            vext = VEXT_NONE;
+            strncpy(bare, after_om, KIN_MAX_STEM - 1);
+            bare[KIN_MAX_STEM - 1] = '\0';
+        }
     }
 
     /* ── LAYER 3b.6: Past-perfect z-final stem — revert false causative-y ── *
@@ -2600,11 +2705,16 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
     /* ── LAYER 3c.1: Prefer full raw_stem over OM + short bare root ──────── *
      * If an OM was stripped AND the un-stripped raw_stem is ALSO a known     *
      * verb root, the OM match is ambiguous.  Prefer the longer root.         *
-     * e.g. raw_stem="ruk" (kuruka) matched OM=ru(Nt.11) + bare="k" (kuba):  *
-     *   both k and ruk are known → prefer ruk (no OM).                       *
-     * This only fires when bare IS known (the ≥2-char ambiguity case);       *
-     * the !known case is already handled by LAYER 3c above.                  */
-    if (obj_cls > 0 && kin_is_known_verb_stem(bare) && kin_is_known_verb_stem(raw_stem)) {
+     * e.g. raw_stem="ruk" (kuruka) matched OM=ru(Nt.11) + bare="rk":        *
+     *   both bare and ruk are known → prefer ruk (no OM).                    *
+     *                                                                         *
+     * Guard: bare must be ≥ 2 chars.  Single-char roots ("h"=guha, "b"=kuba, *
+     * "v"=kuva) are never displaced by a longer raw_stem because the "longer" *
+     * root would simply be OM+single-char — exactly the OM case we want.     *
+     * e.g. raw_stem="bah": OM=ba(Nt.2)+bare="h"(guha).  "bah"(kubaha) is   *
+     * also known, but bare="h" is only 1 char → keep the OM interpretation.  */
+    if (obj_cls > 0 && strlen(bare) >= 2
+            && kin_is_known_verb_stem(bare) && kin_is_known_verb_stem(raw_stem)) {
         obj_cls = 0;
         vext = VEXT_NONE;
         strncpy(bare, raw_stem, KIN_MAX_STEM - 1);
@@ -2938,6 +3048,51 @@ bool kin_is_verb_conjugated(const char *word, char *stem_out, int *subj_class,
             no_e[eplen - 1] = '\0';
             if (kin_is_known_verb_stem(no_e)) {
                 strncpy(bare, no_e, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
+
+    /* ── LAYER 3c.15: Causative-y + Passive chain (r+y→z + -w-) ──────────── *
+     * Pattern: SP + TM + root + y(CAUS-y, surface z) + w(PASS) + FV        *
+     * After ext_strip peels passive: bare = "gez" (known stem kugeza).     *
+     * But "gez" is actually ger+y→z (causative-y of kugera).               *
+     * Detection: bare ends in 'z', bare[:-1]+'r' is a known verb stem,     *
+     * AND that r-form (bare_r) is DIFFERENT from bare (prevents false hits  *
+     * on stems like "fiz" where "fir" would be a different unrelated root). *
+     * e.g. vext=PASSIVE, bare="gez" → try "ger" → known → CAUS_Y_PASSIVE  */
+    if (vext == VEXT_PASSIVE) {
+        size_t blen = strlen(bare);
+        if (blen >= 3 && bare[blen - 1] == 'z') {
+            char bare_r[KIN_MAX_STEM];
+            strncpy(bare_r, bare, blen - 1);
+            bare_r[blen - 1] = 'r';
+            bare_r[blen]     = '\0';
+            if (kin_is_known_verb_stem(bare_r)) {
+                vext = VEXT_CAUS_Y_PASSIVE;
+                strncpy(bare, bare_r, KIN_MAX_STEM - 1);
+                bare[KIN_MAX_STEM - 1] = '\0';
+            }
+        }
+    }
+
+    /* ── LAYER 3c.16: h+ye→shye palatalization in past perfect ────────── *
+     * Pattern: root ending in 'h' takes past-perfect FV 'ye'.             *
+     * The 'h' palatalizes before 'y': h+y→sh, FV 'ye' remains intact.    *
+     * Surface: root[-h] + sh + ye  →  bare (after stripping 'ye') ends in *
+     * 'sh' (the last two chars of bare are 's','h').                       *
+     * Recovery: strip final 'sh', append 'h' → check known stem.          *
+     * e.g. bworoshye: bare="orosh" → strip 'sh' → "oro" + 'h' = "oroh"  *
+     *      kin_is_known_verb_stem("oroh") ✓ → set bare="oroh"            */
+    if (tense == TENSE_PAST_PERF && !kin_is_known_verb_stem(bare)) {
+        size_t blen = strlen(bare);
+        if (blen >= 3 && bare[blen-2] == 's' && bare[blen-1] == 'h') {
+            char bare_h[KIN_MAX_STEM];
+            strncpy(bare_h, bare, blen - 2);
+            bare_h[blen-2] = 'h';
+            bare_h[blen-1] = '\0';
+            if (kin_is_known_verb_stem(bare_h)) {
+                strncpy(bare, bare_h, KIN_MAX_STEM - 1);
                 bare[KIN_MAX_STEM - 1] = '\0';
             }
         }

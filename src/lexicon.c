@@ -754,6 +754,7 @@ static const InvEntry INVARIABLES[] = {
      * kuri/muri = their forms before pronouns; kwa = ku+wa (someone's place) *
      * ava/kuva  = ablative/source marker ("from")                            */
     { "mu",      POS_LOCATIVE },     /* in / at (Nt.18 locative)            */
+    { "mw",      POS_LOCATIVE },     /* mw'... elision of mu before vowel   */
     { "ku",      POS_LOCATIVE },     /* on / at / to (Nt.17 locative)       */
     { "i",       POS_LOCATIVE },     /* at / in (Nt.19 – proper nouns)      */
     { "kuri",    POS_LOCATIVE },     /* to / towards (ku before pronouns)   */
@@ -878,12 +879,12 @@ static const InvEntry INVARIABLES[] = {
     /* ── Compound time adverbs ────────────────────────────────────────────  *
      * Official Orthography Rules §1.2.2k: words indicating time or parts of *
      * the day are written as a single word.                                  */
-    { "ejobundi", POS_ADVERB     }, /* the day before/after yesterday        */
-    { "ejuru",    POS_ADVERB     }, /* a long time ago / way back            */
-    { "nijoro",   POS_ADVERB     }, /* at night / tonight                    */
-    { "ninjoro",  POS_ADVERB     }, /* at night (variant of nijoro)          */
-    { "nimunsi",  POS_ADVERB     }, /* during the day / by day               */
-    { "nimugoroba",POS_ADVERB    }, /* in the evening / this evening         */
+    { "ejobundi", POS_ADVERB_TIME }, /* the day before/after yesterday       */
+    { "ejuru",    POS_ADVERB_TIME }, /* a long time ago / way back           */
+    { "nijoro",   POS_ADVERB_TIME }, /* at night / tonight                   */
+    { "ninjoro",  POS_ADVERB_TIME }, /* at night (variant of nijoro)         */
+    { "nimunsi",  POS_ADVERB_TIME }, /* during the day / by day              */
+    { "nimugoroba",POS_ADVERB_TIME}, /* in the evening / this evening        */
 
     /* ══ Quotative & complementizer particles ══════════════════════════════ */
     { "iti",     POS_VERB_PARTICLE}, /* quotative: (s)he said "..."        */
@@ -1003,23 +1004,23 @@ static const InvEntry INVARIABLES[] = {
     { "nta na",  POS_ADVERB      }, /* not even                            */
 
     /* ══ Umugereka w'igihe (time adverbs) ══════════════════════════════════ */
-    { "ubu",        POS_ADVERB }, /* now / currently                       */
-    { "none",       POS_ADVERB }, /* now / currently / then                */
-    { "ejo",        POS_ADVERB }, /* yesterday / tomorrow                  */
-    { "ejo hashize",POS_ADVERB }, /* yesterday                             */
-    { "kera",       POS_ADVERB }, /* long ago / in the old days            */
-    { "rimwe",      POS_ADVERB }, /* sometimes / once (also numerical)     */
-    { "buri gihe",  POS_ADVERB }, /* always / every time                   */
-    { "ntibigera",  POS_ADVERB }, /* never                                 */
-    { "ryari",      POS_ADVERB }, /* when? (as time adverb)                */
-    { "hanyuma",    POS_ADVERB }, /* afterwards / then                     */
-    { "mbere",      POS_ADVERB }, /* first / before                        */
+    { "ubu",        POS_ADVERB_TIME }, /* now / currently                   */
+    { "none",       POS_ADVERB_TIME }, /* now / currently / then            */
+    { "ejo",        POS_ADVERB_TIME }, /* yesterday / tomorrow              */
+    { "ejo hashize",POS_ADVERB_TIME }, /* yesterday                         */
+    { "kera",       POS_ADVERB_TIME }, /* long ago / in the old days        */
+    { "rimwe",      POS_ADVERB_TIME }, /* sometimes / once (also numerical) */
+    { "buri gihe",  POS_ADVERB_TIME }, /* always / every time               */
+    { "ntibigera",  POS_ADVERB_TIME }, /* never                             */
+    { "ryari",      POS_ADVERB_TIME }, /* when? (as time adverb)            */
+    { "hanyuma",    POS_ADVERB_TIME }, /* afterwards / then                 */
+    { "mbere",      POS_ADVERB_TIME }, /* first / before                    */
     /* "bukeye" removed: it is inshinga itondaguye (conjugated verb, TENSE_PAST_PERF)
      * deverbative of gucya (to dawn). bu(SP·14)+cy(root)+iye(FV) →bukeye §11.3. */
-    { "uyu munsi",  POS_ADVERB }, /* today                                 */
-    { "vuba",       POS_ADVERB }, /* soon / quickly                        */
-    { "noneho",     POS_ADVERB }, /* right now / just now                  */
-    { "naho",       POS_ADVERB }, /* even / yet / still (also conjunction) */
+    { "uyu munsi",  POS_ADVERB_TIME }, /* today                             */
+    { "vuba",       POS_ADVERB_TIME }, /* soon / quickly                    */
+    { "noneho",     POS_ADVERB_TIME }, /* right now / just now              */
+    { "naho",       POS_ADVERB_TIME }, /* even / yet / still (also conj.)   */
 
     /* ══ Umugereka w'uburyo (manner adverbs) ═══════════════════════════════ */
     { "cyane",      POS_ADVERB }, /* very much / a lot                     */
@@ -1064,6 +1065,7 @@ static const InvEntry INVARIABLES[] = {
     { "ruguru",  POS_LOCATIVE }, /* in the north / above (directional)     */
     { "hirya",   POS_LOCATIVE }, /* over there / on that side              */
     { "hino",    POS_LOCATIVE }, /* on this side / here                    */
+    { "ino",     POS_LOCATIVE }, /* here / to this place (directional)     */
     { "iruhande", POS_LOCATIVE}, /* to the side / sideways                 */
     { "hambavu",  POS_LOCATIVE}, /* beside / next to                       */
 
@@ -1149,7 +1151,10 @@ static const InvEntry INVARIABLES[] = {
     { "igihe",   POS_CONJUNCTION}, /* temporal conj: when / at the time (also*
                                      * Nt.7 noun "time" – dual use; conj form  *
                                      * used sentence-initially as "igihe cyo…")*/
-    { "kugeza",  POS_CONJUNCTION}, /* until / up to (kugeza aho…)            */
+    /* "kugeza" removed from INVARIABLES: it is the verb infinitive of kugeza
+     * (causative of kugera = to reach/deliver). Its "until/up to" meaning
+     * is a grammaticalized use of the infinitive and should not override
+     * verb analysis (cf. byemeje kugeza ijambo = committed to deliver the word). */
     { "ubwo",    POS_CONJUNCTION}, /* temporal: when / while / at that moment *
                                      * (also used as Nt.14 pronoun – keep both)*/
 
@@ -1182,10 +1187,19 @@ static const InvEntry INVARIABLES[] = {
     { "mufite",  POS_VERB_CONJ }, /* 2pl: you all have                            */
     { "bufite",  POS_VERB_CONJ }, /* Nt.14: it has                                */
 
-    /* ── 1sg knowledge / common fixed forms ────────────────────────────────── */
-    { "ndabizi", POS_VERB_CONJ }, /* I know it (1sg pres of kubizi, lit n+da+bizi)*/
-    { "mbizi",   POS_VERB_CONJ }, /* I know it (alt 1sg before labial)            */
-    { "nzi",     POS_VERB_CONJ }, /* I know (1sg of kumenya — short form)         */
+    /* ── kubizi / kumenya – "to know" suppletive paradigm ──────────────────── *
+     * "kubizi" is a parallel verb to "kumenya" (to know).  Both mean the     *
+     * same thing; kubizi is used in these fixed conjugated forms.             *
+     * The paradigm is suppletive: the stem "bizi" does not inflect by the    *
+     * regular SP+TM+root+FV template, so each person is listed explicitly.   */
+    { "ndabizi", POS_VERB_CONJ }, /* 1sg: I know it  (n+da+bizi)                  */
+    { "mbizi",   POS_VERB_CONJ }, /* 1sg: I know it  (alt before labial)          */
+    { "nzi",     POS_VERB_CONJ }, /* 1sg: I know     (kumenya short suppletive)   */
+    { "ubizi",   POS_VERB_CONJ }, /* 2sg: you know   (u+bizi)                     */
+    { "arabizi", POS_VERB_CONJ }, /* 3sg: he/she knows (a+ra+bizi)                */
+    { "twebizi", POS_VERB_CONJ }, /* 1pl: we know    (twe+bizi)                   */
+    { "mwebizi", POS_VERB_CONJ }, /* 2pl: you know   (mwe+bizi)                   */
+    { "babizi",  POS_VERB_CONJ }, /* 3pl: they know  (ba+bizi)                    */
 
     /* ── Common adverb / manner fixes ──────────────────────────────────────── */
     { "nabi",    POS_ADVERB },    /* badly / poorly (manner adverb)              */
@@ -1310,6 +1324,8 @@ static const char *VERB_STEMS[] = {
     "zuk",      /* kuzuka      – to rise / resurrect                      */
     "injir",    /* kwinjira    – to enter / go in                         */
     "ihangan",  /* kwihangana  – to be patient / endure                   */
+    "ihut",     /* kwihuta     – to be quick / hurry / be fast             */
+    "oroh",     /* koroha      – to be easy / light / gentle               */
     "twar",     /* gutwara     – to carry / transport / lead              */
     "twik",     /* gutwika     – to burn / set fire to                   */
     "mvir",     /* kumvira     – to obey / hear / listen                  */
@@ -1415,6 +1431,8 @@ static const char *VERB_STEMS[] = {
     "himbaz",   /* guhimbaza   – to celebrate / honor / praise           */
     "hish",     /* guhisha     – to hide / conceal                       */
     "humur",    /* guhumura    – to comfort / console / reassure         */
+    "humuriza", /* guhumuriza  – to console / empathize / comfort (causative-iz of guhumura) */
+    "rahir",    /* kurahira    – to swear / take an oath                 */
     "geragez",  /* gugerageza  – to try / attempt / make an effort      */
     "erekez",   /* kwerekezeza – to direct toward / point at             */
     "hinduk",   /* guhinduka   – to turn / change / transform            */
@@ -1581,6 +1599,8 @@ static const char *VERB_STEMS[] = {
     "cy",       /* gucya       – to shine / be bright  (→ umucyo = light)     */
     "wijim",    /* kwijima     – to be/become dark      (→ umwijima = darkness)*/
     "wambar",   /* kwambara    – to wear / dress        (→ umwambaro = clothing)*/
+    "sanz",     /* gusanza     – to spread/broaden/increase surface area;
+                   base verb: isanzure ← sanz + -ur-(reversive) + e(FV)     */
     "sanzur",   /* gusanzura   – to spread/stretch out (sky, cloth);
                    ALSO kwisanzura – to free oneself (→ ubwisanzure = freedom) */
     "kwir",     /* gukwira     – to fit / be appropriate / suitable (zikwiriye) */
@@ -1776,6 +1796,8 @@ static const NounStem NOUN_STEMS[] = {
     { "si",       9 }, /* isi – earth / world (Nt.9)        */
     { "mana",     9 }, /* Imana – God (Nt.9)                */
     { "cyo",      7 }, /* umucyo – light (Nt.1/3)           */
+    { "kize",     7 }, /* ikize – wealth/riches (Nt.7; deverbative: gukira→gukiza→ikize) */
+    { "kiza",     7 }, /* ikiza – savior/salvation (Nt.7; deverbative: gukiza→ikiza)    */
     { "wijima",   9 }, /* umwijima – darkness (Nt.3)        */
     { "hengeri",  9 }, /* imuhengeri – abyss (Nt.3)        */
     { "sanzure",  5 }, /* isanzure – expanse/sky (Nt.5)    */
@@ -1848,6 +1870,12 @@ static const KnownWord KNOWN_WORDS[] = {
     { "umwami",   1,  "wami"   },  /* king / lord / master (Nt.1)         */
     { "umuriro",  3,  "riro"   },  /* fire                                */
     { "umunsi",   3,  "nsi"    },  /* day                                 */
+    /* "herican" family: Nt.3/4 pair; "imuhengeri" uses D-vowel alternation   *
+     * u→i (locative augment), exactly as "ibu-" in Nt.14 directional forms.  *
+     * Without these entries the Nt.9 nasal rule in+m→im catches "imuhengeri" */
+    { "umuhengeri", 3, "hengeri" }, /* herican (Nt.3 singular)            */
+    { "imuhengeri", 3, "hengeri" }, /* locative/augment: i(D)+mu(RT)+hengeri */
+    { "imihengeri", 4, "hengeri" }, /* hericans (Nt.4 plural)             */
     /* Common Nt.11 nouns */
     { "urukundo", 11, "kundo"  },  /* love                                */
     { "urugendo", 11, "gendo"  },  /* journey / trip                      */
@@ -1953,7 +1981,16 @@ static const KnownWord KNOWN_WORDS[] = {
     { "musikari",  1,  "sikari" }, /* = umusikari (soldier / warrior)      */
     { "mubyeyi",   1,  "byeyi"  }, /* = umubyeyi (parent)                 */
     { "mukuru",    1,  "kuru"   }, /* = umukuru (elder / chief / senior)   */
+    /* Nt.14 abstract nouns: full form (with D-vowel u) */
+    { "ubusa",    14,  "busa"   }, /* nothing / emptiness / nakedness (Nt.14) */
+    { "uburyo",   14,  "ryo"    }, /* strategy / way / method (ubu+ryo)    */
+    { "ubwihuse", 14,  "ihuse"  }, /* speed / quickness (ubw+ihuse)        */
     /* Nt.14 common nouns with dropped D-vowel 'u' from "ubu" */
+    { "buryo",    14,  "ryo"    }, /* = uburyo (dropped-D form)            */
+    /* Note: "bwihuse" NOT listed here — it is also the past perfect of
+     * kwihuta (to be quick): bw(SP·14)+ihut+ye → bwihuse.  The Step 6
+     * verb guard handles disambiguation; the full noun form "ubwihuse"
+     * is the primary lexicon entry above.                                 */
     { "butayu",   14,  "tayu"   }, /* = ubutayu (desert / wilderness)      */
     { "burenganzira",14,"renganzira"}, /* = uburenganzira (right/authority)*/
     { "busabe",   14,  "sabe"   }, /* = ubusabe (prayer / request)         */
@@ -2423,8 +2460,10 @@ const char *kin_pos_name(POS pos) {
         case POS_CONJUNCTION:  return "Icyungo (Conjunction)";
         case POS_INTERJECTION: return "Irangamutima (Interjection)";
         case POS_ADVERB:       return "Akamamo (Adverb)";
+        case POS_ADVERB_TIME:  return "Akamamo k'igihe (Temporal Adverb)";
         case POS_LOCATIVE:     return "Indangahantu (Locative)";
         case POS_VERB_PARTICLE:return "Ikegeranshinga (Verb particle)";
+        case POS_NUMBER:       return "Inomero (Number)";
         case POS_FOREIGN:      return "Ijambo ry'amahanga (Foreign/Unknown)";
         case POS_PUNCTUATION:  return "Ibirango (Punctuation)";
         default:               return "Ntizwi (Unknown)";
@@ -2462,7 +2501,8 @@ const char *kin_verb_tense_name(VerbTense t) {
         case TENSE_SUBJUNCTIVE:  return "Ikigombero (Subjunctive: SP+stem+e)";
         case TENSE_NARRATIVE:    return "Inkurikizo (Narrative/Sequential: SP+ka+stem+a)";
         case TENSE_OPTATIVE:     return "Inyifurizo (Optative: SP+ra+ka+stem+a)";
-        case TENSE_IMPERATIVE:   return "Integeko (Imperative: bare stem+a)";
+        case TENSE_IMPERATIVE:      return "Integeko (Imperative: bare stem+a)";
+        case TENSE_NEG_IMPERATIVE:  return "Impakanyi y'integeko (Prohibitive: mwi/wi/twi + stem+a)";
         case TENSE_CONDITIONAL:  return "Inziganyo (Conditional: SP+a+stem+a)";
         /* Copula forms of kuba (to be/exist) with locative suffix -ho/-mo/-yo *
          * Underlying morphology: ku-b-a-ho (INF+root+FV+post-final locative)  *
@@ -2503,6 +2543,9 @@ const char *kin_verb_ext_name(VerbExtension e) {
         case VEXT_APPLIC_PASSIVE:
             return "Ikirango+Imbundo (Applicative+Passive: -er-/-ir- + -w-; "
                    "e.g. guhora \xe2\x86\x92 guhorera \xe2\x86\x92 guhorerwa)";
+        case VEXT_CAUS_Y_PASSIVE:
+            return "Ngiza+Imbundo (Causative-y + Passive: r+y\xe2\x86\x92z + -w-; "
+                   "e.g. kugera \xe2\x86\x92 kugeza \xe2\x86\x92 kugezwa)";
         case VEXT_CAUS_NEUTER:
             return "Integeko y'Ingirika (Neuter-Causative: -ek-+-CAUS \xe2\x86\x92 -ets-; "
                    "e.g. gukomereka \xe2\x86\x92 gukomeretsa)";

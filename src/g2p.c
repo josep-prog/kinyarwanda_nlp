@@ -354,11 +354,25 @@ void kin_normalize_text(const char *input, char *output, size_t outsize) {
 
     while (*p && out < end) {
 
-        /* ── Apostrophe contraction: n'amazi → na amazi ──────────────── */
+        /* ── Apostrophe contraction: n'amazi → na amazi ──────────────── *
+         * In Kinyarwanda, 'n'' is a contraction of 'na' (and/with) before     *
+         * a vowel-initial word.  Restore the elided 'a' before separating.    *
+         * Other single-letter contractions (e.g. y' from ya, k' from ku):     *
+         * also restore the missing vowel:                                       *
+         *   n' → na   (na = and/with)                                         *
+         *   y' → ya   (ya = past SP / Nt.6 pres. SP / possessive particle)   *
+         *   k' → ku   (ku = locative / infinitive prefix)                     *
+         *   m' → mu   (mu = inside / Nt.1 RT)                                 *
+         *   All others: just replace apostrophe with a space.                  */
         if (*p == '\'' && p > input) {
-            /* Replace ' with a space if the preceding char is a letter */
             if (isalpha((unsigned char)*(p-1))) {
-                /* Write space to separate the contracted preposition */
+                char prev = (char)tolower((unsigned char)*(p-1));
+                /* Restore elided vowel for known single-letter contractions */
+                if (prev == 'n' && out < end) *out++ = 'a';
+                else if (prev == 'y' && out < end) *out++ = 'a';
+                else if (prev == 'k' && out < end) *out++ = 'u';
+                else if (prev == 'm' && out < end) *out++ = 'u';
+                /* Separate with a space */
                 if (out < end) *out++ = ' ';
                 p++;
                 continue;
