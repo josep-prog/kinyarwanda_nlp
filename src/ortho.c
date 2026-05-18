@@ -1166,3 +1166,165 @@ const char *kin_ortho_rule_name(OrthoViolationType t) {
         default:                    return "Unknown";
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PUBLIC API 6: kin_ortho_fix()
+ *
+ * Auto-fix orthographic violations in a single surface word.
+ * Calls kin_ortho_validate() then applies character-level corrections in a
+ * loop until no fixable violations remain (max 8 passes).
+ *
+ * Fixed automatically:
+ *   ORTHO_NASAL_ASSIM    §3.3   nf→mf, nb→mb, np→mp, nv→mv, nh→mp
+ *   ORTHO_NASAL_ELISION  §3.1   prefix in+m/n → delete the n
+ *   ORTHO_CY_UNFUSED     §3.9   dy→z, gy→z, sy→sh, ky→ts (or s after n),
+ *                               zy→j, ty→s (or sh in a_t context)
+ *   ORTHO_STOP_UNDELETED §3.6.1 nts→ns; §3.6.3 mpf→mf
+ *   ORTHO_C_NOT_SH       §3.6.2 nc→nsh
+ *   ORTHO_VOWEL_ASSIM    §1.3   -ir-/-ish- → -er-/-esh- before o-stem
+ *
+ * NOT auto-fixed (context-dependent or ambiguous):
+ *   ORTHO_VV_HIATUS      which vowel resolves depends on morphology
+ *   ORTHO_LETTER_L       may be a valid loanword / proper name
+ * ═══════════════════════════════════════════════════════════════════════════ */
+void kin_ortho_fix(const char *word, char *fixed, size_t size) {
+    char buf[KIN_MAX_WORD];
+    strncpy(buf, word, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    for (int iter = 0; iter < 8; iter++) {
+        OrthoViolation viols[16];
+        int count = kin_ortho_validate(buf, viols, 16);
+        if (count == 0) break;
+
+        bool fixed_one = false;
+
+        for (int v = 0; v < count && !fixed_one; v++) {
+            int pos = viols[v].pos;
+            int len = (int)strlen(buf);
+            if (pos < 0 || pos >= len) continue;
+
+            char c0 = buf[pos];
+            char c1 = (pos + 1 < len) ? buf[pos + 1] : '\0';
+            char c2 = (pos + 2 < len) ? buf[pos + 2] : '\0';
+
+            switch (viols[v].type) {
+
+            case ORTHO_NASAL_ASSIM:
+                /* §3.3: n before bilabial/labiodental → m; n+h surfaces as mp */
+                if (c0 == 'n') {
+                    if (c1=='f' || c1=='b' || c1=='p' || c1=='v') {
+                        buf[pos] = 'm';
+                        fixed_one = true;
+                    } else if (c1 == 'h') {
+                        buf[pos]     = 'm';
+                        buf[pos + 1] = 'p';
+                        fixed_one = true;
+                    }
+                }
+                break;
+
+            case ORTHO_NASAL_ELISION:
+                /* §3.1: prefix n before m/n elides (validator only fires at
+                 * pos==1, word[0]=='i', so the check here is a safety guard) */
+                if (pos == 1 && buf[0] == 'i' && c0 == 'n' &&
+                    (c1 == 'm' || c1 == 'n')) {
+                    del_at(buf, pos, 1, &len);
+                    fixed_one = true;
+                }
+                break;
+
+            case ORTHO_CY_UNFUSED:
+                /* §3.9: C+y sequences that should have fused at morpheme boundary */
+                if (c1 == 'y') {
+                    char cprev = (pos > 0) ? buf[pos - 1] : '\0';
+
+                    if (c0 == 'd' || c0 == 'g') {
+                        /* §3.9.1/3.9.2: d+y→z, g+y→z */
+                        buf[pos] = 'z';
+                        del_at(buf, pos + 1, 1, &len);
+                        fixed_one = true;
+
+                    } else if (c0 == 's') {
+                        /* §3.9.6: s+y→sh (replace 'y' with 'h', 's' stays) */
+                        buf[pos + 1] = 'h';
+                        fixed_one = true;
+
+                    } else if (c0 == 'z') {
+                        /* §3.9.11: z+y→j */
+                        buf[pos] = 'j';
+                        del_at(buf, pos + 1, 1, &len);
+                        fixed_one = true;
+
+                    } else if (c0 == 'k') {
+                        if (cprev == 'n') {
+                            /* §3.9.8: nk+y→ns (k→s, delete y) */
+                            buf[pos] = 's';
+                            del_at(buf, pos + 1, 1, &len);
+                        } else {
+                            /* §3.9.7: k+y→ts (replace k with ts, delete y) */
+                            int nl = repl_at(buf, pos, 1, "ts", len, KIN_MAX_WORD);
+                            if (nl >= 0) {
+                                len = nl;
+                                del_at(buf, pos + 2, 1, &len);
+                            }
+                        }
+                        fixed_one = true;
+
+                    } else if (c0 == 't') {
+                        /* §3.9.10: t+y→sh when cprev=='a' and next is vowel;
+                         *          t+y→s otherwise */
+                        char cnext2 = (pos + 2 < len) ? buf[pos + 2] : '\0';
+                        if (cprev == 'a' && ov(cnext2)) {
+                            int nl = repl_at(buf, pos, 2, "sh", len, KIN_MAX_WORD);
+                            if (nl >= 0) len = nl;
+                        } else {
+                            buf[pos] = 's';
+                            del_at(buf, pos + 1, 1, &len);
+                        }
+                        fixed_one = true;
+                    }
+                }
+                break;
+
+            case ORTHO_STOP_UNDELETED:
+                /* §3.6.1: nts→ns (delete epenthetic t)
+                 * §3.6.3: mpf→mf (delete epenthetic p) */
+                if (c0 == 'n' && c1 == 't' && c2 == 's') {
+                    del_at(buf, pos + 1, 1, &len);
+                    fixed_one = true;
+                } else if (c0 == 'm' && c1 == 'p' && c2 == 'f') {
+                    del_at(buf, pos + 1, 1, &len);
+                    fixed_one = true;
+                }
+                break;
+
+            case ORTHO_C_NOT_SH:
+                /* §3.6.2: nc→nsh (replace 'c' at pos+1 with 'sh') */
+                if (c0 == 'n' && c1 == 'c') {
+                    int nl = repl_at(buf, pos + 1, 1, "sh", len, KIN_MAX_WORD);
+                    if (nl >= 0) { len = nl; fixed_one = true; }
+                }
+                break;
+
+            case ORTHO_VOWEL_ASSIM:
+                /* §1.3: extension -ir-/-ish- → -er-/-esh- before o-containing stem */
+                if (c0 == 'i' && (c1 == 'r' || c1 == 's')) {
+                    buf[pos] = 'e';
+                    fixed_one = true;
+                }
+                break;
+
+            case ORTHO_VV_HIATUS:
+            case ORTHO_LETTER_L:
+            default:
+                break;   /* cannot safely auto-fix without morphological context */
+            }
+        }
+
+        if (!fixed_one) break;   /* no more fixable violations */
+    }
+
+    strncpy(fixed, buf, size - 1);
+    fixed[size - 1] = '\0';
+}

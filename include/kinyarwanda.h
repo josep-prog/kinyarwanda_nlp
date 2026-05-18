@@ -694,6 +694,12 @@ void kin_ortho_nt9_stem(const char *after_i, char *stem_out, size_t size);
 /* Human-readable name for an OrthoViolationType. */
 const char *kin_ortho_rule_name(OrthoViolationType t);
 
+/* Auto-fix detected violations in a surface word (iterates until stable).
+ * Fixes: ORTHO_NASAL_ASSIM, ORTHO_NASAL_ELISION, ORTHO_CY_UNFUSED,
+ *        ORTHO_STOP_UNDELETED, ORTHO_C_NOT_SH, ORTHO_VOWEL_ASSIM.
+ * Leaves ORTHO_VV_HIATUS and ORTHO_LETTER_L unchanged (context-dependent). */
+void kin_ortho_fix(const char *word, char *fixed, size_t size);
+
 /* analysis.c  (main pipeline) */
 SentenceAnalysis kin_analyze(const char *text);
 void kin_print_analysis(const SentenceAnalysis *sa, bool verbose);
