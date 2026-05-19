@@ -684,6 +684,23 @@ static void analyse_noun(Token *tok)
                  "a\342\206\222\342\210\205 \302\2471.1 (ka+'%c' vowel \342\206\222 k)", c_form[0]);
     }
 
+    /* ── Class 6 post-hoc Rule 4b correction for i-initial C ──────────────────
+     * When kin_lookup_igicumbi returns an 'i'-initial igicumbi (e.g. "inyo") for
+     * a class-6 word beginning with "am+e", the underlying ama+'inyo' triggered
+     * §1.1 Rule 4b (a+i→e) at the RT-C boundary:
+     *   a(D) + ma(RT) + inyo(C) → a + m + enyo = "amenyo"
+     * The switch above set rule_rt to "a→∅ §1.1 (ma+'e'...)" because it only saw
+     * the surface 'e'.  Now that c_form is known to start with 'i', correct the
+     * annotation to the actual rule and flag for the reconstruction below.       */
+    bool rule4b_cls6 = false;
+    if (cls == 6 && kin_starts_with(word, "am") && (unsigned char)word[2] == 'e'
+        && c_form[0] == 'i') {
+        snprintf(rule_rt, sizeof(rule_rt),
+                 "a+i\342\206\222e \302\2471.1 (ama+\342\200\230%s\342\200\231 \342\206\222 am+e%s)",
+                 c_form, c_form + 1);
+        rule4b_cls6 = true;
+    }
+
     /* Verify the reconstruction matches the surface word.
      * When a phonological rule already fired at the RT boundary (rule_rt set),
      * verify directly via surface-piece concatenation — kin_ortho_gen would
@@ -715,8 +732,17 @@ static void analyse_noun(Token *tok)
          * ikeba, ishuri...).  The ∅ character must NOT appear in the
          * reconstruction string — use "" for verification in that case.        */
         const char *rt_recon = (rt_surface[0] == '\xe2') ? "" : rt_surface;
-        snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
-                 d_recon, rt_recon, c_form);
+        if (rule4b_cls6) {
+            /* Rule 4b (a+i→e): surface C is 'e' + c_form[1:], not raw c_form.
+             * a(D) + m(RT) + inyo(C) → surface "a·m·enyo" not "a·m·inyo".    */
+            char c_surf[KIN_MAX_STEM];
+            snprintf(c_surf, sizeof(c_surf), "e%s", c_form + 1);
+            snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
+                     d_recon, rt_recon, c_surf);
+        } else {
+            snprintf(reconstructed, sizeof(reconstructed), "%s%s%s",
+                     d_recon, rt_recon, c_form);
+        }
     } else {
         char underlying[128];
         snprintf(underlying, sizeof(underlying), "%s|%s|%s", d_under, rt_under, c_form);
@@ -729,6 +755,29 @@ static void analyse_noun(Token *tok)
     set_morph(&mb->m[1], "RT", rt_under,  rt_surface, rule_rt);
     set_morph(&mb->m[2], "C",  c_form,    c_form,     "");
     mb->n = 3;
+
+    /* ── Locative deverbative C split: root-trace + locative suffix ────────────
+     * When a noun's C ends in a locative postposition (mo, ho, yo) AND the token
+     * is marked deverbative, show the morpheme boundary in the Ingingo display:
+     *   ibirimo: C = ri-mo  (ri = Nt.5 RT trace fossilized in C; mo = locative
+     *                        suffix from the source verb kubamo = kuba + mo)
+     * The '.surface' keeps the unsplit form (for Guhuza reconstruction);
+     * only '.form' (Ingingo) is updated to show the hyphen.                      */
+    if (tok->is_deverbative && mb->m[2].form[0]) {
+        static const char *LOCS[] = { "mo", "ho", "yo", NULL };
+        for (int li = 0; LOCS[li]; li++) {
+            size_t llen = strlen(LOCS[li]);
+            size_t clen = strlen(mb->m[2].form);
+            if (clen > llen && kin_ends_with(mb->m[2].form, LOCS[li])) {
+                char c_hyph[KIN_MORPH_FORM_LEN];
+                snprintf(c_hyph, sizeof(c_hyph), "%.*s-%s",
+                         (int)(clen - llen), mb->m[2].form, LOCS[li]);
+                strncpy(mb->m[2].form, c_hyph, KIN_MORPH_FORM_LEN - 1);
+                mb->m[2].form[KIN_MORPH_FORM_LEN - 1] = '\0';
+                break;
+            }
+        }
+    }
 
     /* ── aba+nya compound: "people of N" associative construction ────────────
      * Pattern: Nt.2 aba + nya + headnoun (e.g. abanyamahema, abanyarwanda).

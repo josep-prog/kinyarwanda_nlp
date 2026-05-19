@@ -254,7 +254,7 @@ void kin_tag_token(Token *tok) {
 
     const char *w = tok->lower;
 
-    /* Arabic numerals (1, 2, 42, …): all-digit surface → Inomero. */
+    /* Arabic numerals (1, 2, 42, …): all-digit surface → Umubare. */
     {
         const char *d = tok->surface;
         bool all_digits = (*d != '\0');

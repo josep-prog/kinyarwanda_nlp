@@ -1894,6 +1894,13 @@ static const KnownWord KNOWN_WORDS[] = {
     { "amaguru",  6,  "guru"   },  /* legs / feet                         */
     { "amajwi",   6,  "jwi"    },  /* voices / words / sounds             */
     { "amazina",  6,  "zina"   },  /* names (pl of izina)                 */
+    /* amenyo: teeth (Nt.6 pl of iryinyo Nt.5; root/igicumbi = -inyo).
+     * Nt.6 prefix ama- + i-initial C 'inyo': a+i→e §1.1 → am+enyo = amenyo.
+     * WITHOUT this entry the engine misreads a(SP·Nt.1)+meny(root)+o(FV)
+     * and reports kumenya (to know) instead of the correct noun reading. */
+    { "amenyo",   6,  "inyo"   },  /* teeth (Nt.6 pl of iryinyo)         */
+    /* Additional class forms of root -inyo (added to confirm igicumbi).   */
+    { "utwinyo",  13, "inyo"   },  /* teeth – Nt.13 dim-pl (utu+inyo→utw+inyo) */
     /* Common Nt.7 nouns */
     { "icyaha",   7,  "yaha"   },  /* sin / fault / guilt                 */
     { "igihe",    7,  "gihe"   },  /* time / moment / period              */
@@ -2328,6 +2335,15 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "umurongo",      "imirongo",        "rongo",      3,  4  },
     { "umutsima",      "imutsima",        "tsima",      3,  4  },
     /* ── Class 5 ↔ 6 (singular / mass-plural) ──────────────────────────────── */
+    /* iryinyo/amenyo pair: root igicumbi = -inyo.  Separate entries are used
+     * because the surface allomorphs differ (iryinyo vs amenyo) and each form
+     * must display its own correct igicumbi in the morpheme breakdown.
+     * amenyo: ama+inyo → a+i→e §1.1 → am+enyo = amenyo.                       */
+    { "iryinyo",       NULL,              "inyo",        5,  0  },  /* tooth  (Nt.5 sg)          */
+    { "amenyo",        NULL,              "inyo",        6,  0  },  /* teeth  (Nt.6 pl)          */
+    { "ubwinyo",       NULL,              "inyo",       14,  0  },  /* dental (Nt.14 abstract)   */
+    { "utwinyo",       NULL,              "inyo",       13,  0  },  /* small teeth (Nt.13 dim-pl)*/
+    { "ibyinyo",       NULL,              "inyo",        8,  0  },  /* teeth  (Nt.8 ibi-class)   */
     { "itungo",        "amatungo",        "tungo",       5,  6  },  /* domestic animal; primary lexical noun */
     { "itegeko",       "amategeko",       "tegeko",     5,  6  },  /* user's main example */
     { "izina",         "amazina",         "zina",       5,  6  },
@@ -2463,7 +2479,7 @@ const char *kin_pos_name(POS pos) {
         case POS_ADVERB_TIME:  return "Akamamo k'igihe (Temporal Adverb)";
         case POS_LOCATIVE:     return "Indangahantu (Locative)";
         case POS_VERB_PARTICLE:return "Ikegeranshinga (Verb particle)";
-        case POS_NUMBER:       return "Inomero (Number)";
+        case POS_NUMBER:       return "Umubare (Number)";
         case POS_FOREIGN:      return "Ijambo ry'amahanga (Foreign/Unknown)";
         case POS_PUNCTUATION:  return "Ibirango (Punctuation)";
         default:               return "Ntizwi (Unknown)";

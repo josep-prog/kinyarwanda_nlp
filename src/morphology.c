@@ -362,6 +362,7 @@ int kin_detect_noun_class(const char *w) {
     if (kin_starts_with(w, "aka") && wlen > 4) return 12; /* Nt.12       */
     if (kin_starts_with(w, "aga") && wlen > 4) return 12; /* Nt.12 k→g  */
     if (kin_starts_with(w, "utu") && wlen > 4) return 13; /* Nt.13       */
+    if (kin_starts_with(w, "utw") && wlen > 4) return 13; /* Nt.13 u→w  */
     if (kin_starts_with(w, "ubu") && wlen > 4) return 14; /* Nt.14       */
     if (kin_starts_with(w, "uku") && wlen > 4) return 15; /* Nt.15       */
     if (kin_starts_with(w, "ukw") && wlen > 4) return 15; /* Nt.15 u→w  */
@@ -648,7 +649,8 @@ bool kin_strip_noun_prefix(const char *word, char *stem_out, int *class_out) {
             else                               stem_start = word + 3; /* aka */
             break;
         case 13:
-            if (kin_starts_with(word, "tw"))  stem_start = word + 2; /* dropped D */
+            if (kin_starts_with(word, "utw")) stem_start = word + 3; /* u + tu→tw/V: skip utw */
+            else if (kin_starts_with(word, "tw")) stem_start = word + 2; /* dropped D */
             else                             stem_start = word + 3; /* utu */
             break;
         case 14:
