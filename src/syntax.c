@@ -17,8 +17,13 @@
  *         urugo wacu   (nt.1 connector on nt.11 noun)  ✗
  *
  * RULE 3 – Sentence completeness
- *   A sentence (umuvugo) must contain at least one verb (inshinga).
- *   The book (p.57) defines umuvugo as requiring a verb.
+ *   A fully verbal sentence must contain at least one verb (inshinga).
+ *   Exception: nominal predicates — noun + adjective (e.g. "umuntu mwiza") —
+ *   are grammatically complete without a verb in Kinyarwanda and are NOT
+ *   flagged.  The copula is implied.
+ *   Note: the REB textbook uses "umuvugo" for a verb-bearing utterance, but
+ *   in everyday Kinyarwanda "umuvugo" means oral poetry/performance.
+ *   "interuro" is the unambiguous term for 'sentence' used here.
  *
  * RULE 4 – Unknown words
  *   Words tagged POS_FOREIGN that are not proper nouns are flagged.
@@ -133,9 +138,31 @@ void kin_check_syntax(SentenceAnalysis *sa) {
          * number-label, quoted word…) without a verb is a list item or
          * continuation fragment, not a grammatical mistake.                 */
         bool is_fragment = (content_count <= 1);
-        if (!all_interj && !is_fragment) {
+
+        /* Nominal predicate exception: noun + adjective forms a complete
+         * sentence in Kinyarwanda — the copula is implicit.
+         * e.g. "umuntu mwiza" (the/a good person), "inzu nziza" (a nice house).
+         * Allow pronouns, adverbs, prepositions, and locatives alongside
+         * the noun+adjective core without triggering ERR_NO_VERB.         */
+        bool is_nominal_pred = false;
+        {
+            bool has_noun = false, has_adj = false, all_nominal = true;
+            for (int ii = 0; ii < sa->token_count; ii++) {
+                POS p = sa->tokens[ii].pos;
+                if (p == POS_PUNCTUATION || p == POS_NUMBER) continue;
+                if (p == POS_NOUN || p == POS_RELATIVE_NOUN) has_noun = true;
+                else if (p == POS_ADJECTIVE)                  has_adj  = true;
+                else if (p == POS_PRONOUN   || p == POS_ADVERB     ||
+                         p == POS_ADVERB_TIME || p == POS_LOCATIVE  ||
+                         p == POS_PREPOSITION) { /* compatible modifier */ }
+                else all_nominal = false;
+            }
+            is_nominal_pred = has_noun && has_adj && all_nominal;
+        }
+
+        if (!all_interj && !is_fragment && !is_nominal_pred) {
             add_error(sa, ERR_NO_VERB, -1,
-                "Iri nteruro ntirigira inshinga (umuvugo) / "
+                "Iyi nteruro ntagira inshinga / "
                 "This sentence has no verb.",
                 "Ongeraho inshinga (Add a verb).");
         }
