@@ -520,6 +520,7 @@ typedef enum {
     ERR_MISSING_COLON,         /* 'ati'/'ngo' without following ':' or '"'   */
     ERR_WRONG_PUNCT,           /* Wrong punctuation mark for this context     */
     ERR_EXTRA_PUNCT,           /* Unnecessary punctuation mark                */
+    ERR_MISSING_EXCLAIM,       /* Exclamative sentence ends with '.' not '!'  */
 } ErrorType;
 
 typedef struct {

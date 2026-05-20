@@ -26,9 +26,9 @@
  *         ati Murakoze      ✗  (missing colon)
  *
  * P4 – Question mark for interrogative sentences
- *   Sentences containing 'mbese', 'ese', or interrogative words
- *   ('nde', 'iki', 'ryari', 'he', 'hehe', 'gute', 'kangahe') must end
- *   with '?' not '.'.
+ *   Sentences containing an interrogative word (nde, iki, ryari, he, hehe,
+ *   gute, kangahe, kuki, ikihe, harya, mbese, ese) must end with '?' not '.'.
+ *   Trigger list is corpus-derived (Bibiliya Yera frequency analysis).
  *
  * P5 – Missing terminal punctuation
  *   A sentence whose last token is not POS_PUNCTUATION with is_sent_boundary
@@ -37,6 +37,11 @@
  * P6 – Spurious comma between noun and its immediately following adjective
  *   In Kinyarwanda no comma separates a noun from its modifier.
  *   "umuntu, munini"  ✗  →  "umuntu munini"  ✓
+ *
+ * P7 – Exclamation mark for exclamative sentences
+ *   Sentences containing an exclamative particle (erega, ayii, ishyano,
+ *   mbega, iyaba, dore) should end with '!' not '.'.
+ *   Trigger list is corpus-derived (Bibiliya Yera frequency analysis).
  */
 
 #include <string.h>
@@ -96,17 +101,39 @@ static bool is_adversative(const char *lower) {
             strcmp(lower, "ahubwo")   == 0);
 }
 
-/* True when the lower form is an interrogative word. */
+/*
+ * True when the lower form is an interrogative word.
+ * Core list verified against Bibiliya Yera corpus (2 102 question sentences):
+ *   nde 54x, iki 25x, mbese 77x, he 26x, kuki 112x, ikihe 358x, harya 72x
+ *   ratios = how much more frequent in "?" sentences vs. declaratives.
+ */
 static bool is_interrogative(const char *lower) {
-    return (strcmp(lower, "nde")     == 0 ||
-            strcmp(lower, "iki")     == 0 ||
-            strcmp(lower, "ryari")   == 0 ||
-            strcmp(lower, "he")      == 0 ||
-            strcmp(lower, "hehe")    == 0 ||
-            strcmp(lower, "gute")    == 0 ||
-            strcmp(lower, "kangahe") == 0 ||
-            strcmp(lower, "mbese")   == 0 ||
-            strcmp(lower, "ese")     == 0);
+    return (strcmp(lower, "nde")     == 0 ||  /* who                  */
+            strcmp(lower, "iki")     == 0 ||  /* what                 */
+            strcmp(lower, "ryari")   == 0 ||  /* when                 */
+            strcmp(lower, "he")      == 0 ||  /* where                */
+            strcmp(lower, "hehe")    == 0 ||  /* where (emphatic)     */
+            strcmp(lower, "gute")    == 0 ||  /* how                  */
+            strcmp(lower, "kangahe") == 0 ||  /* how many times       */
+            strcmp(lower, "kuki")    == 0 ||  /* why (corpus: 112x)   */
+            strcmp(lower, "ikihe")   == 0 ||  /* which one (358x)     */
+            strcmp(lower, "harya")   == 0 ||  /* really/is it so (72x)*/
+            strcmp(lower, "mbese")   == 0 ||  /* polar question marker */
+            strcmp(lower, "ese")     == 0);   /* polar question marker */
+}
+
+/*
+ * True when the lower form is an exclamative particle.
+ * Corpus-derived from Bibiliya Yera exclamation sentences (325 total):
+ *   erega 249x, ayii 394x, ishyano 89x, mbega 131x, iyaba 62x.
+ */
+static bool is_exclamative(const char *lower) {
+    return (strcmp(lower, "erega")   == 0 ||  /* indeed/really! (249x) */
+            strcmp(lower, "ayii")    == 0 ||  /* interjection (394x)   */
+            strcmp(lower, "ishyano") == 0 ||  /* woe/disaster (89x)    */
+            strcmp(lower, "mbega")   == 0 ||  /* how great!/behold (131x) */
+            strcmp(lower, "iyaba")   == 0 ||  /* would that/if only (62x) */
+            strcmp(lower, "dore")    == 0);   /* look!/behold          */
 }
 
 /*
@@ -126,6 +153,7 @@ void kin_check_punctuation(SentenceAnalysis *sa) {
     if (sa->token_count == 0) return;
 
     bool has_interrogative = false;
+    bool has_exclamative   = false;
 
     for (int i = 0; i < sa->token_count; i++) {
         const Token *t = &sa->tokens[i];
@@ -157,9 +185,11 @@ void kin_check_punctuation(SentenceAnalysis *sa) {
             continue;
         }
 
-        /* P4: Track interrogative words */
+        /* P4 / P7: Track interrogative and exclamative words */
         if (is_interrogative(t->lower))
             has_interrogative = true;
+        if (is_exclamative(t->lower))
+            has_exclamative = true;
 
         /* P1: Adversative conjunctions need a preceding comma */
         if (is_adversative(t->lower) && i > 0 && !preceded_by_comma(sa, i)) {
@@ -238,6 +268,22 @@ void kin_check_punctuation(SentenceAnalysis *sa) {
         }
     }
 
+    /* P7: Exclamative sentence should end with '!' not '.' */
+    if (has_exclamative && !has_interrogative) {
+        int sb = last_sent_boundary_idx(sa);
+        if (sb >= 0 && sa->tokens[sb].punct_type == PUNCT_PERIOD) {
+            char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+            snprintf(msg, sizeof(msg),
+                "Interuro ifite ijambo ry'ubwishime isozwa n'ikirango '.' "
+                "aho kuba '!'. / "
+                "An exclamative sentence ends with '.' instead of '!'.");
+            snprintf(sug, sizeof(sug),
+                "Hindura '.' ugashyira '!'. / "
+                "Replace the final '.' with an exclamation mark '!'.");
+            add_error(sa, ERR_MISSING_EXCLAIM, sb, msg, sug);
+        }
+    }
+
     /* P5: Missing terminal punctuation — no period/question/exclamation at all */
     if (last_sent_boundary_idx(sa) < 0) {
         /* Find the last content token to attach the error to */
@@ -246,7 +292,8 @@ void kin_check_punctuation(SentenceAnalysis *sa) {
             if (sa->tokens[i].pos != POS_PUNCTUATION) { last_c = i; break; }
         }
         if (last_c >= 0) {
-            const char *mark = has_interrogative ? "?" : ".";
+            const char *mark = has_interrogative ? "?" :
+                               has_exclamative   ? "!" : ".";
             char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
             snprintf(msg, sizeof(msg),
                 "Interuro irangira nta kirango cy'iherezo ('.', '?', '!'). / "

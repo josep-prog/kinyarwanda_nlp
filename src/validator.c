@@ -42,6 +42,7 @@ static const char *error_type_tag(ErrorType t) {
         case ERR_MISSING_COLON:       return "MISSING_COLON";
         case ERR_WRONG_PUNCT:         return "WRONG_PUNCT";
         case ERR_EXTRA_PUNCT:         return "EXTRA_PUNCT";
+        case ERR_MISSING_EXCLAIM:     return "MISSING_EXCLAIM";
         default:                      return "ERROR";
     }
 }
@@ -64,14 +65,16 @@ static const char *error_type_rw(ErrorType t) {
         case ERR_MISSING_COLON:       return "Nta koma ndende";
         case ERR_WRONG_PUNCT:         return "Ikirango kidahuye";
         case ERR_EXTRA_PUNCT:         return "Ikirango kirenze";
+        case ERR_MISSING_EXCLAIM:     return "Nta kirango cy'ubwishime";
         default:                      return "Ikindi";
     }
 }
 
 static bool is_punct_error(ErrorType t) {
-    return (t == ERR_MISSING_PERIOD || t == ERR_MISSING_COMMA  ||
-            t == ERR_MISSING_QMARK  || t == ERR_MISSING_COLON  ||
-            t == ERR_WRONG_PUNCT    || t == ERR_EXTRA_PUNCT);
+    return (t == ERR_MISSING_PERIOD   || t == ERR_MISSING_COMMA  ||
+            t == ERR_MISSING_QMARK    || t == ERR_MISSING_COLON  ||
+            t == ERR_WRONG_PUNCT      || t == ERR_EXTRA_PUNCT    ||
+            t == ERR_MISSING_EXCLAIM);
 }
 
 /* ── Formatting helpers ───────────────────────────────────────────────────── */
@@ -130,7 +133,7 @@ static void print_report(const SentenceAnalysis *sa,
                sent_num, sent_num, input_text);
 
     if (sa->error_count == 0) {
-        printf("  ✓ Ntamukono wabonetse — imvugo inoze. / "
+        printf("  ✓ Iyi nyandiko ntakosa ifite. / "
                "No violations — sentence is correct.\n\n");
         return;
     }
@@ -175,7 +178,7 @@ static void print_report(const SentenceAnalysis *sa,
 
     putchar('\n');
     print_rule('=');
-    printf("  Incamake: imikono %d — imvugo/imyandikire %d, ibirango %d\n",
+    printf("  Incamake: amakosa %d — indangamitereko/imyandikire %d, ibirango %d\n",
            sa->error_count, gram_n, punct_n);
     printf("  Summary:  %d violation(s) — %d grammar/spelling, %d punctuation\n",
            sa->error_count, gram_n, punct_n);
@@ -237,7 +240,7 @@ static void validate_text_block(const char *text, int *sent_num, int *total) {
 static void print_header(const char *label) {
     putchar('\n');
     for (int i = 0; i < VAL_WIDTH; i++) putchar('=');
-    printf("\nISUZUMA RY'IMVUGO — Sentence Validation\n");
+    printf("\nISUZUMA RY'INYANDIKO — Sentence Validation\n");
     if (label && label[0])
         printf("%s\n", label);
     for (int i = 0; i < VAL_WIDTH; i++) putchar('=');

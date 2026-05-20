@@ -1,1 +1,16 @@
 data/docx/*.docx
+
+# Compiled binaries
+kinyarwanda_nlp
+kinyarwanda_nlp_dbg
+kinyarwanda_nlp_dbg2
+kinyarwanda_asan
+batch_tag
+
+# Libraries (rebuilt with: make)
+libkinyarwanda.so
+libkinyarwanda.a
+
+# Build artifacts
+src/*.o
+src/*.d
