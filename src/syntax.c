@@ -415,6 +415,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
              * the error — the true subject is that earlier noun.
              * Also treat Nt.4/9 as equivalent (same SP "i") when scanning. */
             bool has_remote_subject = false;
+            bool crossed_conj = false;
             for (int j = i - 1; j >= 0; j--) {
                 const Token *t = &sa->tokens[j];
                 /* Stop scanning back at sentence boundaries               */
@@ -431,6 +432,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                      * by the earlier verb's SP, not by any intervening noun.  */
                     tc = t->noun_class;
                 } else {
+                    if (t->pos == POS_CONJUNCTION) crossed_conj = true;
                     continue;
                 }
                 if (tc == vc) { has_remote_subject = true; break; }
@@ -449,6 +451,12 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                  * of the relative clause; yakoze's subject is Imana (Nt.9).    */
                 if (vc == 6 && (tc == 1 || tc == 3 || tc == 9))
                     { has_remote_subject = true; break; }
+                /* Coordinate subject: [Nt.1/3 noun] kandi [Nt.1/3 noun] + ba-(Nt.2) verb.
+                 * Two human nouns joined by a conjunction collectively take
+                 * class-2 plural agreement (ba-).
+                 * e.g. "umugabo kandi umugore barakora" is correct grammar.    */
+                if (crossed_conj && vc == 2 && (tc == 1 || tc == 3) && (nc == 1 || nc == 3))
+                    { has_remote_subject = true; break; }
             }
             if (has_remote_subject) continue;
 
@@ -460,7 +468,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
              * capitalised, not already confirmed as a proper noun, and the
              * verb uses human SP (class 1 or 3), suppress the error.      */
             if (isupper((unsigned char)noun->surface[0]) &&
-                !noun->is_proper_noun && (vc == 1 || vc == 3)) {
+                !noun->is_proper_noun && !noun->is_kinyarwanda && (vc == 1 || vc == 3)) {
                 bool sent_initial = (i == 0);
                 if (!sent_initial) {
                     for (int k = i - 1; k >= 0; k--) {
@@ -563,8 +571,12 @@ void kin_check_syntax(SentenceAnalysis *sa) {
      *              Takes path phrases:   "aragenda ku muhanda" (on the road) ✓
      *              Does NOT take bare destination nouns.
      *   kujya    = directional:          "to go TO (a destination)"
-     *              Takes destination NP: "ajya ishuri"  (goes to school) ✓
+     *              Takes destination NP: "ajya ku ishuri"  (goes to school) ✓
      *                                    "azajya i Kigali" (will go to Kigali) ✓
+     *              Requires locative connector before common nouns:
+     *                ku  = to/at a place from outside (ku ishuri, ku ibitaro)
+     *                mu  = into an enclosed space     (mu nzu, mu cyumba, mu gari)
+     *                i   = to a proper place name     (i Kigali, i Musanze)
      *
      * When a "gend"-stem verb is immediately followed by a bare destination
      * noun (no intervening preposition), flag the error and suggest kujya.
@@ -581,29 +593,76 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         Token *next = &sa->tokens[ni];
 
         if (verb->pos != POS_VERB_CONJ) continue;
-        /* Only flag when the verb stem is "gend" or "end" (both map to kugenda) */
-        if (strcmp(verb->stem, "gend") != 0 && strcmp(verb->stem, "end") != 0)
-            continue;
-        /* Only flag when immediately followed by a bare noun (no preposition) */
-        if (next->pos != POS_NOUN) continue;
-        /* Skip if the noun is a proper noun (place names used with i/ku
-         * preposition are fine; mid-sentence capitals are proper nouns) */
-        if (next->is_proper_noun) continue;
+        bool is_kugenda = (strcmp(verb->stem, "gend") == 0 || strcmp(verb->stem, "end") == 0);
+        bool is_kujya   = (strcmp(verb->stem, "jy")   == 0 || strcmp(verb->stem, "giy") == 0);
+        if (!is_kugenda && !is_kujya) continue;
 
-        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
-        snprintf(msg, sizeof(msg),
-            "Guhitamo inshinga nabi: '%s' (kugenda) ikurikirwa n'izina '%s' "
-            "nta mugereka wo hagati. "
-            "Wrong verb: 'kugenda' (manner of movement) followed directly by "
-            "destination noun '%s' without a preposition. "
-            "Use 'kujya' for going TO a destination.",
-            verb->surface, next->surface, next->surface);
-        snprintf(sug, sizeof(sug),
-            "Jyana inshinga 'kugenda' n'inshinga 'kujya' iyo ushaka kuvuga "
-            "kujya ahantu. Urugero: 'ajya ishuri' (not 'aragenda ishuri'). "
-            "Replace 'kugenda' with 'kujya' when going TO a place. "
-            "E.g. 'ajya ishuri' / 'yajya ishuri' / 'azajya ishuri'.");
-        add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
+        /* Case A: kugenda + bare common noun (no preposition)
+         * e.g. "aragenda ishuri" — should be "ajya ku ishuri"               */
+        if (is_kugenda && next->pos == POS_NOUN && !next->is_proper_noun) {
+            char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+            snprintf(msg, sizeof(msg),
+                "Guhitamo inshinga nabi: '%s' (kugenda) ikurikirwa n'izina '%s' "
+                "nta mugereka wo hagati. "
+                "Wrong verb: 'kugenda' (manner of movement) followed directly by "
+                "destination noun '%s' without a locative connector. "
+                "Use 'kujya' + locative (ku/mu) for going TO a destination.",
+                verb->surface, next->surface, next->surface);
+            snprintf(sug, sizeof(sug),
+                "Jyana 'kugenda' na 'kujya' + mugereka w'ahantu: "
+                "'ajya ku %s' (ahantu ho hanze) cyangwa 'ajya mu %s' (aho binjiramo). "
+                "Use 'ku' for institutions/destinations, 'mu' for enclosed spaces.",
+                next->surface, next->surface);
+            add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
+        }
+
+        /* Case B: kugenda + locative "i" + destination name
+         * e.g. "Uragenda i Kigali" — should be "Ujya i Kigali"
+         * "i" (locative) marks a destination; only kujya takes a destination. */
+        if (is_kugenda && next->pos == POS_LOCATIVE && strcmp(next->lower, "i") == 0) {
+            int ni2 = ni + 1;
+            while (ni2 < sa->token_count && sa->tokens[ni2].pos == POS_PUNCTUATION) ni2++;
+            if (ni2 < sa->token_count) {
+                Token *dest = &sa->tokens[ni2];
+                if (dest->is_proper_noun || dest->pos == POS_NOUN) {
+                    char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+                    snprintf(msg, sizeof(msg),
+                        "Guhitamo inshinga nabi: '%s' (kugenda) ikurikirwa n'indangahantu "
+                        "'i %s'. Inshinga 'kugenda' ntiyemera intego y'ahantu. "
+                        "Wrong verb: 'kugenda' cannot take a locative destination 'i %s'. "
+                        "Use 'kujya' for going TO a place.",
+                        verb->surface, dest->surface, dest->surface);
+                    snprintf(sug, sizeof(sug),
+                        "Jyana inshinga 'kugenda' n'inshinga 'kujya' iyo ushaka kuvuga "
+                        "kujya ahantu. Urugero: 'urajya i Kigali' (not 'uragenda i Kigali'). "
+                        "Replace 'kugenda' with 'kujya'. "
+                        "E.g. 'urajya i Kigali' / 'uzajya i Kigali' / 'wagiye i Kigali'.");
+                    add_error(sa, ERR_VERB_SELECTION, i, msg, sug);
+                }
+            }
+        }
+
+        /* Case C: kujya + bare common noun (missing locative connector)
+         * e.g. "Ajya ishuri" — correct form is "Ajya ku ishuri"
+         * kujya requires ku (to/at a place) or mu (into a space) before the noun.
+         * Spoken: "ku ishuri" → "kwishuri"; written standard: "ku ishuri".
+         * Case B above handles proper nouns with "i"; this catches common nouns. */
+        if (is_kujya && next->pos == POS_NOUN && !next->is_proper_noun) {
+            char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+            snprintf(msg, sizeof(msg),
+                "Inshinga 'kujya' isaba mugereka w'ahantu (ku cyangwa mu) "
+                "imbere y'izina '%s'. "
+                "Missing locative connector before '%s': "
+                "'kujya' requires 'ku' or 'mu' before a destination noun.",
+                next->surface, next->surface);
+            snprintf(sug, sizeof(sug),
+                "Shyira 'ku' imbere y'izina (ahantu ho hanze): 'ajya ku %s'. "
+                "Shyira 'mu' (aho binjiramo): 'ajya mu %s'. "
+                "Bavuga 'kw-/mw-' imbere y'inzwi; inyandiko: 'ku/mu + izina'. "
+                "Use 'ku' for destinations, 'mu' for enclosed spaces.",
+                next->surface, next->surface);
+            add_error(sa, ERR_MISSING_LOCATIVE, i, msg, sug);
+        }
     }
 
     /* RULE 8: Conditional clause marking (Inziganyo)                          *

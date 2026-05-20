@@ -516,6 +516,7 @@ typedef enum {
     ERR_OBJ_VERB_AGREEMENT,    /* Verb OM doesn't match object noun class  */
     ERR_VOWEL_HIATUS,          /* Two adjacent vowels (iranya ry'impanvu)  */
     ERR_VERB_SELECTION,        /* Wrong verb choice (e.g. kugenda vs kujya) */
+    ERR_MISSING_LOCATIVE,      /* Locative connector (ku/mu) missing before destination noun */
     /* ── Punctuation placement errors (ibirango) ──────────────────────── */
     ERR_MISSING_PERIOD,        /* Sentence ends without terminal punctuation */
     ERR_MISSING_COMMA,         /* Comma required before conjunction/clause   */

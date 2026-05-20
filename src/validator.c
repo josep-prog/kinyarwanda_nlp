@@ -36,6 +36,7 @@ static const char *error_type_tag(ErrorType t) {
         case ERR_OBJ_VERB_AGREEMENT:  return "OBJ_VERB_AGREEMENT";
         case ERR_VOWEL_HIATUS:        return "VOWEL_HIATUS";
         case ERR_VERB_SELECTION:      return "VERB_SELECTION";
+        case ERR_MISSING_LOCATIVE:    return "MISSING_LOCATIVE";
         case ERR_MISSING_PERIOD:      return "MISSING_PERIOD";
         case ERR_MISSING_COMMA:       return "MISSING_COMMA";
         case ERR_MISSING_QMARK:       return "MISSING_QMARK";
@@ -61,6 +62,7 @@ static const char *error_type_rw(ErrorType t) {
         case ERR_OBJ_VERB_AGREEMENT:  return "Indangasobwa";
         case ERR_VOWEL_HIATUS:        return "Iranya ry'impanvu";
         case ERR_VERB_SELECTION:      return "Guhitamo inshinga";
+        case ERR_MISSING_LOCATIVE:    return "Nta mugereka w'ahantu";
         case ERR_MISSING_PERIOD:      return "Nta kirango cy'iherezo";
         case ERR_MISSING_COMMA:       return "Nta koma";
         case ERR_MISSING_QMARK:       return "Nta kibazo";
