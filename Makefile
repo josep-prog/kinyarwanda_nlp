@@ -16,7 +16,9 @@ LIB_SRCS = src/tokenizer.c \
            src/analysis.c \
            src/g2p.c \
            src/gloss.c \
-           src/api.c
+           src/api.c \
+           src/punctuation.c \
+           src/validator.c
 
 # All sources (library + CLI)
 SRCS     = src/main.c $(LIB_SRCS)

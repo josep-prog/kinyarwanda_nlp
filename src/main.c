@@ -34,6 +34,10 @@ static void print_help(const char *prog) {
     printf("  %s -f dosiye.txt          Sesengura dosiye txt (text file)\n", prog);
     printf("  %s -p dosiye.pdf          Sesengura dosiye PDF (PDF file)\n", prog);
     printf("  %s -v -s \"interuro\"       Ibisobanuro by'inizi (verbose)\n", prog);
+    printf("  %s --g2p -s \"interuro\"   Imodoka y'amajwi (G2P phoneme mode)\n", prog);
+    printf("  %s --gloss -s \"interuro\" Isuzuma ry'uturemezo (interlinear gloss)\n", prog);
+    printf("  %s -validation \"interuro\" Suzuma imyandikire (validation mode)\n", prog);
+    printf("  %s -validation dosiye.pdf  Suzuma dosiye (PDF/DOC/TXT validation)\n", prog);
     printf("  %s -h, --help             Uru rupapuro rw'ubufasha (this help)\n", prog);
     printf("  %s --version              Werekana version\n\n", prog);
 
@@ -75,7 +79,9 @@ static void print_help(const char *prog) {
     printf("  %s -s \"Imana yaremye ijuru n'isi\"\n", prog);
     printf("  %s -v -s \"Urugo rwacu rurabaho\"\n", prog);
     printf("  %s -f inkuru.txt\n", prog);
-    printf("  %s -p Bibiliya.pdf\n\n", prog);
+    printf("  %s -p Bibiliya.pdf\n", prog);
+    printf("  %s -validation \"Abantu munini baragenda ariko yagiye\"\n", prog);
+    printf("  %s -validation inyandiko.pdf\n\n", prog);
 
     printf("DOSIYE ZIHABWA / SUPPORTED FILE TYPES:\n");
     printf("  .txt  – Analyzed line by line\n");
@@ -204,12 +210,14 @@ static int analyse_pdf(const char *pdfpath, bool verbose) {
 }
 
 int main(int argc, char *argv[]) {
-    bool verbose     = false;
-    bool g2p_mode    = false;
-    bool gloss_mode  = false;
-    const char *sentence = NULL;
-    const char *filename = NULL;
-    const char *pdffile  = NULL;
+    bool verbose         = false;
+    bool g2p_mode        = false;
+    bool gloss_mode      = false;
+    bool validation_mode = false;
+    const char *sentence       = NULL;
+    const char *filename       = NULL;
+    const char *pdffile        = NULL;
+    const char *val_input      = NULL;   /* -validation argument */
 
     /* Parse arguments */
     for (int i = 1; i < argc; i++) {
@@ -226,6 +234,10 @@ int main(int argc, char *argv[]) {
             g2p_mode = true;
         } else if (strcmp(argv[i], "--gloss") == 0) {
             gloss_mode = true;
+        } else if (strcmp(argv[i], "-validation") == 0) {
+            validation_mode = true;
+            if (i + 1 < argc && argv[i+1][0] != '-')
+                val_input = argv[++i];
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             sentence = argv[++i];
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -237,6 +249,49 @@ int main(int argc, char *argv[]) {
                             "Gerageza: %s --help\n", argv[i], argv[i], argv[0]);
             return 1;
         }
+    }
+
+    /* Validation mode: -validation <sentence|paragraph|file> */
+    if (validation_mode) {
+        if (val_input) {
+            /* Auto-detect: if arg is a readable file → validate_file;
+             * otherwise treat it as an inline sentence/paragraph string. */
+            FILE *probe = fopen(val_input, "r");
+            if (probe) {
+                fclose(probe);
+                kin_validate_file(val_input);
+            } else {
+                kin_validate_text(val_input);
+            }
+        } else if (sentence) {
+            kin_validate_text(sentence);
+        } else if (filename) {
+            kin_validate_file(filename);
+        } else if (pdffile) {
+            kin_validate_file(pdffile);
+        } else {
+            /* Interactive validation mode */
+            printf("╔══════════════════════════════════════════════════════════════════╗\n");
+            printf("║   Kinyarwanda NLP — Isuzuma ry'Imvugo / Validation Mode         ║\n");
+            printf("╚══════════════════════════════════════════════════════════════════╝\n");
+            printf("Andika interuro cyangwa agace k'inkuru maze ugaragaze Enter.\n");
+            printf("Type a sentence or paragraph and press Enter to validate it.\n");
+            printf("Andika 'quit' cyangwa Ctrl+D gusozerezaho.\n\n");
+            char line[MAX_LINE];
+            while (1) {
+                printf("val>>> ");
+                fflush(stdout);
+                if (!fgets(line, sizeof(line), stdin)) break;
+                size_t l = strlen(line);
+                if (l > 0 && line[l-1] == '\n') line[--l] = '\0';
+                if (l > 0 && line[l-1] == '\r') line[--l] = '\0';
+                if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
+                    strcmp(line, "urabeho") == 0) break;
+                kin_str_trim(line);
+                if (line[0]) kin_validate_text(line);
+            }
+        }
+        return 0;
     }
 
     /* G2P / phoneme mode: --g2p -s "text" */

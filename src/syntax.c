@@ -161,12 +161,30 @@ void kin_check_syntax(SentenceAnalysis *sa) {
                     next->surface, next->noun_class,
                     cur->surface, cur->noun_class,
                     next->surface, next->noun_class);
+                /* Generate the actual corrected adjective surface form */
+                char corrected_adj[KIN_MAX_WORD] = {0};
+                const char *adj_core = NULL;
+                for (int m = 0; m < next->morph.n; m++) {
+                    if (strcmp(next->morph.m[m].label, "C") == 0) {
+                        adj_core = next->morph.m[m].form;
+                        break;
+                    }
+                }
+                if (adj_core && adj_core[0])
+                    kin_vv_join(expected_pfx, adj_core,
+                                corrected_adj, sizeof(corrected_adj));
+
                 snprintf(sug, sizeof(sug),
-                    "Indangasano y'intera igomba kuba '%s' kugira ngo ishyikire "
-                    "inteko %d. / "
-                    "The adjective concordance prefix should be '%s' for class %d.",
+                    "Hindura '%s' ugashyira '%s'. "
+                    "Indangasano y'intera igomba kuba '%s' (inteko %d). / "
+                    "Replace '%s' with '%s'. "
+                    "Concordance prefix for class %d must be '%s'.",
+                    next->surface,
+                    corrected_adj[0] ? corrected_adj : expected_pfx,
                     expected_pfx, cur->noun_class,
-                    expected_pfx, cur->noun_class);
+                    next->surface,
+                    corrected_adj[0] ? corrected_adj : expected_pfx,
+                    cur->noun_class, expected_pfx);
                 add_error(sa, ERR_ADJ_AGREEMENT, i + 1, msg, sug);
             }
         }

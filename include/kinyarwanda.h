@@ -513,6 +513,13 @@ typedef enum {
     ERR_OBJ_VERB_AGREEMENT,    /* Verb OM doesn't match object noun class  */
     ERR_VOWEL_HIATUS,          /* Two adjacent vowels (iranya ry'impanvu)  */
     ERR_VERB_SELECTION,        /* Wrong verb choice (e.g. kugenda vs kujya) */
+    /* ── Punctuation placement errors (ibirango) ──────────────────────── */
+    ERR_MISSING_PERIOD,        /* Sentence ends without terminal punctuation */
+    ERR_MISSING_COMMA,         /* Comma required before conjunction/clause   */
+    ERR_MISSING_QMARK,         /* Interrogative sentence ends with '.' not '?' */
+    ERR_MISSING_COLON,         /* 'ati'/'ngo' without following ':' or '"'   */
+    ERR_WRONG_PUNCT,           /* Wrong punctuation mark for this context     */
+    ERR_EXTRA_PUNCT,           /* Unnecessary punctuation mark                */
 } ErrorType;
 
 typedef struct {
@@ -739,5 +746,12 @@ void kin_strlower(const char *src, char *dst, size_t dstlen);
 bool kin_starts_with(const char *s, const char *prefix);
 bool kin_ends_with(const char *s, const char *suffix);
 void kin_str_trim(char *s);
+
+/* punctuation.c — punctuation placement rules */
+void kin_check_punctuation(SentenceAnalysis *sa);
+
+/* validator.c — validation report output and file handling */
+void kin_validate_text(const char *text);
+void kin_validate_file(const char *path);
 
 #endif /* KINYARWANDA_H */
