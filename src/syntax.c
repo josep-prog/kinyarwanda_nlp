@@ -203,7 +203,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
 
                 snprintf(sug, sizeof(sug),
                     "Hindura '%s' ugashyira '%s'. "
-                    "Indangasano y'intera igomba kuba '%s' (inteko %d). / "
+                    "Indangasano ya ntera igomba kuba '%s' (inteko %d). / "
                     "Replace '%s' with '%s'. "
                     "Concordance prefix for class %d must be '%s'.",
                     next->surface,

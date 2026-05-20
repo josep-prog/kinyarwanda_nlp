@@ -48,7 +48,7 @@ static const char *error_type_tag(ErrorType t) {
 
 static const char *error_type_rw(ErrorType t) {
     switch (t) {
-        case ERR_ADJ_AGREEMENT:       return "Indangasano y'intera";
+        case ERR_ADJ_AGREEMENT:       return "Indangasano ya ntera";
         case ERR_POSS_AGREEMENT:      return "Ikinyazina ngenera";
         case ERR_NO_VERB:             return "Nta nshinga";
         case ERR_UNKNOWN_WORD:        return "Ijambo ridaziwe";
@@ -330,7 +330,9 @@ void kin_validate_file(const char *path) {
             snprintf(cmd, sizeof(cmd),
                 "libreoffice --headless --convert-to txt:Text "
                 "\"%s\" --outdir /tmp/ 2>/dev/null", path);
-            (void)system(cmd);
+            if (system(cmd) != 0) {
+                /* libreoffice unavailable; rename below will detect failure */
+            }
             /* libreoffice writes <basename>.txt in /tmp/ */
             const char *base = strrchr(path, '/');
             base = base ? base + 1 : path;

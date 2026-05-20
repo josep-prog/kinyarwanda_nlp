@@ -485,7 +485,7 @@ static void print_noun_reconstruction(const Token *t) {
         if (c_split_nzi)
             printf("       Itegeko:  %c+y\xe2\x86\x92z \xc2\xa7"
                    "%s "
-                   "(Ukwiyunga: %c yiyunga na y y'intera -yi bikabyara z; "
+                   "(Ukwiyunga: %c yiyunga na y ya ntera -yi bikabyara z; "
                    "%s+yi \xe2\x86\x92 %.*szi)\n",
                    nzi_underlying,
                    nzi_underlying == 'g' ? "3.9.2" : "3.9.4",
@@ -515,7 +515,7 @@ static void print_noun_reconstruction(const Token *t) {
                        d_m->form, rt_m->form, t->verb_root, c_fv);
                 printf("       Itegeko:  %c+y\xe2\x86\x92z \xc2\xa7"
                        "%s "
-                       "(Ukwiyunga: %c yiyunga na y y'intera -yi bikabyara z; "
+                       "(Ukwiyunga: %c yiyunga na y ya ntera -yi bikabyara z; "
                        "%s+yi \xe2\x86\x92 %.*szi)\n",
                        nzi_underlying,
                        nzi_underlying == 'g' ? "3.9.2" : "3.9.4",
