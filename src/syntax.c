@@ -162,7 +162,7 @@ void kin_check_syntax(SentenceAnalysis *sa) {
 
         if (!all_interj && !is_fragment && !is_nominal_pred) {
             add_error(sa, ERR_NO_VERB, -1,
-                "Iyi nteruro ntagira inshinga / "
+                "Iyi nteruro ntifite inshinga / "
                 "This sentence has no verb.",
                 "Ongeraho inshinga (Add a verb).");
         }
