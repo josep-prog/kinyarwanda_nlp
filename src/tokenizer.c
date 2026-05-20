@@ -122,12 +122,14 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
          * based on context: OPEN when no unmatched open quote precedes it;  *
          * CLOSE otherwise.  Curly " (U+201C) is always OPEN, " (U+201D)    *
          * always CLOSE.                                                      */
-        if (*p == ',')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COMMA);      p++; continue; }
-        if (*p == '.')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_PERIOD);     p++; continue; }
-        if (*p == '?')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_QUESTION);   p++; continue; }
-        if (*p == '!')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_EXCLAIM);    p++; continue; }
-        if (*p == ';')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_SEMICOLON);  p++; continue; }
-        if (*p == ':')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COLON);      p++; continue; }
+        if (*p == ',')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COMMA);       p++; continue; }
+        if (*p == '.')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_PERIOD);      p++; continue; }
+        if (*p == '?')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_QUESTION);    p++; continue; }
+        if (*p == '!')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_EXCLAIM);     p++; continue; }
+        if (*p == ';')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_SEMICOLON);   p++; continue; }
+        if (*p == ':')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_COLON);       p++; continue; }
+        if (*p == '(')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_PAREN_OPEN);  p++; continue; }
+        if (*p == ')')  { count += emit_punct(out,count,max_tokens,p,1,PUNCT_PAREN_CLOSE); p++; continue; }
         if (*p == '"')  {
             /* ASCII " is ambiguous: open when no prior unmatched open exists,
              * close otherwise (toggle logic). */
@@ -162,13 +164,50 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
             (unsigned char)p[2]==0x99) {
             count += emit_punct(out,count,max_tokens,p,3,PUNCT_QUOTE_CLOSE); p+=3; continue;
         }
+        /* UTF-8 U+00AB LEFT-POINTING DOUBLE ANGLE QUOTATION MARK  C2 AB  «
+         * Used in formal Kinyarwanda for titles and outer quotation layer.   */
+        if ((unsigned char)p[0]==0xC2 && (unsigned char)p[1]==0xAB) {
+            count += emit_punct(out,count,max_tokens,p,2,PUNCT_QUOTE_OPEN);  p+=2; continue;
+        }
+        /* UTF-8 U+00BB RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK C2 BB  » */
+        if ((unsigned char)p[0]==0xC2 && (unsigned char)p[1]==0xBB) {
+            count += emit_punct(out,count,max_tokens,p,2,PUNCT_QUOTE_CLOSE); p+=2; continue;
+        }
+        /* ASCII << and >> — common keyboard substitutes for « and ».
+         * Treated identically to the Unicode guillemets.                     */
+        if (p[0]=='<' && p[1]=='<') {
+            count += emit_punct(out,count,max_tokens,p,2,PUNCT_QUOTE_OPEN);  p+=2; continue;
+        }
+        if (p[0]=='>' && p[1]=='>') {
+            count += emit_punct(out,count,max_tokens,p,2,PUNCT_QUOTE_CLOSE); p+=2; continue;
+        }
+        /* UTF-8 U+2013 EN DASH  E2 80 93  –
+         * UTF-8 U+2014 EM DASH  E2 80 94  —
+         * Used as list-bullet, morpheme marker, or parenthetical separator.  */
+        if ((unsigned char)p[0]==0xE2 && (unsigned char)p[1]==0x80 &&
+            ((unsigned char)p[2]==0x93 || (unsigned char)p[2]==0x94)) {
+            count += emit_punct(out,count,max_tokens,p,3,PUNCT_DASH); p+=3; continue;
+        }
+        /* ASCII -- (double hyphen) — keyboard substitute for en/em dash.     */
+        if (p[0]=='-' && p[1]=='-' && p[2]!= '-') {
+            count += emit_punct(out,count,max_tokens,p,2,PUNCT_DASH); p+=2; continue;
+        }
 
         /* Find end of current word (whitespace, punctuation, or double quote) */
         const char *word_end = p;
         while (*word_end && *word_end != ' ' && *word_end != '\t' &&
                *word_end != '\n' && *word_end != '\r' &&
                !(*word_end=='.'||*word_end==','||*word_end=='!'||
-                 *word_end=='?'||*word_end==';'||*word_end==':') &&
+                 *word_end=='?'||*word_end==';'||*word_end==':'||
+                 *word_end=='('||*word_end==')') &&
+               !((*word_end=='<'||*word_end=='>') && *(word_end+1)==*word_end) &&
+               !(*word_end=='-' && *(word_end+1)=='-' && *(word_end+2)!='-') &&
+               !((unsigned char)*word_end==0xC2 &&
+                 ((unsigned char)*(word_end+1)==0xAB ||
+                  (unsigned char)*(word_end+1)==0xBB)) &&
+               !((unsigned char)*word_end==0xE2 && (unsigned char)*(word_end+1)==0x80 &&
+                 ((unsigned char)*(word_end+2)==0x93 ||
+                  (unsigned char)*(word_end+2)==0x94)) &&
                !is_dquote(word_end))
             word_end++;
 

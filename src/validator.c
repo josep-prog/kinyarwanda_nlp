@@ -43,6 +43,8 @@ static const char *error_type_tag(ErrorType t) {
         case ERR_WRONG_PUNCT:         return "WRONG_PUNCT";
         case ERR_EXTRA_PUNCT:         return "EXTRA_PUNCT";
         case ERR_MISSING_EXCLAIM:     return "MISSING_EXCLAIM";
+        case ERR_UNBALANCED_QUOTE:    return "UNBALANCED_QUOTE";
+        case ERR_UNBALANCED_PAREN:    return "UNBALANCED_PAREN";
         default:                      return "ERROR";
     }
 }
@@ -66,15 +68,18 @@ static const char *error_type_rw(ErrorType t) {
         case ERR_WRONG_PUNCT:         return "Ikirango kidahuye";
         case ERR_EXTRA_PUNCT:         return "Ikirango kirenze";
         case ERR_MISSING_EXCLAIM:     return "Nta kirango cy'ubwishime";
+        case ERR_UNBALANCED_QUOTE:    return "Inyandiko ituzuye";
+        case ERR_UNBALANCED_PAREN:    return "Imbyino ituzuye";
         default:                      return "Ikindi";
     }
 }
 
 static bool is_punct_error(ErrorType t) {
-    return (t == ERR_MISSING_PERIOD   || t == ERR_MISSING_COMMA  ||
-            t == ERR_MISSING_QMARK    || t == ERR_MISSING_COLON  ||
-            t == ERR_WRONG_PUNCT      || t == ERR_EXTRA_PUNCT    ||
-            t == ERR_MISSING_EXCLAIM);
+    return (t == ERR_MISSING_PERIOD   || t == ERR_MISSING_COMMA    ||
+            t == ERR_MISSING_QMARK    || t == ERR_MISSING_COLON    ||
+            t == ERR_WRONG_PUNCT      || t == ERR_EXTRA_PUNCT      ||
+            t == ERR_MISSING_EXCLAIM  || t == ERR_UNBALANCED_QUOTE  ||
+            t == ERR_UNBALANCED_PAREN);
 }
 
 /* ── Formatting helpers ───────────────────────────────────────────────────── */

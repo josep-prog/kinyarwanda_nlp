@@ -232,6 +232,9 @@ typedef enum {
     PUNCT_COLON,           /* : – introduces a list or direct speech       */
     PUNCT_QUOTE_OPEN,      /* " or « – opens quoted/direct speech          */
     PUNCT_QUOTE_CLOSE,     /* " or » – closes quoted/direct speech         */
+    PUNCT_PAREN_OPEN,      /* (  – opens a parenthetical remark            */
+    PUNCT_PAREN_CLOSE,     /* )  – closes a parenthetical remark           */
+    PUNCT_DASH,            /* – — or -- clause/list separator              */
 } PunctType;
 
 /* ─── Verb tense (ibihe by'inshinga) ─────────────────────────────────────────
@@ -517,10 +520,12 @@ typedef enum {
     ERR_MISSING_PERIOD,        /* Sentence ends without terminal punctuation */
     ERR_MISSING_COMMA,         /* Comma required before conjunction/clause   */
     ERR_MISSING_QMARK,         /* Interrogative sentence ends with '.' not '?' */
-    ERR_MISSING_COLON,         /* 'ati'/'ngo' without following ':' or '"'   */
-    ERR_WRONG_PUNCT,           /* Wrong punctuation mark for this context     */
-    ERR_EXTRA_PUNCT,           /* Unnecessary punctuation mark                */
-    ERR_MISSING_EXCLAIM,       /* Exclamative sentence ends with '.' not '!'  */
+    ERR_MISSING_COLON,         /* speech particle without following ':' or '"' */
+    ERR_WRONG_PUNCT,           /* Wrong punctuation mark for this context      */
+    ERR_EXTRA_PUNCT,           /* Unnecessary punctuation mark                 */
+    ERR_MISSING_EXCLAIM,       /* Exclamative sentence ends with '.' not '!'   */
+    ERR_UNBALANCED_QUOTE,      /* Opening/closing quotes not paired            */
+    ERR_UNBALANCED_PAREN,      /* Opening/closing parentheses not paired       */
 } ErrorType;
 
 typedef struct {

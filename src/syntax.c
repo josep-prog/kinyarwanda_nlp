@@ -27,6 +27,24 @@
  *
  * RULE 4 – Unknown words
  *   Words tagged POS_FOREIGN that are not proper nouns are flagged.
+ *
+ * RULE 10 – Cross-word connector elision (ikata ry'inyajwi hagati y'amagambo)
+ *   A connector/conjunction whose full form ends in a vowel MUST be written
+ *   in its elided form (final vowel dropped + apostrophe) when immediately
+ *   followed by a word beginning with a vowel.  RALC §12.1.
+ *
+ *   Affected connectors and their elided forms:
+ *     ya→y'  wa→w'  ba→b'  rya→ry'  cya→cy'  bya→by'
+ *     za→z'  rwa→rw' twa→tw' bwa→bw' kwa→kw'  hwa→hw'
+ *     na→n'  nka→nk'
+ *
+ *   Exceptions (RALC §12.3–12.4 — these forms never elide):
+ *     ku, mu   — prepositions: "ku ishuri" (not "k'ishuri")
+ *     ni, si   — copula/negation: "ni inka" (not "n'inka" in copula context)
+ *     nyiri    — possessive title: "nyiri inzu" (not "nyir'inzu")
+ *
+ *   e.g.  "inka y'undi yagiye."   ✓   "n'umugore we."   ✓
+ *         "inka ya undi yagiye."  ✗   "na umugore we."  ✗
  */
 
 #include <ctype.h>
@@ -717,6 +735,77 @@ void kin_check_syntax(SentenceAnalysis *sa) {
             " / Replace '%s' with '%s'.",
             t->surface, corrected, t->surface, corrected);
         add_error(sa, ERR_SPELLING, i, msg, sug);
+    }
+
+    /* RULE 10: Cross-word connector elision (ikata ry'inyajwi hagati y'amagambo)
+     * Connectors/conjunctions in their full vowel-final form must be written
+     * as elided (drop final vowel + apostrophe) before a vowel-initial word.
+     * Source: RALC Orthography Rules §12.1 (Ikata ry'inyajwi).
+     *
+     * Exceptions that NEVER elide (§12.3-12.4):
+     *   ku, mu  — prepositions
+     *   ni, si  — copula / negative copula
+     *   nyiri   — possessive title
+     * Numbers (POS_NUMBER) and punctuation tokens are also skipped.         */
+    static const struct { const char *full; const char *elided; }
+    CONN_ELISION[] = {
+        /* Possessive connectors (ibinyazina ngenera) */
+        {"ya",  "y'"},   /* Nt.4, Nt.6, Nt.9  */
+        {"wa",  "w'"},   /* Nt.1, Nt.3         */
+        {"ba",  "b'"},   /* Nt.2               */
+        {"rya", "ry'"},  /* Nt.5               */
+        {"cya", "cy'"},  /* Nt.7               */
+        {"bya", "by'"},  /* Nt.8               */
+        {"za",  "z'"},   /* Nt.10, Nt.12       */
+        {"rwa", "rw'"},  /* Nt.11              */
+        {"twa", "tw'"},  /* Nt.13              */
+        {"bwa", "bw'"},  /* Nt.14              */
+        {"kwa", "kw'"},  /* Nt.15              */
+        {"hwa", "hw'"},  /* Nt.16              */
+        /* Conjunctions */
+        {"na",  "n'"},
+        {"nka", "nk'"},
+        {NULL,  NULL}
+    };
+
+    for (int i = 0; i + 1 < sa->token_count; i++) {
+        const Token *tc = &sa->tokens[i];      /* connector candidate  */
+        const Token *tn = &sa->tokens[i + 1];  /* following word       */
+
+        /* Skip punctuation tokens on either side */
+        if (tc->pos == POS_PUNCTUATION || tn->pos == POS_PUNCTUATION) continue;
+        /* Skip number tokens as the next word */
+        if (tn->pos == POS_NUMBER) continue;
+
+        /* Find this token's lower form in the elision table */
+        const char *elided = NULL;
+        for (int k = 0; CONN_ELISION[k].full; k++) {
+            if (strcmp(tc->lower, CONN_ELISION[k].full) == 0) {
+                elided = CONN_ELISION[k].elided;
+                break;
+            }
+        }
+        if (!elided) continue;
+
+        /* Check if the following word starts with a vowel */
+        if (!tn->lower[0] || !is_vowel_ch(tn->lower[0])) continue;
+
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        snprintf(msg, sizeof(msg),
+            "Ijambo '%s' riri imbere y'ijambo ritangira indomo ('%s') — "
+            "inyajwi isoza '%s' igomba gukatwa (kaswe), wandika '%s%s'. / "
+            "'%s' precedes a vowel-initial word ('%s') — final vowel must be "
+            "elided; write '%s%s' instead.",
+            tc->surface, tn->surface, tc->surface,
+            elided, tn->surface,
+            tc->surface, tn->surface,
+            elided, tn->surface);
+        snprintf(sug, sizeof(sug),
+            "Hindura '%s %s' ugakoresheje '%s%s'. / "
+            "Replace '%s %s' with '%s%s'.",
+            tc->surface, tn->surface, elided, tn->surface,
+            tc->surface, tn->surface, elided, tn->surface);
+        add_error(sa, ERR_VOWEL_HIATUS, i, msg, sug);
     }
 
     sa->is_complete = sa->has_verb && (sa->error_count == 0);
