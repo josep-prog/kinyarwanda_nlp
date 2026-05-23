@@ -782,7 +782,6 @@ static const InvEntry INVARIABLES[] = {
     { "ariko",   POS_CONJUNCTION },  /* but / however                      */
     { "nyamara", POS_CONJUNCTION },  /* however / yet                      */
     { "keretse", POS_CONJUNCTION },  /* except / unless                    */
-    { "kuko",    POS_CONJUNCTION },  /* because                            */
     { "kubera",  POS_CONJUNCTION },  /* because of                         */
     { "none",    POS_CONJUNCTION },  /* now / then / so                    */
     { "maze",    POS_CONJUNCTION },  /* and then (sequence)                */
@@ -826,14 +825,32 @@ static const InvEntry INVARIABLES[] = {
     { "atari",   POS_VERB_CONJ   }, /* nt.1  neg past copula: he was not   */
     { "ntari",   POS_VERB_CONJ   }, /* 1sg   neg past copula: I was not    */
     { "amen",    POS_INTERJECTION}, /* Amen (Hebrew loanword, invariable)   */
-    /* ── "kuzizi" (to know) conjugated forms ─────────────────────────────  */
-    /* These end in -i (not standard -a/-e), caught here as special forms   */
-    { "nzi",     POS_VERB_CONJ   }, /* 1sg: I know                          */
-    { "uzi",     POS_VERB_CONJ   }, /* 2sg: you know                        */
-    { "bazi",    POS_VERB_CONJ   }, /* nt.2: they know                      */
-    { "tuzi",    POS_VERB_CONJ   }, /* 1pl: we know                         */
-    { "sinzi",   POS_VERB_CONJ   }, /* 1sg neg kuzizi: I don't know         */
-    /* "muzi" (2pl: you know) OMITTED — conflicts with umuzi (homestead) in KNOWN_WORDS */
+    /* ── kumenya (to know) – irregular stative-present paradigm ──────────  *
+     * These forms end in -i (not the standard FV -a or -e) and cannot be  *
+     * reached by the regular conjugation engine.  Root: -zi- with FV -i.  *
+     * Source: REB textbooks S4–S6; Kinyarwanda/Verbs (Wikibooks).         *
+     * Positive forms                                                        */
+    { "nzi",     POS_VERB_CONJ   }, /* 1sg:      I know                     */
+    { "uzi",     POS_VERB_CONJ   }, /* 2sg:      you know                   */
+    { "azi",     POS_VERB_CONJ   }, /* Nt.1 3sg: he/she knows               */
+    { "bazi",    POS_VERB_CONJ   }, /* Nt.2 3pl: they know                  */
+    { "tuzi",    POS_VERB_CONJ   }, /* 1pl:      we know                    */
+    { "bizi",    POS_VERB_CONJ   }, /* Nt.8:     it/they know (bi+zi)       */
+    /* "muzi" (2pl: you know) OMITTED — conflicts with umuzi (homestead)   */
+    /* Negative forms                                                        */
+    { "sinzi",   POS_VERB_CONJ   }, /* 1sg neg:      I don't know           */
+    { "ntazi",   POS_VERB_CONJ   }, /* Nt.1 3sg neg: he/she doesn't know    */
+    { "ntibazi", POS_VERB_CONJ   }, /* Nt.2 3pl neg: they don't know        */
+    { "ntibizi", POS_VERB_CONJ   }, /* Nt.8 neg:     it doesn't know        */
+    /* ── kumenya + ko (know-that compounds) ──────────────────────────────  *
+     * Contracted form of [stative] + complementizer "ko" = "know that".   *
+     * Common in speech; both parts fused as a single orthographic word.    */
+    { "nziko",   POS_VERB_CONJ   }, /* 1sg:      I know that                */
+    { "uziko",   POS_VERB_CONJ   }, /* 2sg:      you know that              */
+    { "aziko",   POS_VERB_CONJ   }, /* Nt.1 3sg: he/she knows that          */
+    { "baziko",  POS_VERB_CONJ   }, /* Nt.2 3pl: they know that             */
+    { "tuziko",  POS_VERB_CONJ   }, /* 1pl:      we know that               */
+    { "biziko",  POS_VERB_CONJ   }, /* Nt.8:     it knows that              */
     /* ── Short verb forms too small for morphological detection ──────────  */
     { "mpa",     POS_VERB_CONJ   }, /* 1sg: I give (guha, 1sg n→m before p) */
     { "mbe",     POS_VERB_CONJ   }, /* 1sg subj/request: let me (be)        */
@@ -845,7 +862,7 @@ static const InvEntry INVARIABLES[] = {
     { "uwari",    POS_VERB_CONJ  }, /* relative copula: the one who was     */
     { "ne",       POS_CONJUNCTION}, /* and (variant of 'na' before vowel)   */
     /* ── Negative forms with inner verbs ending in 'i' ───────────────────  */
-    { "ntuzi",    POS_VERB_CONJ  }, /* nt.1sg neg: we don't know (kuzizi)   */
+    { "ntuzi",    POS_VERB_CONJ  }, /* 2sg neg: you don't know (nti+u+zi)   */
     { "ntiyari",  POS_VERB_CONJ  }, /* neg copula Nt.1 past: was not        */
     { "sinzongera",POS_VERB_CONJ }, /* neg: will not add again (si+zongera) */
     { "ntabwo",  POS_ADVERB      }, /* not at all / absolutely not         */

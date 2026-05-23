@@ -37,6 +37,7 @@ static const char *error_type_tag(ErrorType t) {
         case ERR_VOWEL_HIATUS:        return "VOWEL_HIATUS";
         case ERR_VERB_SELECTION:      return "VERB_SELECTION";
         case ERR_MISSING_LOCATIVE:    return "MISSING_LOCATIVE";
+        case ERR_WRONG_LOCATIVE:      return "WRONG_LOCATIVE";
         case ERR_MISSING_PERIOD:      return "MISSING_PERIOD";
         case ERR_MISSING_COMMA:       return "MISSING_COMMA";
         case ERR_MISSING_QMARK:       return "MISSING_QMARK";
@@ -46,6 +47,7 @@ static const char *error_type_tag(ErrorType t) {
         case ERR_MISSING_EXCLAIM:     return "MISSING_EXCLAIM";
         case ERR_UNBALANCED_QUOTE:    return "UNBALANCED_QUOTE";
         case ERR_UNBALANCED_PAREN:    return "UNBALANCED_PAREN";
+        case ERR_WRONG_VERB_MOOD:     return "WRONG_VERB_MOOD";
         default:                      return "ERROR";
     }
 }
@@ -63,6 +65,7 @@ static const char *error_type_rw(ErrorType t) {
         case ERR_VOWEL_HIATUS:        return "Iranya ry'impanvu";
         case ERR_VERB_SELECTION:      return "Guhitamo inshinga";
         case ERR_MISSING_LOCATIVE:    return "Nta mugereka w'ahantu";
+        case ERR_WRONG_LOCATIVE:      return "Indangahantu itakuye";
         case ERR_MISSING_PERIOD:      return "Nta kirango cy'iherezo";
         case ERR_MISSING_COMMA:       return "Nta koma";
         case ERR_MISSING_QMARK:       return "Nta kibazo";
@@ -72,6 +75,7 @@ static const char *error_type_rw(ErrorType t) {
         case ERR_MISSING_EXCLAIM:     return "Nta kirango cy'ubwishime";
         case ERR_UNBALANCED_QUOTE:    return "Inyandiko ituzuye";
         case ERR_UNBALANCED_PAREN:    return "Imbyino ituzuye";
+        case ERR_WRONG_VERB_MOOD:     return "Uburyo bw'inshinga";
         default:                      return "Ikindi";
     }
 }

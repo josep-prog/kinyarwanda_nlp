@@ -517,6 +517,7 @@ typedef enum {
     ERR_VOWEL_HIATUS,          /* Two adjacent vowels (iranya ry'impanvu)  */
     ERR_VERB_SELECTION,        /* Wrong verb choice (e.g. kugenda vs kujya) */
     ERR_MISSING_LOCATIVE,      /* Locative connector (ku/mu) missing before destination noun */
+    ERR_WRONG_LOCATIVE,        /* mu used where muri required, or vice versa (ku/kuri)       */
     /* ── Punctuation placement errors (ibirango) ──────────────────────── */
     ERR_MISSING_PERIOD,        /* Sentence ends without terminal punctuation */
     ERR_MISSING_COMMA,         /* Comma required before conjunction/clause   */
@@ -527,6 +528,8 @@ typedef enum {
     ERR_MISSING_EXCLAIM,       /* Exclamative sentence ends with '.' not '!'   */
     ERR_UNBALANCED_QUOTE,      /* Opening/closing quotes not paired            */
     ERR_UNBALANCED_PAREN,      /* Opening/closing parentheses not paired       */
+    /* ── Verb mood errors (uburyo bw'inshinga) ─────────────────────────── */
+    ERR_WRONG_VERB_MOOD,       /* Indicative verb after purpose "ngo"/"kugira ngo" — subjunctive required */
 } ErrorType;
 
 typedef struct {

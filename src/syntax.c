@@ -867,5 +867,204 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         add_error(sa, ERR_VOWEL_HIATUS, i, msg, sug);
     }
 
+    /* RULE 11: Locative form selection — mu/muri and ku/kuri             *
+     *                                                                     *
+     * "-ri" is the locative copula (verb "to be" in locative form).      *
+     * It is REQUIRED when the complement is:                             *
+     *   • a personal pronoun  (muri mwe, muri bo, kuri we, kuri mwe…)   *
+     *   • a proper name       (muri Egiputa, muri Kristo — handled below)*
+     *                                                                     *
+     * It is WRONG when the complement is a plain common noun:            *
+     *   muri nzu → mu nzu  /  muri gihugu → mu gihugu                   *
+     *                                                                     *
+     * Source: corpus analysis of Bibiliya Yera (30,984 sentences):       *
+     *   muri + personal pronoun: 1,156 instances (zero exceptions)       *
+     *   mu  + common noun:       13,626 instances (zero muri+common_noun)*
+     *   kuri + personal pronoun: 200+ instances                          *
+     *   ku  + common noun:       6,197 instances                         *
+     *                                                                     *
+     * 11a: mu  + PRON_PERSONAL  → should be "muri"                      *
+     * 11b: ku  + PRON_PERSONAL  → should be "kuri"                      *
+     * 11c: muri + common noun   → should be "mu"                        */
+    for (int i = 0; i < sa->token_count - 1; i++) {
+        const Token *loc = &sa->tokens[i];
+        if (loc->pos != POS_LOCATIVE) continue;
+
+        /* Find next non-punctuation token */
+        int ni = i + 1;
+        while (ni < sa->token_count && sa->tokens[ni].pos == POS_PUNCTUATION) ni++;
+        if (ni >= sa->token_count) continue;
+        const Token *nxt = &sa->tokens[ni];
+
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+
+        /* 11a: mu + personal pronoun */
+        if (strcmp(loc->lower, "mu") == 0 &&
+            nxt->pos == POS_PRONOUN && nxt->pron_type == PRON_PERSONAL) {
+            snprintf(msg, sizeof(msg),
+                "'mu' ntishyiranye n'ikinyazina '%s'. "
+                "Indangahantu 'mu' isaba '-ri' imbere y'ibinyazina ngenga. "
+                "'mu' cannot precede a personal pronoun '%s'; "
+                "the locative copula '-ri' is required.",
+                nxt->surface, nxt->surface);
+            snprintf(sug, sizeof(sug),
+                "Hindura 'mu %s' ugakoresheje 'muri %s'. "
+                "Replace 'mu %s' with 'muri %s'.",
+                nxt->surface, nxt->surface, nxt->surface, nxt->surface);
+            add_error(sa, ERR_WRONG_LOCATIVE, i, msg, sug);
+        }
+
+        /* 11b: ku + personal pronoun */
+        if (strcmp(loc->lower, "ku") == 0 &&
+            nxt->pos == POS_PRONOUN && nxt->pron_type == PRON_PERSONAL) {
+            snprintf(msg, sizeof(msg),
+                "'ku' ntishyiranye n'ikinyazina '%s'. "
+                "Indangahantu 'ku' isaba '-ri' imbere y'ibinyazina ngenga. "
+                "'ku' cannot precede a personal pronoun '%s'; "
+                "use 'kuri' instead.",
+                nxt->surface, nxt->surface);
+            snprintf(sug, sizeof(sug),
+                "Hindura 'ku %s' ugakoresheje 'kuri %s'. "
+                "Replace 'ku %s' with 'kuri %s'.",
+                nxt->surface, nxt->surface, nxt->surface, nxt->surface);
+            add_error(sa, ERR_WRONG_LOCATIVE, i, msg, sug);
+        }
+
+        /* 11c: muri + common noun (no demonstrative) → should be mu
+         * Exception: muri + proper noun (muri Egiputa) is CORRECT.
+         * Exception: when the next token is POS_CONJUNCTION (demonstrative
+         * like icyo/iyo/uwo tagged as CONJ), "muri icyo gihe" is correct. */
+        if (strcmp(loc->lower, "muri") == 0 &&
+            nxt->pos == POS_NOUN && !nxt->is_proper_noun) {
+            snprintf(msg, sizeof(msg),
+                "'muri' ntishyiranye n'izina mbonera '%s'. "
+                "Indangahantu 'muri' ikoreshwa imbere y'ibinyazina ngenga "
+                "n'amazina bwite (akarere/igihugu), si imbere y'amazina mbonera. "
+                "'muri' is used before pronouns and proper names, "
+                "not before common nouns like '%s'.",
+                nxt->surface, nxt->surface);
+            snprintf(sug, sizeof(sug),
+                "Hindura 'muri %s' ugakoresheje 'mu %s'. "
+                "Replace 'muri %s' with 'mu %s'.",
+                nxt->surface, nxt->surface, nxt->surface, nxt->surface);
+            add_error(sa, ERR_WRONG_LOCATIVE, i, msg, sug);
+        }
+    }
+
+    /* RULE 12: Purpose particle "ngo" / "kugira ngo" requires subjunctive mood
+     *
+     * In Kinyarwanda the purpose conjunction "ngo" ("in order to / so that")
+     * and the compound "kugira ngo" ("so that / in order that") MUST be
+     * followed by a verb in the subjunctive (ikigombero: SP + stem + -e).
+     *
+     * Corpus evidence (Bibiliya Yera, 30 984 sentences):
+     *   All 1 158 instances of "kugira ngo" are followed by a subjunctive or
+     *   negative-relative verb: abe, babone, mumenye, ubone, mubone, mube,
+     *   menye (TENSE_SUBJUNCTIVE) and hatagira, itagira (TENSE_NEG_RELATIVE).
+     *   Zero occurrences of an indicative verb after "kugira ngo".
+     *
+     * Detection:
+     *   "ngo" tagged POS_VERB_PARTICLE used as a PURPOSE particle
+     *   (not hearsay) is identified by context:
+     *     • Preceded by "kugira" (POS_VERB_INF, stem=="gir") — definite purpose
+     *     • Not sentence-initial AND not immediately after a clause/sentence
+     *       boundary mark — mid-sentence ngo is purpose in formal/written text
+     *
+     * Only clear indicative tenses are flagged:
+     *   TENSE_PRESENT / TENSE_PRESENT_NORA / TENSE_PAST_PERF /
+     *   TENSE_PAST_IMPF / TENSE_FUTURE
+     *
+     * Source: Bibiliya Yera corpus + Zorc & Nibagwire (1990) §7.4;
+     *         REB S4 textbook (ikigombero section).
+     */
+    for (int i = 0; i < sa->token_count; i++) {
+        Token *t = &sa->tokens[i];
+        if (t->pos != POS_VERB_PARTICLE) continue;
+        if (strcmp(t->lower, "ngo") != 0) continue;
+
+        /* ── Distinguish purpose ngo from hearsay ngo ───────────────────── */
+        bool is_purpose = false;
+
+        /* Case A: immediately preceded by kugira (verb inf, stem "gir") */
+        for (int k = i - 1; k >= 0; k--) {
+            Token *prev = &sa->tokens[k];
+            if (prev->pos == POS_PUNCTUATION) continue;
+            if (prev->pos == POS_VERB_INF &&
+                strcmp(prev->stem, "gir") == 0)
+                is_purpose = true;
+            break;
+        }
+
+        /* Case B: mid-sentence ngo — not sentence-initial and not right after
+         * a clause or sentence boundary (comma, semicolon, period…).       */
+        if (!is_purpose && i > 0) {
+            Token *prev = &sa->tokens[i - 1];
+            bool after_boundary = (prev->pos == POS_PUNCTUATION &&
+                                   (prev->is_clause_boundary ||
+                                    prev->is_sent_boundary));
+            if (!after_boundary) is_purpose = true;
+        }
+
+        if (!is_purpose) continue;
+
+        /* ── Find the next conjugated verb (up to 4 tokens ahead) ──────── *
+         * Only nouns and pronouns may intervene between "ngo" and its    *
+         * complement verb (they act as the subject of the purpose clause). *
+         * Any other non-verb token (conjunction, locative, adverb, etc.) *
+         * signals the end of the complement clause scope — stop scanning.  *
+         * Note: some short verb forms (e.g. "abe", "mbe") are stored in   *
+         * INVARIABLES as POS_CONJUNCTION; they end the scope here, which  *
+         * is correct: if the complement verb is already "abe" (subj.), no *
+         * further verb needs to be checked.                                */
+        for (int j = i + 1; j < sa->token_count && j <= i + 4; j++) {
+            Token *vt = &sa->tokens[j];
+            if (vt->pos == POS_PUNCTUATION) {
+                if (vt->is_clause_boundary || vt->is_sent_boundary) break;
+                continue;
+            }
+            /* Subject noun/pronoun of the purpose clause — skip over */
+            if (vt->pos == POS_NOUN || vt->pos == POS_PRONOUN) continue;
+            /* Anything other than a conjugated verb ends the scope */
+            if (vt->pos != POS_VERB_CONJ) break;
+
+            /* Acceptable: subjunctive, neg-relative (hatagira), or unknown */
+            if (vt->verb_tense == TENSE_SUBJUNCTIVE     ||
+                vt->verb_tense == TENSE_SUBJUNCTIVE_LOC ||
+                vt->verb_tense == TENSE_NEG_RELATIVE    ||
+                vt->verb_tense == TENSE_NONE) break;
+
+            /* Flag only unambiguous indicative tenses */
+            if (vt->verb_tense == TENSE_PRESENT      ||
+                vt->verb_tense == TENSE_PRESENT_NORA ||
+                vt->verb_tense == TENSE_PAST_PERF    ||
+                vt->verb_tense == TENSE_PAST_IMPF    ||
+                vt->verb_tense == TENSE_FUTURE) {
+                char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+                snprintf(msg, sizeof(msg),
+                    "Inshinga '%s' ikurikira '%s' igomba kuba mu ikigombero "
+                    "(SP + igicumbi + -e). "
+                    "'%s' follows purpose particle '%s' and must be in the "
+                    "subjunctive (ikigombero: SP + root + e).",
+                    vt->surface, t->surface,
+                    vt->surface, t->surface);
+                /* Build the corrected form: replace final -a with -e */
+                char corrected[KIN_MAX_WORD];
+                strncpy(corrected, vt->surface, sizeof(corrected) - 1);
+                corrected[sizeof(corrected) - 1] = '\0';
+                size_t clen = strlen(corrected);
+                if (clen > 0 && corrected[clen - 1] == 'a')
+                    corrected[clen - 1] = 'e';
+                snprintf(sug, sizeof(sug),
+                    "Hindura '%s' ugakoresheje ikigombero: '%s'. "
+                    "Replace '%s' with its subjunctive form: '%s' "
+                    "(final vowel -a → -e).",
+                    vt->surface, corrected,
+                    vt->surface, corrected);
+                add_error(sa, ERR_WRONG_VERB_MOOD, j, msg, sug);
+            }
+            break;
+        }
+    }
+
     sa->is_complete = sa->has_verb && (sa->error_count == 0);
 }
