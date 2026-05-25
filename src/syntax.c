@@ -347,158 +347,133 @@ void kin_check_syntax(SentenceAnalysis *sa) {
 
     /* RULE 5: Subject-verb agreement (indangasubizi y'inshinga na izina)  *
      * A conjugated verb's subject prefix (SP) must match the class of the  *
-     * subject noun that precedes it.  Book p.88 + year-4 p.102+.           *
-     * We only check adjacent noun → verb pairs where both classes are known */
-    for (int i = 0; i < sa->token_count - 1; i++) {
-        Token *noun = &sa->tokens[i];
-        /* Skip punctuation in the outer scan */
-        if (noun->pos == POS_PUNCTUATION) continue;
-        /* Find the next non-punctuation token as the verb candidate */
-        int vi = i + 1;
-        while (vi < sa->token_count && sa->tokens[vi].pos == POS_PUNCTUATION) vi++;
-        if (vi >= sa->token_count) continue;
+     * subject noun.  We use a verb-centric scan: for each conjugated verb,  *
+     * walk back through the token list (skipping adj/adv/conj) to find the  *
+     * nearest preceding noun.  This correctly handles non-adjacent pairs    *
+     * such as "Abantu munini baragenda" (adj between noun and verb) and     *
+     * clauses with intervening conjunctions.  Book p.88 + year-4 p.102+.   */
+    for (int vi = 0; vi < sa->token_count; vi++) {
         Token *verb = &sa->tokens[vi];
-
-        if (noun->pos != POS_NOUN)      continue;
         if (verb->pos != POS_VERB_CONJ) continue;
-        /* Do not check agreement across a clause/sentence boundary.
-         * A comma or period between noun and verb means they belong to
-         * different clauses — subject-verb agreement does not apply.       */
-        {
-            bool boundary_between = false;
-            for (int k = i + 1; k < vi; k++) {
-                if (sa->tokens[k].pos == POS_PUNCTUATION &&
-                    (sa->tokens[k].is_clause_boundary ||
-                     sa->tokens[k].is_sent_boundary)) {
-                    boundary_between = true;
+        /* Verbal nouns are syntactically nouns — skip agreement check.     */
+        if (verb->gram_role == GRAM_ROLE_VERBAL_NOUN) continue;
+        /* Copula locative tenses are impersonal — no agreement obligation. */
+        if (verb->verb_tense == TENSE_COPULA_PAST ||
+            verb->verb_tense == TENSE_COPULA_PRES) continue;
+        /* Skip when the verb's SP class is unknown (class 0).             */
+        if (verb->noun_class == 0) continue;
+
+        /* Scan back for the nearest subject noun, stopping at sentence    *
+         * boundaries and skipping adjectives, adverbs, conjunctions,      *
+         * pronouns, and other non-noun tokens.                            */
+        int noun_idx = -1;
+        for (int j = vi - 1; j >= 0; j--) {
+            const Token *t = &sa->tokens[j];
+            if (t->pos == POS_PUNCTUATION) {
+                if (t->is_sent_boundary || t->is_clause_boundary) break;
+                continue;
+            }
+            if (t->pos == POS_NOUN && t->noun_class > 0) {
+                noun_idx = j;
+                break;
+            }
+            /* Skip adjectives, adverbs, conjunctions, locatives, pronouns */
+            if (t->pos == POS_ADJECTIVE  || t->pos == POS_ADVERB    ||
+                t->pos == POS_CONJUNCTION || t->pos == POS_LOCATIVE  ||
+                t->pos == POS_PRONOUN)
+                continue;
+            /* Any other token type (another verb, unknown word) stops
+             * the search — we cannot safely attribute a subject.         */
+            break;
+        }
+        if (noun_idx < 0) continue;
+
+        Token *noun = &sa->tokens[noun_idx];
+        int nc = noun->noun_class;
+        int vc = verb->noun_class;
+
+        /* Unknown noun class — skip.                                      */
+        if (nc == 0) continue;
+        /* Nt.1 and Nt.3 share SP "a/u"; treat as compatible.             */
+        if ((nc == 1 || nc == 3) && (vc == 1 || vc == 3)) continue;
+        /* Nt.4 and Nt.9 share SP "i"; treat as compatible.               */
+        if ((nc == 4 || nc == 9) && (vc == 4 || vc == 9)) continue;
+        /* Nt.9/Nt.10 are a paired singular/plural class; compatible.      */
+        if ((nc == 9 || nc == 10) && (vc == 9 || vc == 10)) continue;
+        /* "ya" SP (stored as class 6) is also the Nt.1 past-tense form.  *
+         * e.g. "Imana yaremye ijuru" — Nt.9 noun + ya (Nt.1-past) verb. */
+        if (vc == 6 && (nc == 1 || nc == 3 || nc == 9)) continue;
+
+        if (nc == vc) continue;
+
+        /* Before flagging, scan further back from noun_idx: if an earlier *
+         * noun/verb in the sentence matches vc, then the noun we found is *
+         * an object and the true subject is further back.  Suppress.      */
+        bool has_remote_subject = false;
+        bool crossed_conj = false;
+        for (int j = noun_idx - 1; j >= 0; j--) {
+            const Token *t = &sa->tokens[j];
+            if (t->pos == POS_PUNCTUATION && t->is_sent_boundary) break;
+            int tc = 0;
+            if (t->pos == POS_NOUN && t->noun_class > 0) {
+                tc = t->noun_class;
+            } else if (t->pos == POS_VERB_CONJ && t->noun_class > 0
+                       && t->gram_role != GRAM_ROLE_VERBAL_NOUN) {
+                /* Preceding conjugated verb with the same SP → coordinate  *
+                 * clause sharing the same implicit subject.                */
+                tc = t->noun_class;
+            } else {
+                if (t->pos == POS_CONJUNCTION) crossed_conj = true;
+                continue;
+            }
+            if (tc == vc) { has_remote_subject = true; break; }
+            if ((tc == 4 || tc == 9) && (vc == 4 || vc == 9))
+                { has_remote_subject = true; break; }
+            if ((tc == 1 || tc == 3) && (vc == 1 || vc == 3))
+                { has_remote_subject = true; break; }
+            if ((tc == 9 || tc == 10) && (vc == 9 || vc == 10))
+                { has_remote_subject = true; break; }
+            if (vc == 6 && (tc == 1 || tc == 3 || tc == 9))
+                { has_remote_subject = true; break; }
+            /* Coordinate human subject: [Nt.1/3] kandi [Nt.1/3] + ba-(Nt.2). */
+            if (crossed_conj && vc == 2 && (tc == 1 || tc == 3) && (nc == 1 || nc == 3))
+                { has_remote_subject = true; break; }
+        }
+        if (has_remote_subject) continue;
+
+        /* Sentence-initial capitalised word: may be a human proper noun    *
+         * with SP "a" (class 1/3) regardless of phonological prefix shape. */
+        if (isupper((unsigned char)noun->surface[0]) &&
+            !noun->is_proper_noun && !noun->is_kinyarwanda && (vc == 1 || vc == 3)) {
+            bool sent_initial = (noun_idx == 0);
+            if (!sent_initial) {
+                for (int k = noun_idx - 1; k >= 0; k--) {
+                    if (sa->tokens[k].pos == POS_PUNCTUATION) {
+                        if (sa->tokens[k].is_sent_boundary)
+                            { sent_initial = true; break; }
+                        continue;
+                    }
                     break;
                 }
             }
-            if (boundary_between) continue;
+            if (sent_initial) continue;
         }
-        /* Verbal nouns (izina ryaturutse ku nshinga) are syntactically nouns
-         * even though they carry POS_VERB_CONJ morphology.  They do not
-         * agree with a preceding subject noun — they ARE the subject noun. */
-        if (verb->gram_role == GRAM_ROLE_VERBAL_NOUN) continue;
-        /* Skip when either side has an unknown or ambiguous class */
-        if (noun->noun_class == 0 || verb->noun_class == 0) continue;
-        /* Nt.1 and Nt.3 both use the same SP "a/u"; treat as compatible */
-        int nc = noun->noun_class;
-        int vc = verb->noun_class;
-        if ((nc == 1 || nc == 3) && (vc == 1 || vc == 3)) continue;
-        /* Nt.4 and Nt.9 both use the same SP "i"; treat as compatible.
-         * e.g. "Imana iravuga" — Imana is Nt.9 but iravuga's SP "i" is
-         * stored as Nt.4 (first-match in the SP table).              */
-        if ((nc == 4 || nc == 9) && (vc == 4 || vc == 9)) continue;
-        /* Nt.9 (singular) and Nt.10 (plural) are a paired noun class.
-         * Class 9 nouns used with plural reference take class 10 agreement
-         * e.g. "imbuto zikwiriye" — imbuto is Nt.9 but plural agreement
-         * uses SP "zi" (Nt.10). These are grammatically correct forms.  */
-        if ((nc == 9 || nc == 10) && (vc == 9 || vc == 10)) continue;
-        /* "ya" SP (stored as cls 6) is ambiguous: it is ALSO the Nt.1 past
-         * tense form (a-subject + past 'a' marker → "ya").  Do not flag   *
-         * agreement errors when verb SP class is 6 and noun is Nt.1/3/9.  *
-         * e.g.  "Imana yaremye ijuru" – Nt.9 noun + ya (Nt.1-past) verb.  */
-        if (vc == 6 && (nc == 1 || nc == 3 || nc == 9)) continue;
-        /* Copula + locative forms (TENSE_COPULA_PAST/PRES) are existential   *
-         * constructions and do not follow strict subject-verb agreement.      *
-         * "yariho ubusa busa" = "there was emptiness" – yariho is impersonal.*
-         * "hari" (existential) similarly carries no agreement obligation.     *
-         * Skip agreement checking for all copula locative tenses.            */
-        if (verb->verb_tense == TENSE_COPULA_PAST ||
-            verb->verb_tense == TENSE_COPULA_PRES) continue;
 
-        if (nc != vc) {
-            /* Before flagging, scan further back: if an earlier noun in the
-             * sentence has a class that matches the verb's SP (vc), then the
-             * immediate predecessor is an object, not the subject.  Suppress
-             * the error — the true subject is that earlier noun.
-             * Also treat Nt.4/9 as equivalent (same SP "i") when scanning. */
-            bool has_remote_subject = false;
-            bool crossed_conj = false;
-            for (int j = i - 1; j >= 0; j--) {
-                const Token *t = &sa->tokens[j];
-                /* Stop scanning back at sentence boundaries               */
-                if (t->pos == POS_PUNCTUATION && t->is_sent_boundary) break;
-                int tc = 0;
-                if (t->pos == POS_NOUN && t->noun_class > 0) {
-                    tc = t->noun_class;
-                } else if (t->pos == POS_VERB_CONJ && t->noun_class > 0
-                           && t->gram_role != GRAM_ROLE_VERBAL_NOUN) {
-                    /* A preceding conjugated verb with the same SP class means
-                     * this is a coordinate clause sharing the same implicit
-                     * subject.  e.g. "bitegeke ... , bitandukanye ..." — both
-                     * verbs are class 8; the subject (lights) is established
-                     * by the earlier verb's SP, not by any intervening noun.  */
-                    tc = t->noun_class;
-                } else {
-                    if (t->pos == POS_CONJUNCTION) crossed_conj = true;
-                    continue;
-                }
-                if (tc == vc) { has_remote_subject = true; break; }
-                if ((tc == 4 || tc == 9) && (vc == 4 || vc == 9))
-                    { has_remote_subject = true; break; }
-                if ((tc == 1 || tc == 3) && (vc == 1 || vc == 3))
-                    { has_remote_subject = true; break; }
-                /* Nt.9 (singular) / Nt.10 (plural) are a paired class.
-                 * imbuto (Nt.9) is a valid remote subject for a Nt.10 verb. */
-                if ((tc == 9 || tc == 10) && (vc == 9 || vc == 10))
-                    { has_remote_subject = true; break; }
-                /* "ya" SP (stored as class 6) is also the Nt.1/3/9 past-tense
-                 * form (a + past-TM-a → ya).  A remote Nt.1/3/9 noun or verb
-                 * with the same implicit subject is a valid match for ya- verbs.
-                 * e.g. "Imana irangiza imirimo yakoze" — imirimo is the object
-                 * of the relative clause; yakoze's subject is Imana (Nt.9).    */
-                if (vc == 6 && (tc == 1 || tc == 3 || tc == 9))
-                    { has_remote_subject = true; break; }
-                /* Coordinate subject: [Nt.1/3 noun] kandi [Nt.1/3 noun] + ba-(Nt.2) verb.
-                 * Two human nouns joined by a conjunction collectively take
-                 * class-2 plural agreement (ba-).
-                 * e.g. "umugabo kandi umugore barakora" is correct grammar.    */
-                if (crossed_conj && vc == 2 && (tc == 1 || tc == 3) && (nc == 1 || nc == 3))
-                    { has_remote_subject = true; break; }
-            }
-            if (has_remote_subject) continue;
-
-            /* Sentence-initial capitalised words that the prefix heuristic
-             * assigned a non-human class may be proper names of people.
-             * In Kinyarwanda all human proper nouns take class-1 agreement
-             * (SP "a") regardless of their phonological shape (e.g. Kayini,
-             * Kagome, Rukesha, Butera).  When the noun is sentence-initial,
-             * capitalised, not already confirmed as a proper noun, and the
-             * verb uses human SP (class 1 or 3), suppress the error.      */
-            if (isupper((unsigned char)noun->surface[0]) &&
-                !noun->is_proper_noun && !noun->is_kinyarwanda && (vc == 1 || vc == 3)) {
-                bool sent_initial = (i == 0);
-                if (!sent_initial) {
-                    for (int k = i - 1; k >= 0; k--) {
-                        if (sa->tokens[k].pos == POS_PUNCTUATION) {
-                            if (sa->tokens[k].is_sent_boundary)
-                                { sent_initial = true; break; }
-                            continue;
-                        }
-                        break;
-                    }
-                }
-                if (sent_initial) continue;
-            }
-
-            char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
-            snprintf(msg, sizeof(msg),
-                "Inshinga '%s' ntishyikira izina '%s': "
-                "inteko y'inshinga=%d ariko inteko y'izina=%d. "
-                "Verb '%s' subject prefix (class %d) doesn't agree "
-                "with noun '%s' (class %d).",
-                verb->surface, noun->surface, vc, nc,
-                verb->surface, vc, noun->surface, nc);
-            const NounClass *ncls = kin_get_noun_class(nc);
-            snprintf(sug, sizeof(sug),
-                "Indangasubizi igomba kuba '%s' (inteko %d). "
-                "The subject prefix for class %d should be '%s'.",
-                ncls ? ncls->subj_prefix : "?", nc,
-                nc, ncls ? ncls->subj_prefix : "?");
-            add_error(sa, ERR_SUBJ_VERB_AGREEMENT, i + 1, msg, sug);
-        }
+        char msg[KIN_MAX_MSG], sug[KIN_MAX_MSG];
+        snprintf(msg, sizeof(msg),
+            "Inshinga '%s' ntishyikira izina '%s': "
+            "inteko y'inshinga=%d ariko inteko y'izina=%d. "
+            "Verb '%s' subject prefix (class %d) doesn't agree "
+            "with noun '%s' (class %d).",
+            verb->surface, noun->surface, vc, nc,
+            verb->surface, vc, noun->surface, nc);
+        const NounClass *ncls = kin_get_noun_class(nc);
+        snprintf(sug, sizeof(sug),
+            "Indangasubizi igomba kuba '%s' (inteko %d). "
+            "The subject prefix for class %d should be '%s'.",
+            ncls ? ncls->subj_prefix : "?", nc,
+            nc, ncls ? ncls->subj_prefix : "?");
+        add_error(sa, ERR_SUBJ_VERB_AGREEMENT, vi, msg, sug);
     }
 
     /* RULE 6: Vowel contact (iranya ry'impanvu) – Amategeko y'igenamajwi    *

@@ -1255,18 +1255,8 @@ static void print_pronoun_morphemes(const Token *t)
                    t->noun_class, val);
         else if (t->noun_class > 0)
             printf("  \342\224\224\342\224\200 Inteko: Nt.%d\n", t->noun_class);
-        /* icumi / ijana / igihumbi: PRON_NUMERICAL with noun_class = 0 */
-        if (t->noun_class == 0) {
-            static const struct { const char *w; int v; } BIG[] = {
-                {"icumi",10},{"ijana",100},{"igihumbi",1000},{NULL,0}
-            };
-            for (int bi = 0; BIG[bi].w; bi++) {
-                if (strcmp(t->lower, BIG[bi].w) == 0) {
-                    printf("  \342\224\224\342\224\200 Agaciro: %d\n", BIG[bi].v);
-                    break;
-                }
-            }
-        }
+        if (t->noun_class == 0 && val > 0)
+            printf("  \342\224\224\342\224\200 Agaciro: %d\n", val);
     }
 }
 

@@ -365,30 +365,6 @@
 
 ---
 
-## PART VIII — THE BROADER PLATFORM AND FUTURE ROADMAP
-
-### Chapter 37 — The Seven-Layer AI Platform
-- 37.1 Architecture Overview
-- 37.2 Layer 1 → 2: NLP Engine Feeds G2P
-- 37.3 Layer 2 → 3: G2P Feeds ASR Fine-Tuning (Whisper)
-- 37.4 Layer 2 → 4: G2P Feeds TTS Acoustic Model Training
-- 37.5 Layer 1 → 5: NLP Validates NLLB-200 Translation Output
-- 37.6 Layer 3+4+5 → 6: Conversational Voice Agent with RAG
-- 37.7 Layer 6 → 7: Voice Cloning for Film Dubbing
-
-### Chapter 38 — Planned Features and Known Gaps
-- 38.1 Compound Nouns
-- 38.2 Noun Class Shifts
-- 38.3 Igisantera (Compound Adjective)
-- 38.4 Full Punctuation Restoration for ASR Output
-- 38.5 Demonstrative Proximity Forms 3–6
-- 38.6 Numerals Beyond 7
-- 38.7 REST HTTP Wrapper
-- 38.8 Python pip Package Distribution
-- 38.9 WebAssembly Browser Bundle
-
----
-
 ## APPENDICES
 
 - **Appendix A** — The 16 Noun Classes: Complete Reference Table

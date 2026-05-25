@@ -323,6 +323,29 @@ void kin_tag_token(Token *tok) {
         }
     }
 
+    /* Step 3b → Tree 1: nyiri-/nyira- compound nouns (izina rikomeza)       *
+     * "nyiri-" means "owner/person of X" and "nyira-" is the female variant. *
+     * Both are productive prefixes forming class-1 (human) compound nouns.   *
+     * Examples: nyiricyubahiro (person of dignity), nyirabukwe (mother-in-  *
+     * law), Nyiramongi (woman with many things), nyiriyubutaka (landowner).  *
+     * Capitalised forms are proper nouns; lowercase are common compound nouns.*
+     * Prefix length: 5 for "nyiri" / "nyira"; stem is the remainder.        */
+    {
+        const char *wl = w;   /* w is already lowercase */
+        bool is_nyiri = (strncmp(wl, "nyiri", 5) == 0 && wl[5] != '\0');
+        bool is_nyira = (strncmp(wl, "nyira", 5) == 0 && wl[5] != '\0');
+        if (is_nyiri || is_nyira) {
+            tok->pos            = POS_NOUN;
+            tok->noun_class     = 1;          /* always human Nt.1            */
+            tok->is_kinyarwanda = true;
+            tok->is_proper_noun = isupper((unsigned char)tok->surface[0]);
+            strncpy(tok->stem,             wl + 5, KIN_MAX_STEM - 1);
+            strncpy(tok->detected_prefix,  is_nyira ? "nyira" : "nyiri", 5);
+            tok->detected_prefix[5] = '\0';
+            return;
+        }
+    }
+
     /* Step 4 → Tree 3a (inshinga imbundo): verb infinitive (ku/gu/kw/gw + C + a)? */
     char stem[KIN_MAX_STEM];
     if (kin_is_verb_infinitive(w, stem)) {

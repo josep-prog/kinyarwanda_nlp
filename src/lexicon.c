@@ -168,7 +168,8 @@ bool kin_is_adj_reduplicated(const char *sfx, const char *pfx, char *stem_out) {
  *   PRON_NUMERICAL      Ikinyazina nyamubaro     (umwe...-rindwi per class)
  *   PRON_VOCATIVE       Ikinyazina mpamagazi     (wa — O! address)
  *
- * Gap: demonstrative proximities 3-6 (further from speaker) partially missing.
+ * Demonstrative coverage: proximity 1 (uyu), 2 (uwo), 3 full+reduced (-riya/-rya).
+ * Proximity 3 rule: -riya = visible/pointing; -rya = not visible/far (i-drop form).
  * ══════════════════════════════════════════════════════════════════════════ */
 typedef struct { const char *word; PronounType type; int class; } PronounEntry;
 
@@ -210,19 +211,53 @@ static const PronounEntry PRONOUNS[] = {
     { "ubu",   PRON_DEMONSTRATIVE, 14 },
     { "uku",   PRON_DEMONSTRATIVE, 15 },
     { "aha",   PRON_DEMONSTRATIVE, 16 },
-    /* proximity 2 (there): uwo/abo/uwo/iyo/iryo/ayo/icyo/ibyo/iyo/izo/urwo/ako/utwo/ubwo/ukwo/aho */
+    /* proximity 2 (near hearer): uwo/abo/uwo/iyo/iryo/ayo/icyo/ibyo/iyo/izo/urwo/ako/utwo/ubwo/uko/aho */
     { "uwo",   PRON_DEMONSTRATIVE,  1 },
     { "abo",   PRON_DEMONSTRATIVE,  2 },
+    { "uwo",   PRON_DEMONSTRATIVE,  3 }, /* Nt.3 (object) shares forms with Nt.1 */
     { "iyo",   PRON_DEMONSTRATIVE,  4 },
     { "iryo",  PRON_DEMONSTRATIVE,  5 },
     { "ayo",   PRON_DEMONSTRATIVE,  6 },
     { "icyo",  PRON_DEMONSTRATIVE,  7 },
     { "ibyo",  PRON_DEMONSTRATIVE,  8 },
+    { "iyo",   PRON_DEMONSTRATIVE,  9 }, /* Nt.9 shares SP "i" with Nt.4      */
     { "izo",   PRON_DEMONSTRATIVE, 10 },
     { "urwo",  PRON_DEMONSTRATIVE, 11 },
     { "ako",   PRON_DEMONSTRATIVE, 12 },
+    { "utwo",  PRON_DEMONSTRATIVE, 13 },
     { "ubwo",  PRON_DEMONSTRATIVE, 14 },
+    { "uko",   PRON_DEMONSTRATIVE, 15 }, /* NOT ukwo */
     { "aho",   PRON_DEMONSTRATIVE, 16 },
+    /* proximity 3 — two surface forms per class:                             *
+     *   -riya  (full):    speaker is pointing at something currently visible. *
+     *                     Present-tense reference. "that one over there"      *
+     *   -rya  (reduced):  speaker is referring to something not visible, or   *
+     *                     to a past action / event already concluded.          *
+     *                     NEVER used for present-tense reference.             *
+     *                     Formed by dropping the "i" between "r" and "ya".   *
+     * This distinction applies to every noun class under proximity 3.        *
+     * Nt.1/3 share the same demonstrative paradigm ("uyu/uwo/uriya/urya");   *
+     * the human (Nt.1) vs. object (Nt.3) distinction is carried by the noun. *
+     * Nt.5: two full forms — ririya (ri+riya, full) and iriya (i+riya, alt.) *
+     * Nt.6: "ma" augment is dropped → ariya/arya (NOT mariya/marya).         *
+     * Nt.10: ziriya/zirya (zi+riya/rya); NOT niriya/nirya.                   *
+     * Nt.16 (locative hariya/harya) is already in the invariables table.     */
+    { "uriya",  PRON_DEMONSTRATIVE,  1 }, { "urya",  PRON_DEMONSTRATIVE,  1 },
+    { "bariya", PRON_DEMONSTRATIVE,  2 }, { "barya", PRON_DEMONSTRATIVE,  2 },
+    { "uriya",  PRON_DEMONSTRATIVE,  3 }, { "urya",  PRON_DEMONSTRATIVE,  3 },
+    { "iriya",  PRON_DEMONSTRATIVE,  4 }, { "irya",  PRON_DEMONSTRATIVE,  4 },
+    { "ririya", PRON_DEMONSTRATIVE,  5 }, { "rirya", PRON_DEMONSTRATIVE,  5 },
+    { "iriya",  PRON_DEMONSTRATIVE,  5 }, { "irya",  PRON_DEMONSTRATIVE,  5 },
+    { "ariya",  PRON_DEMONSTRATIVE,  6 }, { "arya",  PRON_DEMONSTRATIVE,  6 },
+    { "kiriya", PRON_DEMONSTRATIVE,  7 }, { "kirya", PRON_DEMONSTRATIVE,  7 },
+    { "biriya", PRON_DEMONSTRATIVE,  8 }, { "birya", PRON_DEMONSTRATIVE,  8 },
+    { "niriya", PRON_DEMONSTRATIVE,  9 }, { "nirya", PRON_DEMONSTRATIVE,  9 },
+    { "ziriya", PRON_DEMONSTRATIVE, 10 }, { "zirya", PRON_DEMONSTRATIVE, 10 },
+    { "ruriya", PRON_DEMONSTRATIVE, 11 }, { "rurya", PRON_DEMONSTRATIVE, 11 },
+    { "kariya", PRON_DEMONSTRATIVE, 12 }, { "karya", PRON_DEMONSTRATIVE, 12 },
+    { "turiya", PRON_DEMONSTRATIVE, 13 }, { "turya", PRON_DEMONSTRATIVE, 13 },
+    { "buriya", PRON_DEMONSTRATIVE, 14 }, { "burya", PRON_DEMONSTRATIVE, 14 },
+    { "kuriya", PRON_DEMONSTRATIVE, 15 }, { "kurya", PRON_DEMONSTRATIVE, 15 },
 
     /* ── Ikinyazina ngenera (possessive/relative connectors) ───────────── */
     { "wa",    PRON_POSSESSIVE,  1 },
@@ -1225,7 +1260,7 @@ static const InvEntry INVARIABLES[] = {
     /* NOTE: gatanu/gatandatu/karindwi/umunani/kabiri/kane are in PRON_NUMERICAL  */
     /* (Nt.12 counting forms); moved there so step-2 pronoun check catches them. */
     { "tatu",      POS_ADVERB }, /* three bare stem (saa tatu = 9 AM)            */
-    { "icumi",     POS_ADVERB }, /* ten                                          */
+    /* "icumi" removed from invariables: it is PRON_NUMERICAL (class 0) = 10   */
 
     { NULL, POS_UNKNOWN }
 };
@@ -1675,8 +1710,16 @@ bool kin_is_known_verb_stem(const char *stem) {
 /*
  * kin_numerical_value() — cardinal integer for a PRON_NUMERICAL surface form.
  *
- * Returns 1–7 for the basic numerals across all noun classes, or 0 if the
- * surface is not a simple 1–7 numeral (e.g. icumi/ijana/igihumbi return 0).
+ * Returns the integer value for any recognised numeral surface form:
+ *   1–9   basic class-concordant numerals (all 16 noun-class variants)
+ *   10    icumi
+ *   20    makumyabiri
+ *   100   ijana
+ *   200   maganabiri
+ *   1000  igihumbi / ibihumbi (plural)
+ *   10    mirongo (the tens multiplier base — "mirongo itatu" = 30)
+ *   100   magana  (the hundreds multiplier base — "magana atatu" = 300)
+ * Returns 0 for unrecognised or non-numeral surfaces.
  *
  * Class-concordant endings used as keys (RALC p.119-121):
  *   1 → -mwe   (umwe/imwe/rimwe/amwe/kimwe/zimwe/rumwe/kamwe/tumwe/bumwe/kumwe/hamwe)
@@ -1686,9 +1729,21 @@ bool kin_is_known_verb_stem(const char *stem) {
  *   5 → -tanu  (itanu/batanu/atanu/bitanu/eshanu/dutanu/butanu/hatanu)
  *   6 → -tandatu (itandatu/batandatu/atandatu/bitandatu/esheshatu/dutandatu/…)
  *   7 → -rindwi (irindwi/barindwi/arindwi/birindwi/zirindwi/turindwi/…)
+ *   8 → -nani   (inani/anani/binani/zinani/runani/…)
+ *   9 → -yenda/-wenda (icyenda; urwenda = uru+wenda, Nt.11 §1.1)
  */
 int kin_numerical_value(const char *lower) {
     if (!lower || !lower[0]) return 0;
+    /* Named large-number forms (exact match first, before suffix scan)     */
+    if (strcmp(lower, "icumi")       == 0) return 10;
+    if (strcmp(lower, "makumyabiri") == 0) return 20;
+    if (strcmp(lower, "ijana")       == 0) return 100;
+    if (strcmp(lower, "maganabiri")  == 0) return 200;
+    if (strcmp(lower, "igihumbi")    == 0) return 1000;
+    if (strcmp(lower, "ibihumbi")    == 0) return 1000; /* pl — minimum unit */
+    /* Multiplier base words: mirongo (×10 base), magana (×100 base)       */
+    if (strcmp(lower, "mirongo")     == 0) return 10;
+    if (strcmp(lower, "magana")      == 0) return 100;
     size_t n = strlen(lower);
 #define _NV_EW(s) (n >= sizeof(s)-1 && strcmp(lower + n - (sizeof(s)-1), (s)) == 0)
     if (_NV_EW("mwe"))     return 1;
@@ -1697,10 +1752,10 @@ int kin_numerical_value(const char *lower) {
     if (_NV_EW("tatu"))    return 3;
     if (_NV_EW("tanu"))    return 5;
     if (_NV_EW("rindwi"))  return 7;
-    if (_NV_EW("nani"))    return 8;   /* inani/anani/binani/runani/… */
-    if (_NV_EW("yenda"))   return 9;   /* icyenda (ci-yenda→cy+yenda) */
-    if (_NV_EW("wenda"))   return 9;   /* urwenda = uru+wenda (Nt.11: u→w §1.1) */
-    if (strcmp(lower, "enye") == 0) return 4;   /* Nt.10 form of 4        */
+    if (_NV_EW("nani"))    return 8;
+    if (_NV_EW("yenda"))   return 9;   /* icyenda (ci-yenda→cy+yenda)      */
+    if (_NV_EW("wenda"))   return 9;   /* urwenda = uru+wenda (Nt.11 §1.1) */
+    if (strcmp(lower, "enye") == 0) return 4;   /* Nt.10 form of 4         */
     if (_NV_EW("ne"))      return 4;
 #undef _NV_EW
     return 0;
