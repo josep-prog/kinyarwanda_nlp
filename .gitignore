@@ -14,3 +14,4 @@ libkinyarwanda.a
 # Build artifacts
 src/*.o
 src/*.d
+__pycache__/
