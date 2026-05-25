@@ -1,0 +1,61 @@
+{
+  "_comment": "Local Kinyarwanda knowledge base for offline USSD responses. Add entries here to reduce cloud API calls and support offline operation. keywords[] are matched against the user's question. answer_rw must be in Kinyarwanda.",
+  "version": "1.0",
+  "entries": [
+    {
+      "id": "gov_register_birth",
+      "keywords": ["kwiyandikisha", "kuvuka", "indangamuntu", "icyangombwa", "zaho", "zaho ry'amavuko"],
+      "answer_rw": "Kwiyandikisha kuvuka bikorwa mu murwa mukuru w'akarere kawe. Uzana: icyemezo cy'ivuka kivuye ku bitaro, indangamuntu z'ababyeyi, n'ifoto. Kwiyandikisha buri mubyeyi ahabwa iminsi 30 avutse. Bivugwa ko kwiyandikisha ku giti cyawe bikorwa ku Nyarugenge, Gasabo, Kicukiro, cyangwa Kicukiro."
+    },
+    {
+      "id": "gov_id_card",
+      "keywords": ["indangamuntu", "ID", "ikarita", "indangamuntu mpya", "indangamuntu yangiritse"],
+      "answer_rw": "Indangamuntu ihabwa abenegihugu bafite imyaka 16 n'hejuru. Uzana: icyangombwa cy'amavuko, ifoto y'ubu, n'inshuti ifite indangamuntu. Usaba ku murwa mukuru w'akarere kawe cyangwa ku biro bya RIB. Nta giciro bitwara keretse usaba nshya iyo yayo yaguye cyangwa yacubikwa."
+    },
+    {
+      "id": "health_child",
+      "keywords": ["ubuzima", "umwana", "indwara", "kwigwa", "urukingo", "inkingo", "vaksini"],
+      "answer_rw": "Ubuzima bw'umwana bugerwa cyane cyane n'inkingo. Inkingo zitangwa ku bitaro bya leta nta giciro. Inkingo z'ingenzi: BCG (kuvuka), Polio, DTP, Measles (amezi 9), na Vitamin A. Sana umwana we muri clipping ku bitaro hafi yawe kuri gahunda y'ubuzima."
+    },
+    {
+      "id": "health_insurance",
+      "keywords": ["mutuelle", "ubuzima", "bwishingizi", "buringanye", "akazi", "biwate", "mutuelle de santé"],
+      "answer_rw": "Mutuelle de Santé ni bwishingizi bw'ubuzima bw'abanyarwanda bose. Usabira kuri seli y'isoko yawe. Ibi bigufasha kwivuza ku giciro gito (10%). Inshuti z'umuryango bose bangirira akamaro. Fata kopi y'ibihe by'isi ya mutuelle yawe kugira ngo ubuzima bwawe bukomeze."
+    },
+    {
+      "id": "edu_primary",
+      "keywords": ["amashuri", "abanza", "ishuri", "kwiga", "injira", "P1", "urwego"],
+      "answer_rw": "Amashuri abanza mu Rwanda yitwa P1 kugeza P6. Urwego rw'amashuri abanza ni imyaka 6. Injira y'umwana itangirira afite imyaka 7. Amashuri ya leta ntacyo batwara. Abana bose bagomba kwiga kugeza urwego rwa P6 nibura."
+    },
+    {
+      "id": "edu_secondary",
+      "keywords": ["amashuri", "yisumbuye", "S1", "S6", "senior", "secondary", "injira", "national", "urwego"],
+      "answer_rw": "Amashuri yisumbuye mu Rwanda atangira S1 akageza S6 (imyaka 6). Habaho ikizamini cya leta cya P6 kigaragaza abana bagomba kwiga amashuri yisumbuye ya leta. Amashuri myinshi afasha abana bakennye gutunga ubwishingizi bwo kwiga."
+    },
+    {
+      "id": "traffic_law",
+      "keywords": ["amategeko", "umuhanda", "imodoka", "gutwara", "permis", "permis de conduire", "sefu"],
+      "answer_rw": "Mu Rwanda, amategeko y'umuhanda asaba: gutwara imodoka afite permis, gukoresha umuzigo w'umutwe (casque) ku gare na moto, kwirinda kunywa inzoga ukajya gutwara, no gutwara ku ruhande rw'iburyo. Permis ihabwa na RURA nyuma yo gupiganira. Ibihano: amande cyangwa gusubizwa ibindabindi."
+    },
+    {
+      "id": "mobile_money",
+      "keywords": ["momo", "mobile money", "MTN", "airtel", "kohereza", "amafaranga", "imali", "konte"],
+      "answer_rw": "Mobile Money (MTN MoMo: *182#, Airtel Money: *500#) ireka kohereza amafaranga nta banki. Ujya ufungura konti ya Mobile Money, ukabishyira amafaranga, ukabira cyangwa kohereza ababyeyi. Iri serivisi rikorana nta iterineti. Irinda ibanga ryawe (PIN)."
+    },
+    {
+      "id": "internet_basics",
+      "keywords": ["interineti", "internet", "data", "wifi", "gukoresha", "browser", "application"],
+      "answer_rw": "Interineti ni uburyo bwo gutumanaho n'abandi n'amakuru ku isi yose. Ukoresha data (MTN cyangwa Airtel) cyangwa WiFi. Porogaramu nka WhatsApp, Facebook zitwara data. Irinda gusura urubuga rwangwa (phishing). Iyo data yawe irangiye, uzuza kuri *150# (MTN) cyangwa *500# (Airtel)."
+    },
+    {
+      "id": "umuganda",
+      "keywords": ["umuganda", "akazi", "gufasha", "buhere", "akarere", "serivisi", "gukorana"],
+      "answer_rw": "Umuganda ni akazi ka leta kakorwa buhere buri wa kane wa nyuma w'ukwezi (7:00 - 11:00 AM). Abanyarwanda bose bafite imyaka 18 - 65 bagomba gukorana umuganda. Ukorana mu karere kawe: gusenya imihanda, gutema ibyatsi, gusukura. Ntibukire umuganda gusa keretse ufite impamvu nziza."
+    },
+    {
+      "id": "irembo",
+      "keywords": ["irembo", "serivisi", "online", "leta", "interineti", "gusaba", "porogaramu"],
+      "answer_rw": "Irembo (irembo.gov.rw) ni portal ya leta ireba serivisi nyinshi za leta online: saba indangamuntu, icyangombwa cy'amavuko, gutangaza inganda, n'ibindi. Ujya wiyandikisha ubanza, hanyuma ucyo usaba. Bikunze kugufasha kwirinda gutumanahana n'abakozi ba leta."
+    }
+  ]
+}
