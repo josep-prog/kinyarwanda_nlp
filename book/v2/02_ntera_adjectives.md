@@ -664,6 +664,60 @@ Five independent, real, testable rules — and every one of them is
 something you can now verify yourself, on any word, by compiling a
 six-line program against this project's real library.
 
+## 4.7 A genuine homograph: `nzima` versus `n` + `zima`
+
+Section 1.5 established that the adjective stem set is closed — but a
+closed set can still contain two *different* stems that happen to
+collide on the surface once a prefix attaches. Recall Section 4.2's
+table: class 9's RS is just `n`, and stays plain `n` (no change at all)
+in front of any stem that doesn't start with a bilabial, `r`, or vowel.
+`zima` ("whole/healthy") starts with `z` — none of those — so `n` +
+`zima` should surface as plain `nzima`. But `ADJ_STEMS[]` (Section 6.1)
+also lists a completely unrelated stem, `nzima` ("heavy/difficult/sick"),
+on its own. Test both readings against the real library:
+
+```
+$ LD_LIBRARY_PATH=. ./p_nzima
+word        ok   class  stem
+nzima       1    9      zima        <- read as: RS=n (class 9) + C=zima
+munzima     1    1      nzima       <- read as: RS=mu (class 1) + C=nzima
+banzima     1    2      nzima       <- read as: RS=ba (class 2) + C=nzima
+kinzima     1    7      nzima       <- read as: RS=ki (class 7) + C=nzima
+```
+
+Bare `nzima` is parsed as class 9, stem `zima` — the function never even
+considers the *other* stem, `nzima`, for this input, because that stem
+can only ever appear **with its own RS already attached in front of
+it** (`munzima`, `banzima`, `kinzima` — never bare `nzima` standing
+alone, the way a noun's D vowel can stand alone or drop, Chapter 1,
+Section 1.9). This is the payoff of a fact Section 1.2 stated and this
+section can now make precise: **an adjective's RS can never be silently
+absent**, the way a noun's D vowel sometimes is. If it could, `nzima`
+would be a genuine, unresolvable ambiguity between two real stems — the
+same shape of problem as Chapter 1's `umuti`/class 1-vs-3 ambiguity.
+Because it can't, the surface collision is real (two different,
+documented words really do share five identical letters) but the
+*parsing* is not ambiguous at all: a bare word is always class 9's
+`n` + whatever's left, full stop, and the only way to reach the other
+stem is to write a longer word with its own RS already in front.
+
+`nzinya` (one of the augmentative "big" variants from Section 6.1's
+stem list) shows the identical pattern, one more time:
+
+```
+$ LD_LIBRARY_PATH=. ./p_augment
+word         ok   class  stem
+bunziginya   1    14     nziginya    <- bu + nziginya (class 14)
+nzinya       1    9      nzinya      <- n + nzinya (class 9, geminate n+n)
+muniniya     1    1      niniya      <- mu + niniya (class 1)
+```
+
+Here the *same* stem, `nzinya`, is reached two different ways depending
+on what precedes it: with no further RS in front, it's class 9's
+geminate `n`+`n`→`n` simplification (Section 6.3); with `bu-` in front,
+it's class 14's `bu`+`nzinya`. Both are completely unambiguous, for the
+exact same reason as the `zima`/`nzima` case above.
+
 ---
 
 # Part 5 — Reframing This as an Engineering Contract
