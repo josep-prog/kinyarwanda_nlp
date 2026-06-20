@@ -209,6 +209,21 @@ can resolve vowel-contact rules (Chapter 1 previewed: `mu+iga→mwiga`,
 `ku+oma→koma`) without ever allocating a temporary buffer: `%.*s` lets you
 print "all but the last N characters of this string" in a single call.
 
+### 5.5.1 The linguistic rule behind `kin_vv_join`, named
+
+`kin_vv_join` exists to join a prefix and a stem that would otherwise put
+two vowels next to each other — `mu` + `iga` should never surface as
+`*muiga`. The rule it implements is **glide formation**, from this
+project's own rule reference (`u→w/_J`, `i→y/_J`: a high vowel becomes a
+semivowel/"glide" immediately before another vowel): `mu`'s `u` becomes
+`w` before `iga`'s leading `i`, giving `mwiga` ("to study/learn," class-15
+infinitive). `ku`+`oma` → `koma` is the companion case where the vowel is
+dropped entirely rather than turned into a glide — RALC §1.1/§2.1 cover
+exactly when each outcome applies, and Chapter 9's `kin_ortho_gen()` is
+where you'll see the *general* version of this same rule running as one
+pass among sixteen, rather than this file's narrower, special-purpose
+version.
+
 ## 5.6 `is_vowel` and indexed lookahead — a different loop style than Chapter 4's
 
 ```c

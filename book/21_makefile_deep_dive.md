@@ -1,14 +1,14 @@
-# Chapter 19 — The Makefile Deep Dive
+# Chapter 21 — The Makefile Deep Dive
 
 ## Opening Part III
 
-Chapters 4–18 covered what the code *does*. This chapter covers how it
+Chapters 4–20 covered what the code *does*. This chapter covers how it
 *becomes a program at all* — the Makefile you glanced at in Chapter 1,
 now read line by line. Everything here is `make` and `gcc` knowledge, not
 C-language knowledge, but it's exactly as load-bearing: get the build
 wrong, and none of the C you've learned matters.
 
-## 19.1 Deriving one list from another: `$(SRCS:.c=.o)`
+## 21.1 Deriving one list from another: `$(SRCS:.c=.o)`
 
 ```make
 LIB_SRCS = src/tokenizer.c \
@@ -52,7 +52,7 @@ prepends it. Two derived lists, from the same underlying source list,
 for the same reason Chapter 1 first explained: a library must never ship
 its own `main()`.
 
-## 19.2 One pattern rule, instead of fourteen explicit ones
+## 21.2 One pattern rule, instead of fourteen explicit ones
 
 ```make
 %.o: %.c
@@ -69,11 +69,11 @@ expands to whatever the actual target of this particular invocation is
 (e.g. `src/tokenizer.o`), and `$<` expands to the first prerequisite
 (`src/tokenizer.c`). One rule, applied generically to every file that
 matches the pattern. This is the exact same DRY instinct you've now seen
-applied to C functions (`set_morph`, Ch.11; `scan_back_noun`, Ch.15;
-`seq_append`, Ch.16) — here applied one level up, to the *build system*
+applied to C functions (`set_morph`, Ch.11; `scan_back_noun`, Ch.16;
+`seq_append`, Ch.17) — here applied one level up, to the *build system*
 itself, instead of to C source code.
 
-## 19.3 `-MMD -MP` and `.d` files: how `make` learns about headers
+## 21.3 `-MMD -MP` and `.d` files: how `make` learns about headers
 
 ```make
 CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2 -fPIC -MMD -MP
@@ -106,7 +106,7 @@ it, because the compiler told `make` about that dependency the *last*
 time it compiled — a self-maintaining dependency graph, rebuilt fresh
 every time you build.
 
-## 19.4 The same object files, three different ways
+## 21.4 The same object files, three different ways
 
 ```make
 all: $(TARGET) $(STATIC_LIB) $(SHARED_LIB)
@@ -124,7 +124,7 @@ $(SHARED_LIB): $(LIB_OBJS)
 Three build targets, but notice: `LIB_OBJS` (the same fourteen object
 files) feeds *both* the static and shared library rules. They are never
 recompiled differently for one library versus the other — the exact same
-`.o` files, produced once by the one pattern rule in Section 19.2, get
+`.o` files, produced once by the one pattern rule in Section 21.2, get
 repackaged two different ways:
 
 - **`ar rcs $@ $^`** — `ar` is the **archiver**: it bundles multiple `.o`
@@ -144,7 +144,7 @@ repackaged two different ways:
 the rule (every object file in `LIB_OBJS`), as opposed to `$<`'s "just
 the first one."
 
-## 19.5 `-fPIC` applied to everything, on purpose
+## 21.5 `-fPIC` applied to everything, on purpose
 
 A shared library's code can be mapped into different processes at
 different memory addresses, so it cannot use absolute memory addresses
@@ -155,7 +155,7 @@ static-library objects have no such requirement — a plain executable is
 typically loaded at a fixed, known base address, so PIC buys it nothing.
 
 Look again at `CFLAGS`: `-fPIC` is listed once, applied unconditionally,
-to *every* object file the single pattern rule in Section 19.2 produces
+to *every* object file the single pattern rule in Section 21.2 produces
 — including the ones that end up in `kinyarwanda_nlp` (the CLI binary)
 and `libkinyarwanda.a` (the static archive), which strictly don't need
 it. This is a deliberate simplicity-over-micro-optimization choice,
@@ -171,7 +171,7 @@ object files for all three build targets, is simpler, and the cost is
 small enough that this project's Makefile accepts it without
 hesitation.
 
-## 19.6 `.PHONY`: targets that aren't files
+## 21.6 `.PHONY`: targets that aren't files
 
 ```make
 .PHONY: all clean test install install-lib uninstall help
@@ -189,7 +189,7 @@ file called `clean` would already "exist." `.PHONY` removes that
 ambiguity entirely for every target that's really just a named action,
 not a build artifact.
 
-## 19.7 Installation: standard Unix conventions, briefly
+## 21.7 Installation: standard Unix conventions, briefly
 
 ```make
 install-lib: $(STATIC_LIB) $(SHARED_LIB)
@@ -243,9 +243,9 @@ needing to set `LD_LIBRARY_PATH` by hand every time.
 - "position independent code PIC explained"
 - ".PHONY targets in Makefiles explained"
 
-## Coming up in Chapter 20
+## Coming up in Chapter 22
 
-Chapter 20 covers `tests/test_framework.h` and the four test files built
+Chapter 22 covers `tests/test_framework.h` and the four test files built
 on top of it — a hand-rolled, dependency-free test harness, the
 `do { ... } while(0)` macro idiom that makes its assertion macros safe to
 use anywhere a single statement is expected, and what it actually means

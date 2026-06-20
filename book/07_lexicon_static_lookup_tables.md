@@ -80,6 +80,97 @@ search is not a missed optimization; it's the right tool, and you should
 be ready to defend that judgment directly rather than treating "use a
 faster data structure" as automatically correct.
 
+### 7.1.1 `NOUN_CLASSES[16]` in full — the table every chapter so far has been pointing at
+
+This is the actual data behind Sections 3.1.1 and 6.0's abstract
+descriptions — every row, exactly as it appears in `lexicon.c`:
+
+| nt. | prefix (D+RT) | rt (RT alone) | adj. concordance | poss. connector | verb subj. prefix | example |
+|---|---|---|---|---|---|---|
+| 1 | umu | mu | mu | wa | a | *umuntu* — person (sg.) |
+| 2 | aba | ba | ba | ba | ba | *abantu* — people (pl.) |
+| 3 | umu | mu | mu | wa | u | *umuti* — tree/medicine (sg.) |
+| 4 | imi | mi | mi | ya | i | *imiti* — trees/medicines (pl.) |
+| 5 | i | ri | ri | rya | ri | *iryango* — door (sg.) |
+| 6 | ama | ma | ma | ya | a | *amazi* — water (mass/pl.) |
+| 7 | iki | ki | ki | cya | ki | *ikigo* — institution (sg.) |
+| 8 | ibi | bi | bi | bya | bi | *ibigo* — institutions (pl.) |
+| 9 | in | n | n | ya | i | *inka* — cow (sg.) |
+| 10 | in | n | zi | za | zi | *inka* — cows (pl. — same surface word as 9!) |
+| 11 | uru | ru | ru | rwa | ru | *urugo* — homestead (long/thin things) |
+| 12 | aka | ka | ka | ka | ka | *akana* — small child (diminutive sg.) |
+| 13 | utu | tu | tu | twa | tu | *utwana* — small children (diminutive pl.) |
+| 14 | ubu | bu | bu | bwa | bu | *uburezi* — education (abstract) |
+| 15 | uku | ku | ku | kwa | ku | *kugenda* — "to walk" (the infinitive **is** a noun class) |
+| 16 | aha | ha | ha | ha | ha | *ahantu* — place (locative) |
+
+A few things worth being able to say out loud about this table, since it's
+the single most-referenced piece of data in the whole project:
+
+- **Classes 1 and 3 are identical in every column except `description`.**
+  This is the concrete proof of Section 6.0's claim that prefix matching
+  alone cannot always tell two classes apart — `NOUN_CLASSES[]` itself
+  encodes that ambiguity rather than hiding it; disambiguating "person" vs.
+  "tree" has to happen elsewhere, by looking up the *stem* in a separate
+  table (`KNOWN_WORDS`/`NOUN_STEMS`, also in this file).
+- **Classes 9 and 10 share the identical *noun* prefix (`in`)** — singular
+  and plural *inka* ("cow"/"cows") look identical on the noun itself.
+  Notice, though, that their `adj. concordance` and `subj. prefix` columns
+  differ (`n`/`i` for singular vs. `zi`/`zi` for plural) — this is *why*
+  Kinyarwanda can still distinguish "one cow is big" from "cows are big"
+  even though the noun itself doesn't visibly change: the *agreement*
+  markers on the surrounding adjective and verb carry the singular/plural
+  distinction instead. This is a real linguistic fact you can cite directly
+  if asked "how does the engine know `inka` is singular or plural here?" —
+  the honest answer is, in isolation, it sometimes can't; it needs the
+  agreeing adjective or verb in the same sentence (Chapter 12 covers
+  exactly this kind of cross-token check).
+- **Class 15 is the infinitive.** This is the detail most likely to
+  surprise someone coming from European-language grammar: Kinyarwanda
+  treats the verb's infinitive form (`kugenda`, "to walk/to go") as
+  belonging to its *own noun class*, with its own prefix (`ku-`) and its
+  own agreement pattern — not as a special, classless verb form the way
+  "to walk" has no gender in English. That's why `PREF` in Section 3.3.1's
+  table is glossed "infinitive verb-class marker," not just "verb prefix":
+  grammatically, it *is* a class marker, doing the same job `RT` does for
+  every other class.
+
+### 7.1.2 `ADJ_STEMS` — the 25 meanings behind the 42 table rows
+
+`ADJ_STEMS` has 42 rows, but several rows are just *spelling variants* of
+the same underlying adjective (`-to`, `-toto`, `-toya` are all "small"),
+so the table is really 25 distinct meanings:
+
+| Stem(s) | Meaning | Stem(s) | Meaning |
+|---|---|---|---|
+| -nini | large/adult | -kuru, -nkuru | old/big, senior/great |
+| -inshi | many | -bisi | raw/unripe |
+| -bi | bad | -shya, -shyashya | new/fresh |
+| -tindi | a different kind | -gufi, -gufiya | short |
+| -gari | wide | -re | long/tall |
+| -iza | good/beautiful | -tagatifu | holy/sacred |
+| -sa | similar/like | -hire | fast/quick |
+| -zima, -nzima | whole/healthy, heavy/difficult | -taraga | old (age) |
+| -to, -toto, -toya | small | -ogo | deep/wide/immense |
+| -ke, -keya | few | -eru | white/clean/pure |
+| (9 "-worthy of..." variants: -nzinya, -nzunyu, -nuya, -niniya, -nzuzunya, -nunuya, -niniriya, -nziginya, -nzugurunyu) | worthy of (a quality) | -rimbwa | lovable/beloved |
+| | | -meze | resembling/in the condition of |
+
+This is a closed, hand-curated list — Kinyarwanda adjectives form a small,
+fixed set of underlying stems (unlike nouns and verbs, which are open-ended
+vocabulary), which is exactly why a flat table this size can cover the
+adjective system completely, rather than just "the adjectives the author
+happened to think of." Two things are worth noticing about the shape of
+this particular semantic field: several stems reduplicate
+(`to`→`toto`, `shya`→`shyashya`, `re`→`rerere` in connected speech) as an
+intensifier — "small" → "very small" — purely by doubling the stem, with no
+separate intensifier word needed; and the 9-variant "worthy of" family
+exists because that one adjectival meaning has unusually many
+phonologically-conditioned surface forms depending on the noun class it
+attaches to (you'll see exactly this kind of one-meaning-many-surface-forms
+pattern again, at much greater scale, in the orthographic rule engine —
+Chapters 9–10).
+
 ## 7.2 Shape 2: a table with multiple columns, as an array of structs
 
 ```c

@@ -51,6 +51,52 @@ noticing immediately:
   array of 16 of these (the full noun-class table, Chapter 7) costs well
   under a kilobyte total.
 
+### 3.1.1 What D, RT, and C actually mean — the noun formula behind every field
+
+`NounClass` is the struct that stores one row of a 16-row table (the full
+table is Chapter 7's subject), and every field name in it is an
+abbreviation of a Kinyarwanda grammatical term. Kinyarwanda nouns are
+traditionally analyzed with the formula:
+
+```
+            D       +       RT       +        C
+        (indomo)      (indanganteko)      (igicumbi)
+       initial vowel    class marker          stem
+        i, u, or a      e.g. mu, ba, ki     carries the
+       (sometimes        (this is the        actual meaning;
+        absent)          part that drives    NEVER changes
+                          agreement —
+                          see below)
+
+   Example:   u   +   mu   +   ntu     =    umuntu   ("person")
+              D       RT        C
+```
+
+Every noun belongs to one of 16 **noun classes** (numbered 1–16 by
+convention, written `nt.1`...`nt.16`), distinguished by which `RT` they take
+— class 1 takes `mu` (singular human: *umuntu*), class 2 takes `ba` (plural
+human: *abantu*), class 7 takes `ki` (*ikintu*, "thing"), and so on. This
+matters enormously for the rest of the grammar, because **the class marker
+doesn't just sit on the noun — it echoes onto every other word that
+"agrees with" that noun**: the adjective describing it, the possessive
+connecting to it, the verb whose subject it is. That's exactly what the
+other four `NounClass` fields are recording:
+
+| Field | Kinyarwanda term | What it lets agree with the noun |
+|---|---|---|
+| `prefix` | D+RT combined | the noun's own surface form, e.g. `"umu"` |
+| `rt` | Indanganteko | the bare class marker, e.g. `"mu"` |
+| `concordance_adj` | Indangasano | the matching adjective prefix — *umuntu mwiza* ("a good person"): `mwiza` takes `mu`-, echoing the noun's class |
+| `concordance_poss` | (possessive connector base) | the matching possessive form — *umuntu we* ("his/her person"): `we` is built from class 1's possessive connector |
+| `subj_prefix` | Indanganshinga ya ruhamwa | the matching verb subject-marker — *Umuntu a-ragenda* ("the person is going"): `a-` is class 1's verb agreement prefix |
+
+So a single `NounClass` row is really "everything every *other* word in
+the sentence needs to know in order to agree with this one noun." This is
+the linguistic reason `syntax.c` (Chapter 12) can detect a grammar error
+just by comparing two strings: if a noun's `concordance_adj` doesn't match
+the prefix actually found on the adjective sitting next to it in the
+sentence, that's a genuine agreement violation, not a guess.
+
 ## 3.2 The fixed-array-as-string idiom, generalized
 
 Why use `char prefix[8]` instead of `char *prefix` everywhere in this
@@ -99,6 +145,33 @@ holds a short tag like `"SP"` or `"PREF"`, so 12 bytes is generous;
 project: each constant is sized by *what actually has to fit in it*, with
 a comment justifying the number — never a round number picked
 arbitrarily. `sizeof(KinMorpheme)` here comes to **196 bytes**.
+
+### 3.3.1 The morpheme-label alphabet: decoding `label[KIN_MORPH_LABEL_LEN]`
+
+Every `KinMorpheme.label` field holds one short abbreviation, and that
+short list of abbreviations is the vocabulary the *entire* morphological
+side of this project speaks. It's worth having all of them in one place,
+since Chapters 6–15 will use them constantly without re-explaining each
+time:
+
+| Label | Kinyarwanda term | English | Appears in the formula for |
+|---|---|---|---|
+| `D` | Indomo | Initial/pre-prefix vowel | Nouns: `D+RT+C` |
+| `RT` | Indanganteko | Noun class marker | Nouns: `D+RT+C` |
+| `C` | Igicumbi | Stem (noun or adjective) | Nouns and adjectives |
+| `RS` | Indangasano | Adjective agreement marker | Adjectives: `RS+C` |
+| `PREF` | Indanganshinga | Infinitive verb-class marker (`ku-`/`gu-`/`kw-`) | Infinitive verbs: `PREF+root+FV` |
+| `SP` | Indanganshinga ya ruhamwa | Subject-agreement prefix | Conjugated verbs |
+| `TM` | Indangagihe | Tense/aspect marker | Conjugated verbs |
+| `OM` | Icyuzuzo k'impagike | Object marker (infixed pronoun) | Conjugated verbs |
+| `EXT` | Ingereka | Derivational extension (passive, causative, ...) | Conjugated verbs |
+| `FV` | Umusozo | Final vowel/suffix | Both verb formulas |
+
+Five word-formulas, ten reusable slot names — every single morpheme this
+project ever produces is labeled with one of these ten strings. Once
+you've memorized this table, every `tok->morph.m[i].label` value you see
+printed in this book's later chapters is immediately readable without
+looking anything up.
 
 ## 3.4 The "capacity + count" idiom: bounded lists without dynamic memory
 
@@ -282,7 +355,48 @@ recursively — and it's a perfectly fair question to be asked in your
 defense: *"what's the memory cost of this design, and when would it stop
 being acceptable?"* Now you have the exact number and the honest answer.
 
-## 3.9 Try it yourself
+## 3.9 Case study: filling in one `Token` by hand for a real noun
+
+To see every struct in this chapter holding real data at once, trace the
+single word **`umuntu`** ("person", "human being") as the pipeline would
+fill in its `Token`. This is the same word used as the running example in
+Section 3.1.1 — here it's followed all the way into the actual struct
+fields:
+
+```
+   surface word:   u  m  u  n  t  u
+                   └D┘└RT┘└──C───┘
+                    u    mu    ntu
+```
+
+| `Token` field | Value after analysis | Why |
+|---|---|---|
+| `surface` | `"umuntu"` | the raw word exactly as written |
+| `lower` | `"umuntu"` | lowercased copy used for case-insensitive matching |
+| `pos` | `POS_NOUN` | Chapter 8 decided this is the noun branch of the word-type tree |
+| `noun_class` | `1` | class 1 = human singular |
+| `stem` | `"ntu"` | the `C` (igicumbi) — the part that never changes |
+| `detected_prefix` | `"umu"` | the combined `D+RT` that was stripped off to find the stem |
+| `is_kinyarwanda` | `true` | the word matched a known Kinyarwanda pattern |
+| `morph.n` | `3` | three morphemes were recorded: D, RT, C |
+| `morph.m[0]` | `{label="D", form="u", surface="u", ...}` | the initial vowel |
+| `morph.m[1]` | `{label="RT", form="mu", surface="mu", ...}` | the class marker |
+| `morph.m[2]` | `{label="C", form="ntu", surface="ntu", english_gloss="person"}` | the stem, with its meaning |
+| `morph.verified` | `true` | re-assembling D+RT+C reproduced the original surface string exactly |
+
+Every other field not listed above (`pron_type`, `verb_tense`, `verb_ext`,
+`is_negative`, `gram_role`, ...) simply sits at its zero value — `PRON_NONE`,
+`TENSE_NONE`, `VEXT_NONE`, `false`, `GRAM_ROLE_NONE` — because none of them
+apply to a noun. This is Chapter 2's "zero means nothing happened" idiom
+(Section 2.3), now visible as a complete, concrete `Token` rather than an
+abstract rule: roughly two-thirds of this one struct's fields are
+*correctly* sitting at zero, simply because `umuntu` is a noun and not,
+say, a conjugated verb — which would instead leave `noun_class`,
+`detected_prefix`, and the noun-specific morpheme labels at zero, and fill
+in `verb_tense`, `verb_ext`, and an `SP+TM+OM+root+EXT+FV`-shaped
+`morph` breakdown instead.
+
+## 3.10 Try it yourself
 
 Reproduce the table above on your own machine — it's worth seeing these
 numbers come out of your own compiler, not just trusting the printed

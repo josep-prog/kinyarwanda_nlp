@@ -43,7 +43,7 @@ functions whose full source it could see, every file would have to
 `#include` every other file's entire source, and changing one line of
 `tokenizer.c` would force you to recompile the whole project from scratch
 every time. Instead, each `.c` file is compiled once into a `.o` object
-file (more on this in Chapter 19), and the **linker** — a separate tool
+file (more on this in Chapter 21), and the **linker** — a separate tool
 that runs after the compiler — matches up calls to definitions across all
 the `.o` files at the end. The header is the thing that lets the compiler
 check your calls are *type-correct* without yet knowing where the real
@@ -60,9 +60,9 @@ Run `ls` at the repo root and you'll see:
 ```
 include/    — public header files (the contract — Section 1.3)
 src/        — implementation files, one .c per pipeline stage / grammar tree
-tests/      — a hand-rolled test suite (Chapter 20)
+tests/      — a hand-rolled test suite (Chapter 22)
 man/        — a Unix manual page for the CLI tool
-Makefile    — build instructions (Chapter 19)
+Makefile    — build instructions (Chapter 21)
 ```
 
 `include/` holds three headers:
@@ -77,7 +77,7 @@ Makefile    — build instructions (Chapter 19)
   meant for external callers who just want "give me corrected text" or
   "give me a phoneme string" without learning the full `Token`/
   `SentenceAnalysis` model. You'll see why this separation matters in
-  Chapter 17.
+  Chapter 18.
 
 `src/` mirrors the pipeline. The Makefile's `LIB_SRCS` list is, in effect,
 a second table of contents — it's the order the *build system* sees the
@@ -94,9 +94,30 @@ Section 1.5.
 
 ## 1.3 Anatomy of `kinyarwanda.h`: reading a header like an engineer
 
-Open `include/kinyarwanda.h`. Ignore the big linguistic comment block at
-the top for now (that's the *content* the engine encodes — Kinyarwanda
-grammar trees — not the C structure). Skip down to line 188:
+Open `include/kinyarwanda.h`. Set aside the big linguistic comment block at
+the very top for a moment — it's worth describing briefly, because it's
+genuinely unusual, before skipping past it for the C structure.
+
+### A header comment that doubles as a linguistics syllabus
+
+Lines 1–187 of `kinyarwanda.h` are a "GRAMMAR TREE MAP" — for each of the
+five word-type trees this book has been building toward (Section 2.0's
+diagram), the comment states its morpheme formula, names every C function
+that implements detection/analysis/display for that tree, and even marks
+which sub-types and transitions are `✓ complete` versus `✗ planned`. This
+is worth reading end to end once, on your own, before continuing — not
+because you need to memorize it now (every tree gets its own full chapter:
+nouns and adjectives in Chapters 6–7 and 11–13, verbs across Chapters
+8–11), but because it's a rare, valuable thing in a real codebase: the
+header isn't just declaring C function signatures, it's *also* documenting
+the linguistic theory those functions implement, with an honest status
+marker for what's finished and what's still a known gap. Few production
+codebases bother to keep a living map this explicit; treat it as the
+project's own table of contents for everything Chapters 2–15 unpack in
+full.
+
+Now, for the rest of *this* chapter, set that content aside and skip down
+to line 188, where the pure C structure begins:
 
 ```c
 #ifndef KINYARWANDA_H
@@ -223,7 +244,7 @@ you're compiling with a C++ compiler.
 
 This is why `kinyarwanda_api.h` has it but you'll notice the comment in the
 file calling this out explicitly — it's a deliberate "we know C++ users
-will want to link against this" decision, tied directly to Chapter 22's
+will want to link against this" decision, tied directly to Chapter 24's
 topic (cross-language integration) but introduced here because it's a
 header-level concept.
 
@@ -249,7 +270,7 @@ project's own CLI tool — were compiled into the library, then any external
 program linking against `libkinyarwanda.a` would get a second, conflicting
 `main()` function fighting with their own. A library should expose
 *functions to be called*, never an entry point of its own. This is why
-Chapter 17 (`api.c`) and Chapter 18 (`main.c`) are different chapters about
+Chapter 18 (`api.c`) and Chapter 19 (`main.c`) are different chapters about
 different concerns: `api.c` is part of the library (logic other programs
 can call); `main.c` is the one file that exists purely to let *this*
 project's own command-line tool exist, and it is explicitly excluded from

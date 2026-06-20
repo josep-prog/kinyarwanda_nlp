@@ -293,6 +293,35 @@ Finishing the entire first pass before starting any context-sensitive
 correction guarantees every `prev->pos` a later pass reads is already
 settled.
 
+## 8.6 Case study: tagging "Imana yaremye ijuru n'isi" end to end
+
+This is the project's own canonical example sentence (you'll see it again
+in `main.c`'s help text and the test suite) — "Imana yaremye ijuru n'isi,"
+*"God created heaven and earth."* Tracing every token through the
+nine-step chain shows exactly why the step *order* from Section 8.1 is
+load-bearing, not cosmetic:
+
+| Token | Step that claims it | Result | Why this step, and not an earlier/later one |
+|---|---|---|---|
+| `Imana` | 3 — known full word | `POS_NOUN`, class 9, stem `mana` | The lexicon has an exact entry `{"imana", 9, "mana"}`. This **has** to be checked before Step 6's generic prefix detector, because class 9's prefix table entry is `"in"` — `Imana` doesn't start with `in`, it starts with bare `i`, so the generic noun-prefix detector from Chapter 6 would likely fail or guess wrong on this specific word. The exact-lexicon override exists precisely for high-frequency words like this one. |
+| `yaremye` | 8 — conjugated verb | `POS_VERB_CONJ`, `verb_tense = TENSE_PAST_PERF` | Decomposes as `ya` (SP, class-1 "he/she") + `rem` (root, "-rem-", "create") + `ye` (perfect FV) — the `SP+TM+root+FV` formula. No invariable, pronoun, lexicon, or infinitive check matches first, so the chain reaches Step 8. |
+| `ijuru` | 3 — known full word | `POS_NOUN`, class 5, stem `juru` | Another exact lexicon hit (`{"ijuru", 5, "juru"}`), same reasoning as `Imana`. |
+| `n'` | 1 — invariable | `POS_CONJUNCTION` | `na` ("and") with its final vowel elided before the following word's initial vowel — Part 12 of the RALC rules (vowel elision) governs exactly this surface contraction; Chapter 4's tokenizer already split it into its own token before tagging ever runs. |
+| `isi` | 3 — known full word | `POS_NOUN`, class 9, stem `si` | A third exact lexicon hit — and notice it's class 9 again, the *same* class as `Imana`, even though the two words share no visible prefix at all (`i-mana` vs. `i-si`); this is only knowable because the lexicon stores it directly, not because a prefix rule derived it. |
+
+Two lessons fall out of this one sentence. First, **three of five word
+tokens are resolved at Step 3**, not by any of the "clever" detection
+machinery from Chapters 6–7 — for exactly the high-frequency words a
+parser sees constantly, a flat lexicon hit is both the simplest and the
+most reliable path, which is *why* Step 3 sits this early in the chain
+rather than last. Second, the chain never needs to "guess" here: every
+token is resolved with full confidence by Step 8 at the latest, with
+Steps 4–7 (infinitive, proper-noun heuristic, prefix-based noun
+detection, adjective) all silently not firing for this particular
+sentence — a reminder that the nine steps aren't nine things that happen
+to every word; they're nine *opportunities* to claim a word, most of
+which any given real word will simply skip past.
+
 ## Key takeaways
 
 - C has no polymorphism; deciding "what kind of thing is this" is solved

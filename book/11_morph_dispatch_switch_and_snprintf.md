@@ -9,6 +9,42 @@ classified, and produces the full, human-displayable morpheme breakdown,
 calling `kin_ortho_gen()` (Ch.9–10) along the way to *verify* its own
 analysis. This chapter is the payoff for everything you've read so far.
 
+## 11.0 The four formulas, visualized side by side
+
+Every chapter so far has referenced "the noun formula" or "the verb
+formula" individually. Before reading the dispatcher, see all four laid
+out together — this is literally the menu `kin_morpheme_analyze()`
+chooses from, and the rest of this chapter is the C code that fills each
+one in for a real word:
+
+```
+ TREE 1 — IZINA (Noun)              D  +  RT  +  C
+                                     u     mu    ntu        = umuntu  ("person")
+
+ TREE 2 — NTERA (Adjective)              RS  +  C
+                                          mu     iza        = mwiza  ("good/beautiful";
+                                                               u→w/_J glide rule fires)
+
+ TREE 3a — INSHINGA, infinitive     PREF +  root  +  FV
+           (imbundo)                ku      kor      a     = gukora ("to do/work")
+
+ TREE 3b — INSHINGA, conjugated     SP + TM + root + EXT + FV
+           (itondaguye)             ba   ra    kor          a  = barakora ("they are working")
+```
+
+Lay them side by side and the design becomes obvious: **nouns and
+adjectives are two-or-three-slot formulas; conjugated verbs are a
+five-slot formula.** That's not an arbitrary implementation choice — it's
+why `analyse_noun()` and `analyse_adj()` are each a few hundred lines,
+while `analyse_vconj()` (verbs) is the largest single function in the
+file: more morpheme slots to identify means more phonological
+interactions between them, means more code. Every one of these four
+functions has exactly one job: given a tagged `Token`, recover *which
+exact characters* of the surface word correspond to *which named slot* of
+its tree's formula, and record that breakdown into `tok->morph`
+(Chapter 3's `MorphBreakdown`) using the ten-label vocabulary from Section
+3.3.1.
+
 ## 11.1 The dispatcher: Chapter 2's `switch` pattern, now fully earned
 
 ```c
@@ -192,7 +228,7 @@ where to append, and just as capable of overflowing a fixed buffer if you
 don't separately track the remaining space yourself). `snprintf` solves
 both problems in one call: it takes the buffer's capacity directly, and
 it supports the same `%`-format interpolation you'd use for any
-formatted output, in one bounded, safe operation. Chapter 21 will return
+formatted output, in one bounded, safe operation. Chapter 23 will return
 to `snprintf` vs. `sprintf` as a general defensive-programming topic —
 this file is the single best place in the whole codebase to see *why*
 that general lesson matters in concrete, repeated practice.

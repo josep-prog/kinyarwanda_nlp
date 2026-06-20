@@ -11,6 +11,35 @@ sometimes a token an arbitrary distance away? This is the first file
 whose checks genuinely operate over the *whole* `tokens[]` array as a
 single unit, not just a sliding window of one or two positions.
 
+## 12.0 What "agreement" means, and why it's checkable at all
+
+English marks almost no grammatical agreement between a noun and the
+adjective describing it ("a big dog," "big dogs" — "big" never changes).
+Kinyarwanda is the opposite extreme: **every adjective, possessive, and
+verb subject-marker must visibly echo the noun class of the noun it
+relates to** — this is the `concordance_adj`/`concordance_poss`/
+`subj_prefix` system Section 3.1.1 first introduced. Concretely:
+
+```
+   CORRECT:    umuntu      mwiza       "a good person"   (class 1 noun
+               u-mu-ntu    mu-iza       + class-1-agreeing adjective)
+                  ↑class 1    ↑RS=mu, matches!
+
+   INCORRECT:  umuntu      kiza        "✗ a good person"  (class-7-agreeing
+               u-mu-ntu    ki-iza       adjective wrongly attached
+                  ↑class 1    ↑RS=ki, MISMATCH        to a class-1 noun)
+```
+
+This is not a stylistic nuance — to a native speaker, `*umuntu kiza` is as
+immediately, jarringly wrong as "a dogs is here" is to an English speaker.
+And crucially, *because* every class has its own fixed, table-driven
+concordance marker (Chapter 7's `NOUN_CLASSES[]`), checking this kind of
+agreement is not a fuzzy, statistical judgment — it's a deterministic
+string comparison: look up the noun's class, look up what concordance
+prefix *that* class requires, and compare it against what the adjective
+actually has. `syntax.c` is the file that runs exactly this comparison,
+and four more like it, across an entire sentence's tokens.
+
 ## 12.1 `add_error`: the capacity+count idiom, append style, with a cross-struct side effect
 
 ```c
@@ -243,6 +272,45 @@ that can span an unknown distance (which noun, possibly several words
 back, does this verb's subject prefix actually agree with) requires a
 real bounded search, not a fixed-offset peek.
 
+## 12.7 Case study: catching `*urugo wacu` and proposing `urugo rwacu`
+
+`syntax.c`'s own header comment gives this exact pair as the canonical
+Rule 2 example — worth tracing end to end as a complete detect-and-suggest
+cycle:
+
+```
+   INCORRECT:  urugo        wacu       "✗ our homestead"
+               uru-go       wa-cu       wa = class-1 possessive connector
+                  ↑class 11    ↑MISMATCH (class 11 needs "rwa", not "wa")
+
+   CORRECT:    urugo        rwacu      "our homestead"
+               uru-go       rwa-cu      rwa = class-11 possessive connector
+                  ↑class 11    ↑MATCH
+```
+
+`urugo` ("homestead") is class 11, whose possessive connector — straight
+out of Section 7.1.1's table — is `rwa`, not `wa`. Walking through what
+the code actually does with this pair:
+
+1. The noun `urugo` is already tagged `POS_NOUN`, `noun_class = 11`.
+2. The following token, `wacu`, is checked: its leading connector fragment
+   is `wa`, which Section 12.4's `poss_connector[]` table says belongs to
+   class 1 or 3 — not class 11. Mismatch detected.
+3. `poss_connector[11]` is looked up directly (the same table, same
+   technique, just read for the *correct* answer this time) to get `rwa`.
+4. A corrected suggestion is built by substituting `rwa` for the wrong
+   `wa` connector while keeping the rest of the word (`cu`, "our") intact
+   — `rwacu`.
+5. `add_error(sa, ERR_POSS_AGREEMENT, i+1, msg, sug)` records the error
+   against the *possessive's* token index, with both an explanation
+   message and the ready-to-use corrected suggestion string.
+
+Notice this is the exact same three-step shape as the adjective case in
+Section 12.0 (look up what's required, compare against what's actually
+there, propose the table-driven correct form if they differ) — Rule 1 and
+Rule 2 are, structurally, the same check run against two different
+concordance columns of the identical `NOUN_CLASSES[]` table.
+
 ## Key takeaways
 
 - The capacity+count idiom (Ch.3) appears here in its append form
@@ -277,9 +345,13 @@ real bounded search, not a fixed-offset peek.
 
 ## Coming up in Chapter 13
 
-`corrector.c` is the shortest substantive file in the project — only 107
-lines. Chapter 13 covers how it reuses almost everything from this
-chapter and Chapter 11 (the `adj_concordance` table, `kin_vv_join`, the
-morpheme-label search) to actually *generate* the corrected text a
-caller should use instead of the original, completing the loop from
-"detect a problem" to "propose a fix."
+`syntax.c` checked agreement *within* a clause — does this adjective
+match that noun, does this possessive match that noun. `punctuation.c`
+is the file that checks structure *between* clauses: where does one
+clause end and the next begin, is a semicolon doing real work or
+separating a fragment, does a sentence that opens with `"Ko..."` actually
+need a closing exclamation. Chapter 13 covers how this project detects
+clause boundaries and punctuation-level errors using the same
+ordered-checks, array-of-tokens techniques you've just spent this entire
+chapter mastering — applied one level up, from word-to-word agreement to
+clause-to-clause structure.

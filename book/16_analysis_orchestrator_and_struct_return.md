@@ -1,4 +1,4 @@
-# Chapter 15 — `analysis.c`: The Orchestrator, and Returning Structs by Value
+# Chapter 16 — `analysis.c`: The Orchestrator, and Returning Structs by Value
 
 ## The capstone function
 
@@ -10,7 +10,7 @@ past — and that's deliberate; this chapter is partly a review, walking
 through `kin_analyze()` line by line and naming exactly which earlier
 chapter explains each call.
 
-## 15.1 `kin_analyze()`: one function, one line per pipeline stage
+## 16.1 `kin_analyze()`: one function, one line per pipeline stage
 
 ```c
 SentenceAnalysis kin_analyze(const char *text) {
@@ -20,17 +20,17 @@ SentenceAnalysis kin_analyze(const char *text) {
     sa.token_count = kin_tokenize(text, sa.tokens, KIN_MAX_TOKENS);   /* Ch.4  */
     kin_tag_sentence(&sa);                                            /* Ch.8  */
     kin_propagate_proper_nouns(&sa);
-    kin_resolve_sp_ambiguity(&sa);                                    /* §15.4 below */
+    kin_resolve_sp_ambiguity(&sa);                                    /* §16.4 below */
 
     for (int i = 0; i < sa.token_count; i++)
         kin_morpheme_analyze(&sa.tokens[i]);                          /* Ch.11 */
 
     for (int i = 0; i < sa.token_count; i++)
-        kin_fill_morpheme_glosses(&sa.tokens[i]);                     /* Ch.14 */
+        kin_fill_morpheme_glosses(&sa.tokens[i]);                     /* Ch.15 */
 
     kin_tag_gram_roles(&sa);
     kin_check_syntax(&sa);                                            /* Ch.12 */
-    kin_suggest_corrections(&sa);                                     /* Ch.13 */
+    kin_suggest_corrections(&sa);                                     /* Ch.14 */
 
     return sa;
 }
@@ -40,18 +40,18 @@ Every single call here is a function whose internals you've already
 studied in detail. There's no new control-flow cleverness in this
 function — its entire value is *sequencing*: text becomes tokens
 (Ch.4), tokens get tagged with a grammar tree (Ch.8), ambiguous subject
-prefixes get resolved against context (§15.4), every token's morphemes
-get broken down (Ch.11) and then glossed in English (Ch.14), grammatical
+prefixes get resolved against context (§16.4), every token's morphemes
+get broken down (Ch.11) and then glossed in English (Ch.15), grammatical
 roles get assigned, agreement gets checked (Ch.12), and corrections get
-suggested (Ch.13) — strictly in that order, because each stage's input is
+suggested (Ch.14) — strictly in that order, because each stage's input is
 the previous stage's output. If you remember nothing else about this
 function, remember this: **it is the literal, physical evidence that
 this entire project is one pipeline**, and every file you've studied is
 one named stage of it, called here in the only order that makes sense.
 
-## 15.2 `memset(&sa, 0, sizeof(sa));` — Chapter 13's open question, now settled
+## 16.2 `memset(&sa, 0, sizeof(sa));` — Chapter 14's open question, now settled
 
-Back in Chapter 13, `corrector.c` was found relying on an *assumption*:
+Back in Chapter 14, `corrector.c` was found relying on an *assumption*:
 that `err->suggestion` already started as all-zero bytes before its
 `strncpy` call, even without an explicit terminator written afterward.
 Here is the proof that assumption holds, for every `SentenceAnalysis`
@@ -64,7 +64,7 @@ guaranteed `'\0'` the moment `corrector.c` reaches it, for every
 `SentenceAnalysis` that flows through this single, central entry point.
 
 This is worth stating precisely, because the *honest* lesson isn't "so
-Chapter 13's concern was wrong" — it's: **the safety Chapter 13 flagged
+Chapter 14's concern was wrong" — it's: **the safety Chapter 14 flagged
 as missing locally does, in fact, hold globally, but only because of a
 single `memset` call in a completely different file, which
 `corrector.c` itself neither performs nor checks for.** That's a real
@@ -78,7 +78,7 @@ your code's safety actually depends on — rather than vaguely gesturing at
 "it's probably fine" — is precisely the level of precision a defense
 should reward.
 
-## 15.3 Returning a 583-kilobyte struct by value
+## 16.3 Returning a 583-kilobyte struct by value
 
 ```c
 SentenceAnalysis kin_analyze(const char *text) {
@@ -89,7 +89,7 @@ SentenceAnalysis kin_analyze(const char *text) {
 ```
 
 Every other multi-output function in this entire project (Chapters
-5–13) used the out-parameter pattern: take a pointer, write the answer
+5–14) used the out-parameter pattern: take a pointer, write the answer
 through it, return a `bool`/`int` status. `kin_analyze()` does something
 none of them do — it declares its result as a perfectly ordinary local
 variable and returns it **by value**, with the function's return *type*
@@ -132,7 +132,7 @@ is called — and it's the same number Chapter 3 calculated, now seen
 attached to a concrete, callable function rather than an abstract
 `sizeof()` result.
 
-## 15.4 `scan_back_noun`: the backward-search pattern, generalized into a reusable helper
+## 16.4 `scan_back_noun`: the backward-search pattern, generalized into a reusable helper
 
 Chapter 12 showed `syntax.c`'s subject-verb agreement check performing a
 hand-written backward scan, inline, specific to that one check.
@@ -186,13 +186,27 @@ similar enough to deserve a shared abstraction, and when they're better
 left separate because their actual requirements diverge, is itself part
 of what you're being asked to demonstrate understanding of.
 
+### 16.4.1 Why "SP ambiguity" is a real linguistic fact, not a parsing bug
+
+`ya_cls[] = {1, 4, 6, 9}` looks arbitrary until you connect it back to
+Section 7.1.1's noun-class table: classes 1, 4, 6, and 9 are exactly the
+classes whose verb subject-prefix surfaces as `ya`-shaped in the past
+tense, and classes 4 and 9 separately share the surface form `i`. A
+conjugated verb beginning with `ya-` is genuinely, irreducibly ambiguous
+about which of four noun classes its subject belongs to *until* you look
+backward in the sentence and find which class the actual subject noun
+carries — `kin_resolve_sp_ambiguity` exists because this ambiguity is real
+in the language itself, not an artifact of imperfect detection; resolving
+it is a textbook case of needing sentence-level context (`scan_back_noun`)
+to settle something the verb's own letters genuinely cannot.
+
 ## Key takeaways
 
 - `kin_analyze()` is the single function that proves this project is a
   pipeline — every other file's main entry point is called here, exactly
   once, in the only order that produces correct results.
 - A `memset` on the very first line of the orchestrator is what makes
-  every later "assume the buffer started zeroed" assumption (Ch.13) true
+  every later "assume the buffer started zeroed" assumption (Ch.14) true
   in practice — but that safety depends specifically on every
   `SentenceAnalysis` being constructed through this one function.
 - Returning a struct by value is, conceptually, a full copy in the C
@@ -216,10 +230,10 @@ of what you're being asked to demonstrate understanding of.
 - "stack frame size and function calls explained"
 - "DRY principle applied to algorithms not just code"
 
-## Coming up in Chapter 16
+## Coming up in Chapter 17
 
 `g2p.c` (626 lines) converts written Kinyarwanda into a phoneme sequence
-for text-to-speech and speech-recognition use. Chapter 16 covers its
+for text-to-speech and speech-recognition use. Chapter 17 covers its
 `PHONEME_TABLE` and the `sizeof(arr)/sizeof(arr[0])` length-counting
 idiom you first glimpsed back in Chapter 7, now seen in its actual,
 complete call sites — plus how this file packages its output as both a

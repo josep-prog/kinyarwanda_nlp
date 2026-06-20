@@ -67,6 +67,38 @@ ordering you've seen in every priority chain so far (Ch.6, Ch.8) — moving
 markers several rule functions still need to see before they've had a
 chance to fire.
 
+### 10.1.1 What each pass actually changes, in plain English
+
+Before diving into the loop mechanics, here is what every numbered pass is
+*for*, linguistically — the RALC section it implements, and one example
+each (continuing the categories Section 9.0 introduced):
+
+| Pass | RALC § | Rule, in plain English | Example |
+|---|---|---|---|
+| P1 | §2.3 | Swap `w` and a following `y` | `tek-w-ye` → `tek-y-w-e` |
+| P2/P3 | §3.8/§3.9 | A consonant fuses with a following `y` into one new sound | `k+y → ts`, `t+y → cy`, `r+y → z` |
+| P4 | §3.4 | `b` becomes `m` before `n` | `-bw- + n → -mw-`-type clusters |
+| P5 | §3.3 | `n` (and `r`) assimilate to match the next consonant | `n+b → mb`, `r+n → d` |
+| P6 | (folded into P5) | `r` becomes `d` before `n` | `kur-n- → kud-` |
+| P7 | §3.1 | `n` disappears before another nasal | `n+m → m`, `n+n → n` |
+| P8 | §3.7 | A voiceless stop becomes voiced after certain morphemes | `k → g`, `t → d` |
+| P9 (cons. loss) | §2.2 | `y` or `w` is dropped in specific boundary contexts | glide deleted, not kept |
+| P9 (Nt.9/10) | §2.4 | `n+y` fuses to `nz`, only for class 9/10 nouns | class-9/10-specific |
+| P10 | §1.2 | Two vowels fuse into a third vowel | `a+i → e`, `a+u → o` |
+| P11 | §1.1/§2.1 | A vowel becomes a semivowel, or is dropped, next to another vowel | `u → w`, `i → y`, `u → ø` |
+| P12 | — | Strip the now-unneeded `\|` boundary markers | bookkeeping only |
+| P13 | §3.6 | Delete an inserted "helper" consonant once it's no longer needed | `nts → ns`-type cleanup |
+| P14 | §3.2 | One consonant assimilates to match a neighboring one's manner | `z/sh`, `s/j`, `s/sh` pairs |
+| P15 | §1.3 | A vowel matches the "height" of a nearby vowel in the stem | `-ir-/-ish-` → `-er-/-esh-` before an o-stem |
+
+The italicized point worth sitting with: **every single row of this table
+is a real, independently-attested fact about how Kinyarwanda is actually
+pronounced** — none of these are inventions of this codebase. A native
+speaker applies every one of these rules unconsciously, correctly, every
+time they talk. `ortho.c` exists because *software* doesn't have that
+unconscious competence — it has to be told, explicitly, rule by rule, in
+the exact order a speaker's mind would (mostly invisibly) apply them.
+
 ## 10.2 Two different loop shapes for two different rule behaviors
 
 Look closely and you'll notice **two distinct loop shapes** used for
@@ -233,8 +265,52 @@ at all**.
 
 ## 10.6 Try it yourself: trace a real example through the pipeline
 
-The file's own P1 comment documents this worked example:
-`bi|a|tek|w|ye → byatetswe` ("it was cooked"). Confirm it yourself:
+Before tracing the *passes*, it's worth tracing the *meaning* — what is
+`bi|a|tek|w|ye` actually built out of, morpheme by morpheme, and why does
+the surface form come out the way it does?
+
+```
+   bi    -    a    -   tek   -    w    -   ye
+   │         │         │          │         │
+   SP        TM       root       EXT        FV
+ (class 8,  (past)   "-tek-"   (passive)  (perfect)
+  "it/they,
+   things")
+```
+
+In English: *"it/they (some things, class 8) was/were cooked."* This is
+the conjugated-verb formula from Section 3.3.1 (`SP+TM+root+EXT+FV`) with
+one slot doubled up: the `EXT` slot here is filled by the passive marker
+`-w-` ("[was] V-ed", not "V-ed [something]"), and the `FV` slot takes its
+perfect-tense shape `-ye` rather than the plain `-a`. Knowing this meaning
+in advance makes the phonological trace below far more than just
+character-shuffling — every step is a real sound a real speaker makes when
+saying "it was cooked" out loud, not an arbitrary string transformation:
+
+1. **P1 — metathesis**: `tek|w|ye` → `tek|y|w|e`. Kinyarwanda doesn't
+   tolerate the sequence `-wye` directly after a consonant; the `w` and
+   the following `y`-onset of the perfect ending swap places so the
+   syllable structure stays pronounceable. (This is the same general
+   phenomenon English speakers do unconsciously with words like "aks" for
+   "ask" in some dialects — sounds reordering for ease of articulation —
+   just codified here as an official, predictable rule rather than a
+   casual variant.)
+2. **P2/P3 — consonant+y fusion**: the stem-final `k` of `tek` is now
+   directly followed by the relocated `y` (`tek|y` → `te` + `k+y`). RALC
+   §3.9 fuses `k+y` into the single consonant `ts` — this is
+   **palatalization**, the same broad phenomenon that turns English "did
+   you" into the casual "didja": a consonant pulled toward the place in
+   the mouth where `y` is articulated, merging into a new, single sound.
+   The result so far: `bi|a|tetswe`-shaped material.
+3. **P12 — strip boundaries**: the `|` markers, which were never part of
+   the real word, only a bookkeeping device for these rules to find their
+   trigger positions, are removed.
+4. By the time every remaining pass has run (most of P4–P11 and P13–P15
+   find nothing left to change for *this particular* word — they exist for
+   *other* morpheme combinations this same engine has to handle correctly),
+   the buffer reads exactly **`byatetswe`**.
+
+Confirm this yourself by compiling and running it:
 
 ```c
 #include "kinyarwanda.h"

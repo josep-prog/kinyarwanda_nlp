@@ -1,4 +1,4 @@
-# Chapter 20 — The Test Suite: Macros, `do { } while(0)`, and Testing a Rule-Based Engine
+# Chapter 22 — The Test Suite: Macros, `do { } while(0)`, and Testing a Rule-Based Engine
 
 ## A hand-rolled framework, on purpose
 
@@ -9,7 +9,7 @@ chapter explains the one C idiom that makes its macros safe to use
 anywhere, then looks at what running 871 lines of test code across four
 files actually checks for a rule-based linguistic engine like this one.
 
-## 20.1 The `do { } while(0)` trick, explained precisely
+## 22.1 The `do { } while(0)` trick, explained precisely
 
 ```c
 #define ASSERT(r, cond, label) do {                                     \
@@ -57,7 +57,7 @@ without braces) with a trick that costs nothing at runtime — the
 `while(0)` is a compile-time-constant condition that any decent compiler
 eliminates entirely, leaving just the body's actual instructions.
 
-## 20.2 `__FILE__` and `__LINE__`: the preprocessor fills these in for you
+## 22.2 `__FILE__` and `__LINE__`: the preprocessor fills these in for you
 
 ```c
 fprintf(stderr, "  FAIL  %-55s  [%s:%d]\n", (label), __FILE__, __LINE__);
@@ -78,7 +78,7 @@ preprocessor inserts the correct, current location automatically, fresh,
 at every single call site, because that's where the macro's text actually
 gets substituted in before compilation.
 
-## 20.3 `run_tests.c`: a compound literal, and accumulating pass/fail flags
+## 22.3 `run_tests.c`: a compound literal, and accumulating pass/fail flags
 
 ```c
 int main(void) {
@@ -120,10 +120,10 @@ it back off once set. The final `return any_fail ? 1 : 0;` feeds this
 accumulated signal directly into the program's **exit status** — the
 standard Unix convention where `0` means success and any nonzero value
 means failure, which is exactly what lets a shell script, a CI pipeline,
-or `make test`'s own success/failure reporting (Chapter 19) work
+or `make test`'s own success/failure reporting (Chapter 21) work
 correctly off of nothing more than this one returned integer.
 
-## 20.4 Internal wiring without a shared header
+## 22.4 Internal wiring without a shared header
 
 ```c
 /* in run_tests.c, with no dedicated header file for these */
@@ -149,7 +149,7 @@ direct approach is the more honest engineering choice, is itself part of
 what separates a junior read of "always do X" from actually
 understanding *why* X is usually the right call.
 
-## 20.5 What these tests actually check — and how that differs from Chapter 11's `verified` flag
+## 22.5 What these tests actually check — and how that differs from Chapter 11's `verified` flag
 
 ```c
 kin_ortho_gen("ku|eza", false, buf, sizeof(buf));
@@ -177,7 +177,7 @@ but simply *wrong* about the language. If you're asked "how do you know
 your analysis is correct," the strongest answer names both checks
 explicitly and explains what each one can and cannot catch.
 
-## 20.6 Try it yourself: prove the `do`/`while(0)` wrapper is necessary
+## 22.6 Try it yourself: prove the `do`/`while(0)` wrapper is necessary
 
 ```c
 #include <stdio.h>
@@ -209,7 +209,7 @@ Compile this and trace through it by hand (or step through it in a
 debugger): the `BAD_CHECK` call's own internal `else` silently consumes
 the outer `else printf("outer else\n");`, attaching it to the macro's
 `if` instead of the programmer's — exactly the dangling-else bug Section
-20.1 described, now visible with your own eyes instead of taken on
+22.1 described, now visible with your own eyes instead of taken on
 faith.
 
 ## Key takeaways
@@ -245,9 +245,9 @@ faith.
 - "compound literals in C99"
 - "Unix exit status codes explained"
 
-## Coming up in Chapter 21
+## Coming up in Chapter 23
 
-Chapter 21 steps back from any single file to name, directly and in one
+Chapter 23 steps back from any single file to name, directly and in one
 place, the defensive-programming habits you've now seen scattered across
 every chapter: `snprintf` over `sprintf`, the complete absence of
 `malloc`/`free`, bounds checks before every buffer write, and the

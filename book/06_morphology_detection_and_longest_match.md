@@ -8,6 +8,49 @@ Chapter 5 covered the small, general-purpose utilities at the top of
 tables (`OM_TABLE`) and helpers (`om_strip()`). This is also where you'll
 meet this project's one and only use of **recursion**.
 
+## 6.0 Why noun-class detection is a string-prefix problem at all
+
+Section 3.1.1 introduced the noun formula `D + RT + C` and the idea of 16
+noun classes. Before reading the code, it's worth seeing *why* "which class
+is this noun?" reduces, almost entirely, to "which prefix does this string
+start with?" Each of the 16 classes has its own characteristic `D+RT`
+combination, and — critically — these combinations are largely distinct
+strings, which is exactly what makes prefix matching a viable strategy in
+the first place:
+
+```
+ nt.1  umu-   (umuntu, "person")        nt.9   in-/i(n)-  (inka, "cow")
+ nt.2  aba-   (abantu, "people")        nt.10  in-/zi(n)- (inka pl, "cows")
+ nt.3  umu-   (umuti, "tree")           nt.11  uru-       (uruzi, "river")
+ nt.4  imi-   (imiti, "trees")          nt.12  aka-       (akana, "small child")
+ nt.5  i(ri)- (ijuru, "sky")            nt.13  utu-       (utwana, "small children")
+ nt.6  ama-   (amata, "milk")           nt.14  ubu-       (ubuzima, "life")
+ nt.7  iki-   (ikintu, "thing")         nt.15  uku-       (kugenda, "to walk" — infinitive!)
+ nt.8  ibi-   (ibintu, "things")        nt.16  aha-       (ahantu, "place")
+```
+
+(Full reference with every concordance form is Chapter 7's table; this is
+just enough to see the shape of the problem.) Two things make this *harder*
+than a flat lookup table, and both are exactly what `kin_detect_noun_class`
+spends its 100+ lines handling:
+
+1. **Classes 1 and 3 share the identical prefix `umu-`.** There is no
+   string-level way to tell "person" (class 1) apart from "tree" (class 3)
+   by prefix alone — that ambiguity is real, not a flaw in the code, and
+   the disambiguation has to come from elsewhere (often the verb agreement
+   prefix the noun later triggers, or simply the dictionary identity of the
+   stem — `-ntu` is class 1, `-ti` is class 3, looked up in Chapter 7's
+   stem tables).
+2. **The same surface bytes can belong to a noun *or* something else
+   entirely**, once you account for casual speech, poetry, or fast typing
+   dropping the leading `D` vowel. `"bantu"` missing its `a-` could still
+   plausibly be intended as `"abantu"`. This is exactly the kind of
+   ambiguity Sections 6.1–6.2 below show the code resolving with ordered
+   checks and guard conditions — not because the programmer wanted extra
+   complexity, but because the language itself is genuinely ambiguous at
+   the surface-string level, and a rule-based system has to make an
+   explicit, defensible choice every time that happens.
+
 ## 6.1 The longest-match algorithm: order is the entire algorithm
 
 ```c
@@ -224,6 +267,32 @@ which phonological rule fired (`"umu"` vs. the contracted `"mu"`, etc.).
 string — no copying happens here either; it's just a pointer moved
 forward past however many prefix bytes were identified.
 
+### 6.5.1 What an "object marker" actually is, before the table
+
+`OM_TABLE` stands for **object-marker table**, and it's worth pausing to
+say what that means in plain terms, since the rest of this section uses
+the abbreviation constantly. Kinyarwanda can express a verb's *object*
+(the thing the action is done to) two ways: as a separate noun after the
+verb (*Yabonye umuntu* — "He/she saw a person"), or **fused directly inside
+the verb itself**, as an infixed pronoun-like marker sitting between the
+tense marker and the stem:
+
+```
+   Yarabonye        "He/she saw [something]"          (no object marker)
+   Ya-mu-bonye      "He/she saw him/her"               mu = OM, class 1
+   Ya-bi-bonye      "He/she saw it/them"               bi = OM, class 8
+```
+
+This `mu`/`bi`/`ki`/... infix is exactly the `OM` slot from Section
+3.3.1's ten-symbol vocabulary (`SP+TM+OM+root+EXT+FV`) — and you can see
+immediately why it's ambiguous with a *noun-class prefix*: the object
+marker for class 1 (`mu`) is spelled identically to class 1's noun prefix
+fragment. `OM_TABLE` exists specifically to let the code recognize these
+infixed object markers inside a conjugated verb form, using the same
+"prefix-matching against a small table" strategy as noun-class detection
+— a second application of the same underlying idea, applied to a different
+slot in a different word-type's formula.
+
 ## 6.6 `OM_TABLE`: a third sentinel-terminated-list idiom
 
 ```c
@@ -301,6 +370,40 @@ loop either." This is a second illustration of something Chapter 6.2
 already showed with the noun-class guards: matching a prefix textually is
 necessary but not always sufficient — extra, hand-coded disambiguation
 logic is frequently layered on top of a simple lookup.
+
+## 6.8 Case study: why `"bagenda"` and `"bahinzi"` must be told apart
+
+Section 6.2 quoted the guard against verb collisions in the abstract; here
+is the full disambiguation worked end to end on two real words that begin
+with the identical two bytes, `ba`:
+
+```
+   "bagenda"  →  intended reading: VERB, not noun
+                 ba-gend-a  =  SP(class 2, "they") + root "-gend-" + FV "-a"
+                 English: "they go/walk"
+                 Last letter is 'a'  →  guard `w[wlen-1] != 'a'` is FALSE
+                 → kin_detect_noun_class() correctly REFUSES to claim this
+                   as a class-2 noun with dropped 'a-'; it falls through.
+
+   "bahinzi"  →  intended reading: NOUN, class 2, dropped D-vowel
+                 (a)-ba-hinzi  =  D(elided "a") + RT "ba" + C "hinzi"
+                 English: "farmers"
+                 Last letter is 'i'  →  guard `w[wlen-1] != 'a' && != 'e'`
+                 is TRUE for both checks → kin_detect_noun_class() accepts
+                 this as class 2, returns 2.
+```
+
+Both words are real, valid Kinyarwanda; both share the exact same first two
+letters; the *only* signal `kin_detect_noun_class()` has to tell them apart
+— since it only ever looks at one bare word string, with no surrounding
+sentence context available at this stage of the pipeline — is the final
+letter. That single-character heuristic is genuinely fallible (a noun
+ending in `-a` would be wrongly rejected here), and the project accepts
+that cost deliberately rather than building a far more expensive
+context-aware disambiguator for what is, in practice, a small minority of
+cases. If asked to defend this exact trade-off, this worked pair is the
+concrete evidence: it shows the heuristic working correctly on two genuine
+near-collisions, and names exactly the shape of input that would break it.
 
 ## Key takeaways
 

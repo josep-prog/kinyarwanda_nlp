@@ -1,8 +1,8 @@
-# Chapter 17 — `api.c`: Designing a Thin Convenience Layer
+# Chapter 18 — `api.c`: Designing a Thin Convenience Layer
 
 ## Why a second, simpler interface on top of a complete one
 
-`kinyarwanda.h` and `kin_analyze()` (Chapter 15) already give you
+`kinyarwanda.h` and `kin_analyze()` (Chapter 16) already give you
 everything: a full `SentenceAnalysis`, every token's grammar tree,
 tense, morpheme breakdown, every detected error. But most real callers
 of this library — an ASR pipeline cleaning up speech-to-text output, a
@@ -15,7 +15,7 @@ called a **facade**: a small, simplified interface placed in front of a
 larger, more capable subsystem, for callers who only need a fraction of
 what that subsystem can do.
 
-## 17.1 Returning a pointer to a `static` local buffer — and why it's the only safe choice
+## 18.1 Returning a pointer to a `static` local buffer — and why it's the only safe choice
 
 ```c
 const char *kin_correct(const char *text)
@@ -52,7 +52,17 @@ returned. This is *the* canonical reason a C programmer reaches for a
 and there's no heap allocation involved, `static` storage is the only
 one of the three durations that outlives the function call.
 
-## 17.2 The trade-off, and how this project documents it
+A concrete instance of "give me corrected text back," using the exact
+agreement error traced in Sections 12.7 and 13.5: `kin_correct("urugo
+wacu")` would internally run the full `kin_analyze()` pipeline, find the
+`ERR_POSS_AGREEMENT` violation, and return the single corrected string
+`"urugo rwacu"` — no `Token` array, no `Error` struct, no morpheme
+breakdown ever surfaced to the caller. That collapse, from a rich
+multi-field analysis down to one plain string, is the entire value this
+facade adds for an ASR post-processing pipeline that only ever wants the
+cleaned-up sentence, never the grammatical reasoning behind the fix.
+
+## 18.2 The trade-off, and how this project documents it
 
 That safety comes at a real cost, and this project's own header is
 explicit about it — read `kinyarwanda_api.h`'s comment directly:
@@ -82,7 +92,7 @@ since overwritten. This is exactly why the header says the result is
 from two threads at once (two threads writing into the same `buf`
 simultaneously would interleave their writes into one corrupted result).
 
-This is the precise, direct payoff of Chapter 15's discussion of
+This is the precise, direct payoff of Chapter 16's discussion of
 `kin_analyze()` returning a struct **by value**: that design choice gives
 every caller their own independent copy (Chapter 3's struct-copy
 semantics), safe across threads, at the cost of a large value being
@@ -98,7 +108,7 @@ able to explain why two functions in the same library make two different
 choices — and that the difference is intentional, not inconsistent — is
 exactly the kind of question worth being ready for.
 
-## 17.3 Building the corrected sentence: preference lookup, plus manual delimiter logic
+## 18.3 Building the corrected sentence: preference lookup, plus manual delimiter logic
 
 ```c
 const char *word = tok->surface;
@@ -113,7 +123,7 @@ for (int e = 0; e < sa.error_count; e++) {
 ```
 
 This is the same "prefer the better value if one exists, otherwise fall
-back" idiom from Chapter 14 — there it was a single ternary expression;
+back" idiom from Chapter 15 — there it was a single ternary expression;
 here, because the lookup condition needs three separate checks (the
 right token, the right error type, a non-empty suggestion), it's spelled
 out as a small loop with a `break` the moment a match is found, rather
@@ -138,7 +148,7 @@ buf[pos] = '\0';
 
 This is the third time in this book you've built a delimited string by
 hand, one piece at a time, with no `join()` function to lean on
-(Chapter 14's two-row gloss display, Chapter 16's `seq_append`): track a
+(Chapter 15's two-row gloss display, Chapter 17's `seq_append`): track a
 running position (`pos`), decide whether the *next* piece needs a
 separator before it (`attach_left` answers exactly that, this time
 based on whether the upcoming token is punctuation that should hug the
@@ -147,7 +157,7 @@ piece itself with an explicit truncate-rather-than-overflow guard —
 Chapter 4 and Chapter 9's bounds-clamping discipline, applied here to
 the one shared `static` buffer this entire function writes into.
 
-## 17.4 `kin_g2p`: the same static-storage trick, applied to a whole struct
+## 18.4 `kin_g2p`: the same static-storage trick, applied to a whole struct
 
 ```c
 const char *kin_g2p(const char *text)
@@ -159,8 +169,8 @@ const char *kin_g2p(const char *text)
 }
 ```
 
-Same reasoning as Section 17.1, applied one level up: `static
-KinPhonemeSeq seq;` gives the *entire* struct (Chapter 16's dual-view
+Same reasoning as Section 18.1, applied one level up: `static
+KinPhonemeSeq seq;` gives the *entire* struct (Chapter 17's dual-view
 phoneme sequence) program-long lifetime, not just its `char buf[]`
 field. The function then returns `seq.repr` — a pointer to one **field**
 of that static struct, not the struct itself. This is worth confirming
@@ -170,7 +180,7 @@ safe to take the address of and return — `&seq.repr[0]` is just as valid
 a pointer to hand back as `&seq` itself would be, for exactly the same
 reason.
 
-## 17.5 Try it yourself: reproduce the "valid until next call" gotcha
+## 18.5 Try it yourself: reproduce the "valid until next call" gotcha
 
 ```c
 #include "kinyarwanda_api.h"
@@ -209,7 +219,7 @@ to keep it.
   the result is only valid until the next call, and the function is not
   safe to call from multiple threads at once — a trade-off this project
   documents explicitly rather than hiding.
-- Returning a struct **by value** (Ch.15's `kin_analyze`) and returning a
+- Returning a struct **by value** (Ch.16's `kin_analyze`) and returning a
   **pointer to static storage** (this chapter's `kin_correct`/`kin_g2p`)
   are two legitimate, different answers to "how do I hand data back to a
   caller" — safe-but-larger versus cheap-but-shared — and a real library
@@ -229,11 +239,11 @@ to keep it.
 - "thread safety static buffers C"
 - "facade design pattern explained"
 
-## Coming up in Chapter 18
+## Coming up in Chapter 19
 
 `main.c` is the one file in this entire project that is *not* part of
 the library (recall Chapter 1's explanation of why it's excluded from
-`LIB_SRCS`). Chapter 18 covers how it parses command-line arguments
+`LIB_SRCS`). Chapter 19 covers how it parses command-line arguments
 (`argv`/`argc`), reads files line by line, and runs an interactive REPL
 loop — the only place in the whole codebase that talks directly to a
 terminal or a filesystem.

@@ -1,4 +1,4 @@
-# Chapter 22 — Cross-Language Integration: Why C, `extern "C"`, and What FFI Means
+# Chapter 24 — Cross-Language Integration: Why C, `extern "C"`, and What FFI Means
 
 ## The last design question
 
@@ -10,7 +10,7 @@ tables and `if`-chains. The honest answer isn't "C is faster" — it's
 that C is the only language whose compiled output every *other* language
 already knows how to call.
 
-## 22.1 Why C, restated precisely
+## 24.1 Why C, restated precisely
 
 Chapter 1 listed C's advantages briefly; here's why each one matters
 specifically for a library meant to be embedded inside other systems:
@@ -21,9 +21,9 @@ specifically for a library meant to be embedded inside other systems:
   C ABI, which is to say, almost everything.
 - **Predictable latency.** No garbage-collection pause can interrupt an
   analysis call partway through, because there is no garbage collector
-  (Chapter 21's no-heap-allocation discipline is what makes this true,
+  (Chapter 23's no-heap-allocation discipline is what makes this true,
   not a separate guarantee bolted on afterward).
-- **Deterministic memory.** Chapter 3 and Chapter 21 already covered
+- **Deterministic memory.** Chapter 3 and Chapter 23 already covered
   this from the inside; from the outside, it means a caller embedding
   this library never has to worry about it allocating unbounded memory
   under unusual input.
@@ -36,16 +36,16 @@ specifically for a library meant to be embedded inside other systems:
 
 None of these are abstract claims — every one of them is a direct
 consequence of design choices you've already read the actual code for,
-in Chapters 1, 3, 9, and 21.
+in Chapters 1, 3, 9, and 23.
 
-## 22.2 What makes a compiled function "universally callable"
+## 24.2 What makes a compiled function "universally callable"
 
 Every mainstream language's foreign-function mechanism — Python's
 `ctypes`, Java's JNA, Go's `cgo`, C#'s `P/Invoke`, Node's N-API — works
 on the same underlying principle: **load the compiled library into the
 calling process's own memory, locate a function inside it by its exact
 exported name, and call it directly as if it were a function pointer**,
-using the platform's standard calling convention (Chapter 15 introduced
+using the platform's standard calling convention (Chapter 16 introduced
 this idea when explaining how large structs get returned — the same
 calling convention governs how *every* function's arguments and return
 value are physically passed, in registers or on the stack, regardless of
@@ -61,7 +61,7 @@ tool in every language can find a function named `kin_correct` inside
 `libkinyarwanda.so` because that name really is sitting there, verbatim,
 in the binary's symbol table.
 
-## 22.3 Why `extern "C"` (Chapter 1) specifically matters here
+## 24.3 Why `extern "C"` (Chapter 1) specifically matters here
 
 Chapter 1 explained the mechanism: `extern "C"` stops a C++ compiler from
 mangling a function's name. Here's why that's not just a C++-interop
@@ -80,7 +80,7 @@ for the actual C compiler that builds this project — every language's
 binding tooling can rely on the function existing under exactly the name
 its own header already advertises.
 
-## 22.4 Why the public structs are deliberately "flat"
+## 24.4 Why the public structs are deliberately "flat"
 
 Look back at `Token` and `SentenceAnalysis` (Chapter 3) with this
 chapter's question in mind: every field is a fixed-size array, a plain
@@ -103,9 +103,9 @@ anything more "modern" — flatness isn't a missed opportunity for
 abstraction, it's a requirement for the struct to be legible across a
 language boundary at all.
 
-## 22.5 Why `api.c` (Chapter 17) is also an FFI design decision
+## 24.5 Why `api.c` (Chapter 18) is also an FFI design decision
 
-Chapter 17 explained `kin_correct()` and `kin_g2p()` as a convenience
+Chapter 18 explained `kin_correct()` and `kin_g2p()` as a convenience
 layer for C callers who don't want to learn the full `Token` model. From
 this chapter's vantage point, there's a second, equally real reason
 they exist: **a function that takes a `const char *` and returns a
@@ -126,9 +126,9 @@ post-processing, TTS phoneme generation), and the complete, detailed
 model for callers willing to do the extra work of mirroring the real C
 layout.
 
-## 22.6 A brief, concrete illustration
+## 24.6 A brief, concrete illustration
 
-To make Section 22.2's abstract description tangible, here is the
+To make Section 24.2's abstract description tangible, here is the
 entire mechanism, in Python, using nothing but the standard library's
 `ctypes` module — no extra packages, no code generation step:
 
@@ -143,7 +143,7 @@ result = lib.kin_correct(b"Umuntu mugni aragenda")
 print(result.decode("utf-8"))
 ```
 
-Walk through this against Section 22.2's description: `ctypes.CDLL(...)`
+Walk through this against Section 24.2's description: `ctypes.CDLL(...)`
 performs step 1 (load the compiled library into this Python process).
 Setting `.argtypes`/`.restype` performs step 3 (tell Python's FFI layer
 the function's real signature, since C's compiled binary carries no
@@ -151,7 +151,7 @@ type information of its own for `ctypes` to discover automatically).
 Calling `lib.kin_correct(...)` performs steps 2 and 4 together — Python
 finds the symbol `kin_correct` in the loaded library and calls it
 directly, passing the byte string through to the real C function
-exactly as Chapter 17 wrote it, with no translation layer in between
+exactly as Chapter 18 wrote it, with no translation layer in between
 beyond what `ctypes` itself needs to convert a Python `bytes` object into
 a raw C string pointer. Every other language's FFI tool — Java's JNA,
 Go's `cgo`, Node's N-API — performs the conceptually identical four
@@ -170,7 +170,7 @@ steps; only the exact syntax for declaring the signature changes.
   (primitive types, fixed arrays, no language-specific constructs),
   because the calling language has to replicate the exact byte layout,
   padding included, to read them correctly.
-- A simple string-in/string-out convenience function (Ch.17) is not just
+- A simple string-in/string-out convenience function (Ch.18) is not just
   easier for a C caller — it's close to the lowest-friction possible
   surface for any language's FFI tooling, sidestepping the
   struct-layout-mirroring problem entirely.
@@ -187,9 +187,9 @@ steps; only the exact syntax for declaring the signature changes.
 - "name mangling C++ vs C explained"
 - "WebAssembly Emscripten compiling C to WASM"
 
-## Coming up in Chapter 23
+## Coming up in Chapter 25
 
-Part IV begins here: Chapter 23 traces one real sentence — start to
+Part IV begins here: Chapter 25 traces one real sentence — start to
 finish — through every single file this book has covered, naming the
 exact function, the exact algorithm, and the exact chapter for each
 step along the way. It's the rehearsal run for your actual defense.

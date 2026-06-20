@@ -14,6 +14,49 @@ C#, Rust, or TypeScript, and several design decisions in this project only
 make sense once you see where C's enum falls short and how the code
 compensates.
 
+## 2.0 What these enums are actually naming — a guided tour for non-speakers
+
+Before the C mechanics, it helps to know *what kind of thing* each enum is
+modeling, because every one of them is a direct transcription of a category
+that exists in Kinyarwanda grammar — not something the programmer invented.
+If you don't speak Kinyarwanda, here is the minimum linguistic map you need
+to follow the rest of this chapter (and most of the book).
+
+Kinyarwanda traditionally analyzes its vocabulary into **five word-type
+trees** — five families of words, each built by its own formula out of
+smaller pieces called **morphemes** (the smallest meaningful chunks a word
+breaks into; Chapter 3 covers the structs that hold them). This project's
+`POS` enum is a flattened, code-friendly version of those five trees:
+
+```
+                         KINYARWANDA WORDS
+                                |
+        ┌──────────┬──────────┼──────────┬──────────┐
+        │           │          │          │          │
+     IZINA       NTERA     INSHINGA  IKINYAZINA  AMAGAMBO
+     (Nouns)   (Adjectives)  (Verbs)  (Pronouns) ADAHINDUKA
+        │           │          │          │     (Invariables:
+   POS_NOUN     POS_ADJECTIVE  ├─ infinitive    prepositions,
+   POS_RELATIVE_      POS_     │  POS_VERB_INF  conjunctions,
+   NOUN          COMPOUND_ADJ  └─ conjugated    adverbs, etc.)
+                                  POS_VERB_CONJ
+```
+
+Each branch has its own internal "skeleton" formula — nouns are
+**D + RT + C** (prefix-vowel + class-marker + stem), verbs are
+**SP + TM + OM + root + EXT + FV** (subject-marker + tense-marker +
+object-marker + stem + derivational extension + final vowel), and so on.
+You'll meet every one of these formulas in full, with worked examples, in
+Chapter 11 (`morph_dispatch.c`) and Part V of this book. For *this* chapter,
+the only thing that matters is: **every enum member you're about to see is
+naming one leaf of this tree, or one slot inside one of these formulas** —
+`POS_NOUN` names a whole branch; `VerbTense` and `VerbExtension` name two of
+the *slots* inside the verb formula; `PronounType` names the nine
+sub-branches under "pronoun"; `GramRole` doesn't name a word-type at all,
+but the *job* a verb is doing in its sentence (main predicate? subordinate
+clause? reported speech?) — five completely different kinds of category,
+all represented the same way in C: as a named integer.
+
 ## 2.1 An enum is just named integers — nothing more
 
 ```c
@@ -332,6 +375,67 @@ concrete, hands-on proof of Section 2.1's claim: C's enum type does not
 range-check assignments. The safety this project has comes entirely from
 *disciplined usage* (only ever assigning named constants) — never from
 the compiler enforcing it.
+
+## 2.8 Case study: one verb, three enums, one sentence
+
+To see all three "slot" enums (`VerbTense`, `VerbExtension`, `GramRole`)
+working together on real data, trace the conjugated verb **`yarakorewe`**
+("it was done for him/her") as it would be tagged by this pipeline:
+
+```
+   y    a   ra   ko   r    e    w     e
+   |    |   |    |    |    |    |     |
+   SP   ↓   TM   root EXT  FV  EXT2  (final)
+ (3sg)(PAST)(PERF) -kor- -er-(APPLIC) -w-(PASSIVE) -e
+```
+
+| Slot | Surface piece | Enum value assigned to the `Token` | Plain-English meaning |
+|---|---|---|---|
+| SP (subject prefix) | `ya-` | (stored in `tok->subj_prefix`, not its own enum) | "he/she" — 3rd person singular, class 1 |
+| TM (tense marker) | `-a-` + perfect `-ye/-e` shape | `tok->verb_tense = TENSE_PAST_PERF` | Impitakare — recent/completed past |
+| root | `-kor-` | (stored in `tok->root`) | the verb stem "do/work" |
+| EXT 1 | `-er-` | `tok->verb_ext = VEXT_APPLICATIVE` | "do **for/to** someone" — applicative |
+| EXT 2 | `-w-` | a second extension flag the breakdown records alongside it | passive — "**was** done", not "did" |
+| FV (final vowel) | `-e` | (part of the tense ending, not separate) | completes the perfect-tense shape |
+
+Put in English: *"it was done for [him/her]."* Two facts fall directly out
+of the table, and both are facts about *Kinyarwanda*, not about C:
+
+1. `VerbTense` answers **"when"** (recent past, here) — it is set exactly
+   once per verb token, because a verb can only be in one tense at a time.
+2. `VerbExtension` answers **"in what manner the action relates to its
+   participants"** (here: applicative *and* passive stacked together) —
+   and unlike tense, Kinyarwanda verbs can stack *several* extensions on
+   one stem (you saw `VEXT_APPLIC_PASSIVE` listed as its own combined enum
+   value in the header for exactly this reason — some combinations are
+   common enough, and phonologically irregular enough, to deserve their own
+   named slot rather than being computed by combining two separate flags).
+
+`GramRole`, by contrast, is decided *after* tagging, once the whole
+sentence is visible — `yarakorewe` sitting as the only verb in its sentence
+would get `GRAM_ROLE_MAIN_VERB`; the same word appearing after `ngo`
+("...that it was done for him") would get `GRAM_ROLE_COMPLEMENT` instead,
+with no change at all to its `VerbTense` or `VerbExtension`. That
+separation — *what the word's internal pieces mean* (tense, extension)
+versus *what job the whole word does in its sentence* (gram role) — is
+why these live in two different enums rather than one: they answer two
+genuinely independent questions, set at two different stages of the
+pipeline (morpheme analysis vs. sentence-level tagging — Chapter 8 and
+Chapter 16 cover exactly when each one gets assigned).
+
+## 2.9 Quick reference: the five enums at a glance
+
+| Enum | What it tags | How many named values | Set during |
+|---|---|---|---|
+| `POS` | Which of the 5 word-type trees (+ punctuation) a token belongs to | 18 | `pos_tagger.c` (Ch.8) |
+| `VerbTense` | Which of the ~20 tense/mode combinations a conjugated verb is in | 24 | `pos_tagger.c` / `morph_dispatch.c` |
+| `VerbExtension` | Which derivational suffix (or suffix combination) the verb stem carries | 16 | `morph_dispatch.c` (Ch.11) |
+| `PronounType` | Which of the 9 pronoun sub-categories a `POS_PRONOUN` token is | 10 | `pos_tagger.c` |
+| `GramRole` | What job a verb plays in its sentence (main predicate, relative clause, reported speech...) | 7 | `analysis.c` (Ch.16), after full-sentence context is available |
+
+Keep this table nearby for Chapters 6–15: every time you see
+`tok->verb_tense`, `tok->verb_ext`, or `tok->gram_role` read or compared in
+the C code, it's this table you should be translating it back into.
 
 ## Key takeaways
 

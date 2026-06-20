@@ -204,6 +204,29 @@ signed type (`ptrdiff_t`), but the code already knows `apos` comes *after*
 `p` here, so the result is guaranteed non-negative and is immediately
 treated as an unsigned size.
 
+### 4.5.1 Why the tokenizer needs to know about apostrophes at all
+
+`find_apostrophe` exists because of a specific, real fact about written
+Kinyarwanda introduced in Part 12 of this project's grammar reference: the
+conjunctions `na` ("and") and `nka` ("like/as") **elide their final vowel**
+before a word that starts with a vowel, and the official orthography
+writes that elision with an apostrophe:
+
+```
+   na  + isi   →  n'isi    "and earth"     (na's "a" dropped before isi's "i")
+   nka + umwana →  nk'umwana "like a child" (nka's "a" dropped before umwana's "u")
+```
+
+Without `find_apostrophe`, the tokenizer would see `"n'isi"` as one
+unbroken run of letters and apostrophe-like punctuation and have no
+principled way to know it's actually *two words* — the conjunction `na`
+(missing its final vowel) plus the noun `isi`. By splitting at the
+apostrophe and treating the elided fragment (`n'`) as its own token, every
+later chapter's tagging and analysis gets to work with `na` and `isi` as
+the two real, separate grammatical units they linguistically are — exactly
+the split this book's Chapter 8 case study (Section 8.6) relies on when it
+traces this very sentence.
+
 ## 4.6 Defensive clamping: no exceptions, so check and clamp by hand
 
 ```c

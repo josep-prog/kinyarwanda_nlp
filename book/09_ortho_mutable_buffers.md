@@ -12,6 +12,49 @@ it needs its own vocabulary: in-place editing, overlap-safe copying, and
 sentinel return values. This chapter covers the low-level toolbox;
 Chapter 10 covers how that toolbox gets organized into a 16-pass pipeline.
 
+## 9.0 Why a 1,330-line rule engine is needed at all
+
+Every chapter so far has dealt with **underlying forms** — the abstract
+sequence of morphemes a word is built from, written with hyphens between
+the pieces: `bi-a-tek-w-ye`. But nobody actually writes or speaks
+`bi-a-tek-w-ye`. The real, spoken/written word is **`byatetswe`**
+("it was cooked"). Between the abstract morpheme sequence and the real
+surface word, a predictable, rule-governed set of **sound changes**
+happens — and Rwanda's official orthography (RALC, the *Inteko Nyarwanda
+y'Ururimi n'Umuco* 2017 directive) requires writing the *changed* surface
+form, not the abstract one. `ortho.c` is the file that mechanically applies
+those changes. This is not a quirk of this one project — every Bantu
+language with this kind of rich agglutinative morphology has an
+orthography that has to make the same decision (write what's pronounced,
+not the abstract building blocks), and every speaker of the language
+already applies these rules unconsciously, every time they talk. What
+`ortho.c` automates is making that unconscious, internalized knowledge
+explicit and checkable in software.
+
+The sound changes fall into a small number of recognizable linguistic
+*categories*, each with its own RALC section number, and you'll meet a
+representative example of every category across Chapters 9–10:
+
+| Category | Plain-English description | One concrete example |
+|---|---|---|
+| Metathesis | Two adjacent sounds swap places | `tek-w-ye` → `tek-y-w-e` (P1) |
+| Consonant + y fusion (palatalization) | A consonant followed by `y` fuses into a single new consonant | `k+y → ts`, `t+y → cy`, `r+y → z` |
+| Nasal assimilation | `n` changes to match the place of articulation of the consonant after it | `n+b → mb`, `n+f → mf` |
+| Nasal elision | `n` disappears entirely before another nasal | `n+m → m` |
+| Consonant voicing | A "voiceless" consonant becomes "voiced" after certain morphemes | `k → g`, `t → d` |
+| Vowel fusion | Two adjacent vowels merge into one new vowel | `a+i → e`, `a+u → o` |
+| Vowel/glide contact | A vowel becomes a semivowel (glide) before another vowel, or is dropped entirely | `u → w`, `i → y`, `u → ø` |
+| Epenthesis (and its undoing) | An extra consonant is inserted to ease pronunciation between certain sounds, and the orthography sometimes deletes it again | `nts`, `mpf` clusters |
+
+If any of those rule names sound familiar, they should — they are the same
+rules tabulated in Part 16 of this project's own textbook-rule reference
+(`data/textbook_grammar_rules.md`): `u→w/_J`, `n→m/_b`, `r→d/n-`, and so
+on. `ortho.c` is, quite literally, those one-line linguistic rules,
+expanded into runnable C — Section 9.1 onward shows you the buffer
+machinery that makes that translation possible; Chapter 10 shows you the
+16 passes, in the exact order RALC's own rule numbering requires them to
+fire.
+
 ## 9.1 The buffer format: one string, with `|` marking morpheme seams
 
 `kin_ortho_gen()` takes an input like `"bi-a-tek-w-ye"` (morphemes

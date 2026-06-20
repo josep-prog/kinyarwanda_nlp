@@ -1,4 +1,4 @@
-# Chapter 18 — `main.c`: `argv`/`argc`, File I/O, and the REPL Loop
+# Chapter 19 — `main.c`: `argv`/`argc`, File I/O, and the REPL Loop
 
 ## The one file outside the library
 
@@ -10,7 +10,7 @@ a terminal, or to the filesystem. Every other file you've studied takes
 clean, already-extracted strings; this one is where those strings
 *come from*.
 
-## 18.1 Parsing `argv`: the consume-next-argument idiom
+## 19.1 Parsing `argv`: the consume-next-argument idiom
 
 ```c
 for (int i = 1; i < argc; i++) {
@@ -53,7 +53,7 @@ only guaranteed value there is the `NULL` sentinel from Chapter 4's
 discussion of `argv`'s own null-terminated-array shape — reading *past*
 that would be undefined behavior).
 
-## 18.2 Mode selection: the priority chain, one final time, at the top level
+## 19.2 Mode selection: the priority chain, one final time, at the top level
 
 ```c
 if (validation_mode) { /* ... */ return 0; }
@@ -82,7 +82,7 @@ small idea, reused at every level of granularity, rather than a different
 trick invented for each new problem — is a strong, true thing to be able
 to say about this codebase's overall design.
 
-## 18.3 `analyse_text`: a second, purpose-built scanner
+## 19.3 `analyse_text`: a second, purpose-built scanner
 
 ```c
 static void analyse_text(const char *text, bool verbose) {
@@ -132,10 +132,10 @@ than two smaller, separately-readable scanners, each named for exactly
 the granularity it operates at. Recognizing when *not* to unify two
 similar-looking pieces of code — because their actual rules diverge
 enough that forcing them together would cost more clarity than it saves —
-is the same judgment call Chapter 15 raised about `scan_back_noun`,
+is the same judgment call Chapter 16 raised about `scan_back_noun`,
 applied here one more time.
 
-## 18.4 `analyse_stream`: the canonical C line-by-line file-reading loop
+## 19.4 `analyse_stream`: the canonical C line-by-line file-reading loop
 
 ```c
 static void analyse_stream(FILE *fp, bool verbose) {
@@ -171,7 +171,7 @@ just before where the `\n` used to be). This is `kin_str_trim`'s own
 trick from Chapter 5, applied twice in a row by hand, once for each
 possible line-ending convention.
 
-## 18.5 `analyse_pdf`: the project's only call out to another program
+## 19.5 `analyse_pdf`: the project's only call out to another program
 
 ```c
 static int analyse_pdf(const char *pdfpath, bool verbose) {
@@ -228,7 +228,7 @@ context, and exactly what would make it stop being safe, is a much
 stronger answer than either "this is fine" or "this is dangerous" stated
 without the reasoning behind it.
 
-## 18.6 The REPL: `fgets` against `stdin`, with bilingual exit commands
+## 19.6 The REPL: `fgets` against `stdin`, with bilingual exit commands
 
 ```c
 char line[MAX_LINE];
@@ -246,7 +246,7 @@ while (1) {
 }
 ```
 
-This is Section 18.4's `fgets`-loop idiom again, now reading from
+This is Section 19.4's `fgets`-loop idiom again, now reading from
 `stdin` (the terminal) instead of a file — the *exact same* "loop while
 `fgets` keeps succeeding, stop naturally when it returns `NULL`" shape,
 which here doubles as the REPL's natural exit path on `Ctrl+D` (which
@@ -297,12 +297,15 @@ already bilingual.
 - "command injection vulnerability explained"
 - "REPL loop design pattern"
 
-## Coming up in Chapter 19
+## Coming up in Chapter 20
 
-Parts I–IV of this book covered every source file. Part III now turns to
-the tools around the code: Chapter 19 returns to the Makefile from
-Chapter 1, this time going deep — object files, `.d` dependency files,
-the difference between building `kinyarwanda_nlp` (the CLI),
-`libkinyarwanda.a` (the static library), and `libkinyarwanda.so` (the
-shared library) from the *exact same* source files, and why `-fPIC`
-matters specifically for the shared-library build.
+One file is still unaccounted for: `validator.c`. The `-validation` mode
+you just saw `main()`'s argument parser branch on (calling
+`kin_validate_text`/`kin_validate_file`) hands off to exactly this file
+— the layer that
+takes the `Error[]` array `syntax.c` and `punctuation.c` already
+populated and turns it into the bilingual, rule-cited report you actually
+see printed to your terminal in validation mode. Chapter 20 covers how it
+formats that report, and why this kind of "presentation layer" earns
+being its own file rather than living inside `main.c` or `syntax.c`
+directly.

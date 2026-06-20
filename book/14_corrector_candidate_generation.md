@@ -1,4 +1,4 @@
-# Chapter 13 — `corrector.c`: Generating Candidate Corrections
+# Chapter 14 — `corrector.c`: Generating Candidate Corrections
 
 ## The smallest file, and why that's a good sign
 
@@ -11,7 +11,7 @@ answer would have been.** Neither file duplicates the other's job. This
 chapter is short, because the file is short — but the design lesson is
 worth more than its line count suggests.
 
-## 13.1 One shared struct, passed by pointer, read by one file and written by the next
+## 14.1 One shared struct, passed by pointer, read by one file and written by the next
 
 ```c
 void kin_suggest_corrections(SentenceAnalysis *sa) {
@@ -40,7 +40,7 @@ stage (detect → now also correct) costs nothing in plumbing — no new
 parameters to invent, no new struct to define, just another function
 that takes the same `SentenceAnalysis *` everyone else already takes.
 
-## 13.2 `build_adj`: a second `static` local table, and a different "is this a vowel" idiom
+## 14.2 `build_adj`: a second `static` local table, and a different "is this a vowel" idiom
 
 ```c
 static void build_adj(int noun_class, const char *stem, char *out, size_t outsz) {
@@ -88,7 +88,7 @@ inconsistency, and being able to explain *both* idioms confidently rather
 than being caught off guard by the discrepancy, is a stronger defense
 position than pretending the whole codebase follows one uniform style.
 
-## 13.3 A `switch` used only for its exceptions, with one shared fallback after it
+## 14.3 A `switch` used only for its exceptions, with one shared fallback after it
 
 ```c
 if (stem_vowel) {
@@ -121,7 +121,7 @@ switch-as-the-whole-decision versus switch-as-a-few-early-exits-before-a-
 shared-fallback — means you can read any `switch` in any C file and
 correctly predict what happens for the cases it doesn't explicitly list.
 
-## 13.4 A worth-flagging gap: relying on zero-initialization instead of an explicit terminator
+## 14.4 A worth-flagging gap: relying on zero-initialization instead of an explicit terminator
 
 ```c
 char sug[KIN_MAX_MSG * 2];
@@ -143,7 +143,7 @@ Whether that's an actual live bug depends on one fact this chapter alone
 can't settle: is `err->suggestion` guaranteed to already be `'\0'` at
 index 255 *before* this line runs (because the whole `SentenceAnalysis`
 was zero-initialized earlier in the pipeline), or could it ever contain
-leftover, non-zero data from somewhere else? Chapter 15 (`analysis.c`)
+leftover, non-zero data from somewhere else? Chapter 16 (`analysis.c`)
 will let us check exactly how `SentenceAnalysis` values get constructed
 and whether that zero-fill guarantee genuinely holds throughout this
 project. For now, the honest, precise thing to say in your defense is:
@@ -152,6 +152,38 @@ rather than *guaranteeing* termination the way `set_morph()` does
 explicitly — a real, specific difference in defensive discipline between
 two files in the same project, and a legitimate thing to be able to point
 to and reason about rather than gloss over.
+
+## 14.5 Case study: two corrections, two branches of `build_adj`
+
+To see why `build_adj` needs both the vowel-initial `switch` (Section
+14.3) and the plain fallback, trace two different real corrections through
+it side by side:
+
+```
+   Input error:    "umuntu kiza"        (class-1 noun, wrong RS="ki")
+   noun_class = 1, stem = "iza" (vowel-initial: starts with 'i')
+   → stem_vowel is TRUE → switch(1): case 1/3 → "mw" + "iza" → "mwiza"
+   Corrected:      "umuntu mwiza"       "a good/beautiful person"
+
+   Input error:     "ikintu ya"         (class-7 noun, wrong RS="ya")
+   noun_class = 7, stem = "nini" (consonant-initial: starts with 'n')
+   → stem_vowel is FALSE → switch is skipped entirely
+   → falls through to: snprintf(out, outsz, "%s%s", pfx, stem)
+   → pfx = RS[7] = "ki"  →  "ki" + "nini" → "kinini"
+   Corrected:      "ikintu kinini"      "a big thing"
+```
+
+The first correction needs the vowel-glide exception (`mu`+`iza` would
+naively produce the impossible-to-pronounce `muiza`; Kinyarwanda resolves
+adjacent vowels with the `u→w` glide rule from Chapter 9, giving `mwiza`).
+The second correction needs no such exception — `ki`+`nini` is already a
+perfectly normal consonant-then-consonant concatenation, so the function's
+plain fallback line handles it correctly without ever entering the
+`switch` at all. Both are genuine corrections `kin_suggest_corrections`
+would actually produce for a real `ERR_ADJ_AGREEMENT`; the difference in
+which code path each one takes is entirely explained by one fact about the
+*stem*'s first letter — exactly the `stem_vowel` check Section 14.2
+introduced.
 
 ## Key takeaways
 
@@ -182,10 +214,10 @@ to and reason about rather than gloss over.
 - "switch statement fallthrough and default explained"
 - "zero initialization guarantees in C structs and arrays"
 
-## Coming up in Chapter 14
+## Coming up in Chapter 15
 
 `gloss.c` is the second-largest table-driven file in the project (776
-lines, with a 200+ entry verb-gloss table). Chapter 14 covers how it
+lines, with a 200+ entry verb-gloss table). Chapter 15 covers how it
 reuses Chapter 7's lookup-table techniques one more time, at a larger
 scale, plus the specific string-formatting work needed to produce
 Leipzig-style four-line interlinear glosses — aligned columns of text,

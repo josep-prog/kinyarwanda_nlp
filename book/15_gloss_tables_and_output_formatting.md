@@ -1,16 +1,50 @@
-# Chapter 14 — `gloss.c`: Large Tables, Round Two, and Output Formatting
+# Chapter 15 — `gloss.c`: Large Tables, Round Two, and Output Formatting
 
 ## What's genuinely new here
 
 `gloss.c` (776 lines) reuses Chapter 7's table-and-linear-search pattern
 almost exactly — you'll recognize it instantly. What's new in this
 chapter is everything *around* that pattern: a defensive habit Chapter
-13 found missing elsewhere, the ternary operator as a compact
+14 found missing elsewhere, the ternary operator as a compact
 fallback idiom, and — the real centerpiece — how a four-line,
 column-aligned interlinear gloss display is built using nothing but
 `printf` width specifiers, no terminal UI library anywhere in sight.
 
-## 14.1 The same table, the same search, one new defensive habit
+## 15.0 What an "interlinear gloss" is, and where its abbreviations come from
+
+Up to now, this project has mostly *talked about* morphemes (D, RT, C, SP,
+TM...) using whichever vocabulary felt natural per chapter. Linguists have
+a standardized way of *displaying* a morpheme-by-morpheme breakdown
+alongside its meaning, called an **interlinear gloss**, and the specific
+set of abbreviations this project uses (`3SG`, `PRF`, `PASS`, `APPL`,
+`RECP`, `SUBJ`, `IMP`, ...) follows the **Leipzig Glossing Rules** — a
+widely adopted academic convention for exactly this purpose, used across
+linguistics papers on every language family, not invented for this
+project. The convention has three stacked lines per word:
+
+```
+   Line 1 (surface):    yaremye
+   Line 2 (morphemes):  ya  -  rem   -  ye
+   Line 3 (gloss):      3SG.HUM - create - PRF
+   Line 4 (free translation, once per sentence/clause): "he/she created [it]"
+```
+
+Every abbreviation in line 3 is a standardized code, not an ad hoc
+shorthand: `3SG` = third person singular, `HUM` = human (naming which of
+the 16 noun classes the subject agrees with — Section 7.1.1's table is
+exactly where `3SG.HUM` vs. `3SG.CL7` vs. `3SG.LOC` come from), `PRF` =
+perfect/completed aspect. A reader who has never seen a single word of
+Kinyarwanda, but knows the Leipzig conventions (or is simply told what
+each code means, which `kin_print_interlinear`'s own banner does — see the
+"Abbreviations:" lines it prints), can read that gloss line and understand
+the grammatical structure of the word without needing the surface
+spelling decoded at all. This is *why* `gloss.c` exists as its own file,
+separate from `morph_dispatch.c`: Chapter 11 was about recovering *which
+letters* belong to which morpheme; this file is about translating each
+recovered morpheme into this standardized, internationally-readable
+notation.
+
+## 15.1 The same table, the same search, one new defensive habit
 
 ```c
 typedef struct { const char *stem; const char *gloss; } VerbGloss;
@@ -38,7 +72,7 @@ identical. The one new thing worth pointing out: `out[0] = '\0';` runs
 **before the search loop even starts**. If no match is ever found, `out`
 is still guaranteed to be a valid, empty C string when the function
 returns `false` — never untouched, never garbage. This is a direct,
-useful contrast with Chapter 13's finding in `corrector.c`, where a
+useful contrast with Chapter 14's finding in `corrector.c`, where a
 missing explicit terminator left a buffer's safety dependent on an
 assumption about prior zero-initialization. Here, the function takes
 charge of its own output buffer's validity itself, unconditionally, at
@@ -47,7 +81,7 @@ codebase is *more* careful in one file and *less* careful in another,
 specifically and by name, is a stronger defense answer than claiming
 uniform perfection in either direction.
 
-## 14.2 The ternary operator as a "prefer this, else that" idiom
+## 15.2 The ternary operator as a "prefer this, else that" idiom
 
 ```c
 const char *surf = t->morph.m[m].surface[0]
@@ -72,7 +106,7 @@ that recognizing the shape on sight — rather than mentally expanding it
 into an `if`/`else` every time — will make a lot of real-world C (and
 C-like) code faster to read.
 
-## 14.3 Building aligned columns with nothing but `printf` width specifiers
+## 15.3 Building aligned columns with nothing but `printf` width specifiers
 
 ```c
 printf("  %-18s ", t->surface);
@@ -120,7 +154,7 @@ project. The entire alignment is achieved with one `printf` feature:
   underneath the first (surface-word) row's first column, even though the
   second row has nothing of its own to put there.
 
-## 14.4 Hex-escaped UTF-8 bytes in string literals
+## 15.4 Hex-escaped UTF-8 bytes in string literals
 
 ```c
 printf("  \xe2\x95\x90\xe2\x95\x90\xe2\x95\x90 Interlinear Gloss ... \n");
@@ -143,7 +177,7 @@ times is far less legible in the source than the actual `═══...`
 character would be — a genuine cost paid here in exchange for
 byte-exact certainty.
 
-## 14.5 Try it yourself
+## 15.5 Try it yourself
 
 Confirm the "minimum, not maximum width" claim directly:
 
@@ -163,6 +197,44 @@ on, and exactly the limitation worth being able to name if a long
 Kinyarwanda compound word ever visibly throws off the interlinear
 display's column alignment.
 
+## 15.6 Case study: the real interlinear output for `yaremye`
+
+Putting Sections 15.0 and 15.3 together, here is what `kin_print_interlinear`
+actually produces for the verb `yaremye` ("he/she created") from this
+book's running example sentence — reconstructed field by field from the
+gloss functions shown above:
+
+```
+  yaremye            ya       – rem      – ye
+                      3SG.HUM  – create   – PRF
+```
+
+Tracing where each piece of the second and third lines comes from:
+
+- `ya` is the SP morpheme; `sp_class_gloss(1)` (class 1, the noun class
+  `yaremye`'s subject agrees with) returns `"3SG.HUM"` — third person
+  singular, human class.
+- `rem` is the root; its gloss, `"create"`, comes from `VERB_GLOSS_TABLE`
+  (Section 15.1) — the same 200+-row table, the same linear search,
+  just looked up for this specific stem.
+- `ye` is the final-vowel/aspect morpheme; `fv_gloss(TENSE_PAST_PERF)`
+  returns `"PRF"` (perfect/completed aspect) — note there's no separate
+  `TM` morpheme shown here at all, because this particular tense
+  (Impitakare, the recent past) is marked entirely by the `-ye` ending,
+  with no distinct tense-marker syllable the way `-ra-` or `-za-` mark
+  other tenses; `tm_gloss` would return the empty-set symbol `∅` for this
+  tense if a TM slot were present in the breakdown at all, precisely
+  because there is nothing there to gloss.
+
+This three-row, table-driven, `printf`-aligned output is the complete,
+literal product of every chapter from Chapter 7 onward: Chapter 7's
+lookup-table technique, Chapter 8's tagging that decided this token was a
+class-1-agreeing conjugated verb in the past perfect, Chapter 11's
+morpheme recovery that split `yaremye` into `ya`/`rem`/`ye` in the first
+place, and finally this chapter's gloss tables and aligned `printf` calls
+turning that breakdown into the standardized notation a linguist anywhere
+in the world could read without ever having seen Kinyarwanda before.
+
 ## Key takeaways
 
 - A 200+ row lookup table searched linearly is the same technique from
@@ -170,7 +242,7 @@ display's column alignment.
   because a table grows.
 - Pre-clearing an output buffer (`out[0] = '\0';`) before a search loop
   guarantees a valid result even on failure — a defensive habit this
-  file follows that Chapter 13 found missing in `corrector.c`, a useful,
+  file follows that Chapter 14 found missing in `corrector.c`, a useful,
   honest point of comparison between two files in the same project.
 - The ternary operator (`cond ? a : b`) is a compact way to express
   "prefer this value, fall back to that one" without a multi-line
@@ -193,12 +265,12 @@ display's column alignment.
 - "UTF-8 encoding bytes explained"
 - "hex escape sequences in C strings"
 
-## Coming up in Chapter 15
+## Coming up in Chapter 16
 
 `analysis.c` is the orchestrator — the one function, `kin_analyze()`,
 that calls every stage from every chapter so far, in order, and returns
-a complete `SentenceAnalysis`. Chapter 15 covers what it actually means
+a complete `SentenceAnalysis`. Chapter 16 covers what it actually means
 in C to *return a struct by value* (as opposed to filling one through a
 pointer, the pattern every previous chapter has used) — and, as promised
-in Chapter 13, settles exactly how and where a fresh `SentenceAnalysis`
+in Chapter 14, settles exactly how and where a fresh `SentenceAnalysis`
 gets its initial zero-fill.

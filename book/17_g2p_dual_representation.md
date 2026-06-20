@@ -1,4 +1,4 @@
-# Chapter 16 — `g2p.c`: Another Full Table-Driven Conversion Pass
+# Chapter 17 — `g2p.c`: Another Full Table-Driven Conversion Pass
 
 ## A familiar shape, one genuinely new idea
 
@@ -6,13 +6,79 @@
 for text-to-speech and speech-recognition use. Most of its machinery —
 longest-match-first table lookup, `NULL`/sentinel-terminated tables,
 `strncmp`-based digraph matching — is technique you've already mastered
-from Chapters 6, 7, and 14. This chapter moves quickly through the
+from Chapters 6, 7, and 15. This chapter moves quickly through the
 familiar parts and spends its real attention on the one idea this file
 introduces that no earlier chapter needed: maintaining **two different
 representations of the same sequence at once**, kept in sync from a
 single chokepoint function.
 
-## 16.1 `KinPhonemeSeq`: a struct holding two views of the same data
+## 17.0 What G2P is for, and why spelling isn't sound
+
+"Grapheme-to-phoneme" (G2P) means converting **written letters**
+(graphemes) into **spoken sound units** (phonemes) — the step a
+text-to-speech system needs before it can generate audio (it has to know
+*how to say* a word, not just how it's spelled), and the step an
+automatic-speech-recognition system's training pipeline needs in reverse
+(to know which sounds in recorded audio should align with which written
+words). The reason this needs its own dedicated file, rather than just
+reading letters off the page, is that **Kinyarwanda's spelling and its
+pronunciation are not the same alphabet at all**:
+
+```
+   Written:    "umugabo" — 7 letters
+   Spoken:     u-m-u-g-a-b-o — 7 simple sounds (a 1:1 case)
+
+   Written:    "umushyo" — 7 letters
+   Spoken:     u-m-u-sh-y-o — 6 sounds: "sh" is ONE sound (a digraph),
+               not "s" followed by "h"
+
+   Written:    "impuzamiryango" — contains "mp"
+   Spoken:     ...one single PRENASALIZED consonant /mp/, not an /m/
+               sound followed by a separate /p/ sound
+```
+
+This is exactly the **consonant cluster inventory** Part 11 of this
+project's textbook-rule reference catalogs: Kinyarwanda has whole families
+of *prenasalized* (`mb`, `nd`, `nk`, `nz`...), *labialized* (`bw`, `gw`,
+`kw`, `shw`...), and *palatalized* (`by`, `cy`, `ry`, `ty`...) consonant
+clusters that are written as two or three letters but function as **one
+single sound** in actual speech — a fact every native speaker's ear
+already knows, and a fact `g2p.c` has to encode explicitly for software to
+get right. A naive system that converted Kinyarwanda text one letter at a
+time would produce audio that mispronounces every word containing one of
+these clusters, and would misalign training data for every recording that
+contains one. This is the entire reason for Section 17.5's longest-match
+table cascade (`G2P_3` → `G2P_2` → `G2P_1`): a 3-letter cluster like
+`"ngw"` has to be recognized and converted to *one* phoneme before the
+code ever gets a chance to wrongly read it as `"n"` + `"g"` + `"w"`
+separately.
+
+### 17.0.1 The phoneme inventory, with IPA equivalents
+
+`g2p.c`'s own phoneme table stores, for every phoneme, both an ASCII token
+(for systems that can't handle Unicode, like many TTS/ASR toolkits) and
+its **IPA** (International Phonetic Alphabet) symbol — the standard,
+language-independent notation linguists and speech technologists use to
+represent any sound in any language unambiguously:
+
+| Category | Examples (ASCII → IPA) |
+|---|---|
+| Vowels | a→a, e→e, i→i, o→o, u→u |
+| Simple consonants | g→ɡ, r→ɾ (a tap, not the English "r"), y→j, others mostly unchanged |
+| Digraphs (one sound, two letters) | ch→tʃ, j→dʒ, sh→ʃ, ny→ɲ, ts→ts |
+| Labialized (consonant + rounded lips) | kw→kʷ, gw→ɡʷ, shw→ʃʷ, bw→bʷ, ... |
+| Prenasalized (one nasal+stop sound) | mb→mb, ng→ŋɡ, nj→ndʒ, nk→ŋk, nsh→nʃ, nzw→nzʷ, ... |
+
+Two details worth being able to explain directly: **`r` is phonetically a
+tap** (IPA `ɾ`, the same quick tongue-flick sound as the "tt" in American
+English "butter"), not the English "r" — a detail that matters enormously
+for anyone building or evaluating a TTS voice. And **`ŋɡ` (the `ng` in
+`PH_NG`) is two IPA symbols representing one indivisible Kinyarwanda
+sound** — the velar nasal `ŋ` (as in English "sing") fused tightly with a
+following `ɡ`, which is precisely the "prenasalized consonant" phenomenon
+described above, now visible at the level of the phoneme table itself.
+
+## 17.1 `KinPhonemeSeq`: a struct holding two views of the same data
 
 ```c
 typedef struct {
@@ -32,7 +98,7 @@ the pipeline, or a test comparing expected output, would actually want to
 read or print. Both fields describe the same underlying phoneme sequence;
 they just serve two different audiences.
 
-## 16.2 `seq_append`: one function, keeping both views honest
+## 17.2 `seq_append`: one function, keeping both views honest
 
 ```c
 static bool seq_append(KinPhonemeSeq *seq, KinPhonemeID ph) {
@@ -68,7 +134,7 @@ touching either field directly.
 This completes a pattern worth naming explicitly, because you've now
 seen it three times, in three different shapes, across three different
 chapters: Chapter 11's `set_morph()` centralized a repeated *copy*
-operation; Chapter 15's `scan_back_noun()` centralized a repeated
+operation; Chapter 16's `scan_back_noun()` centralized a repeated
 *search* algorithm; `seq_append()` here centralizes a repeated
 *dual-state update*. All three are the same underlying engineering
 instinct — DRY, "don't repeat yourself" — applied to three different
@@ -77,7 +143,7 @@ the same principle, applied to copying, then to searching, then to
 keeping two derived views consistent" is a strong, synthesizing answer if
 you're asked to identify recurring design patterns across the codebase.
 
-## 16.3 Building a delimited string without a `join()` function
+## 17.3 Building a delimited string without a `join()` function
 
 Notice exactly how the space separator gets added:
 
@@ -103,7 +169,7 @@ already written**, and let that — not a loop counter or an externally
 tracked "is this the first iteration" flag — decide whether a separator
 belongs before the next piece.
 
-## 16.4 `PH_COUNT`: counting enum values without `sizeof`
+## 17.4 `PH_COUNT`: counting enum values without `sizeof`
 
 ```c
 typedef enum {
@@ -138,7 +204,7 @@ spelled `_COUNT`, `_MAX`, or `_LAST` — almost always exists purely to
 answer "how many of these enum values exist," the enum equivalent of
 Chapter 7's `sizeof` trick for arrays.
 
-## 16.5 Longest-match-first, one more time, in a new domain
+## 17.5 Longest-match-first, one more time, in a new domain
 
 ```c
 static const G2PRule G2P_3[] = { /* 3-character digraph/cluster rules */ };
@@ -171,7 +237,7 @@ different linguistic levels.
   them from drifting apart.
 - You've now seen the DRY principle applied to three different shapes of
   repetition: a copy operation (Ch.11's `set_morph`), a search algorithm
-  (Ch.15's `scan_back_noun`), and a dual-state update (this chapter's
+  (Ch.16's `scan_back_noun`), and a dual-state update (this chapter's
   `seq_append`) — the same underlying instinct, three different
   applications.
 - Building a delimited string incrementally in C means inspecting the
@@ -193,12 +259,12 @@ different linguistic levels.
 - "data structures with multiple representations of the same data"
 - "longest match tokenization algorithm"
 
-## Coming up in Chapter 17
+## Coming up in Chapter 18
 
 `api.c` is the smallest file in the project (100 lines) — a thin
 convenience layer wrapping `kin_analyze()` and `kin_g2p_sentence()` for
 callers who don't want to learn the full `Token`/`SentenceAnalysis`
-model. Chapter 17 covers why a project bothers writing a *second*, much
+model. Chapter 18 covers why a project bothers writing a *second*, much
 simpler public interface on top of an already-complete one, and what
 that decision says about designing a library for more than one kind of
 caller.
