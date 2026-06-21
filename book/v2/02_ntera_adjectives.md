@@ -82,6 +82,30 @@ example already uses the `u→w/_J` rule you independently rediscovered in
 Chapter 1, Part 4 — the *same* rule, governing a *different* word
 category. That is not a coincidence; Section 1.5 below explains why.
 
+Lining the two formulas up directly, against one real noun and the
+real adjective that agrees with it, makes the missing piece visible
+rather than abstract:
+
+```
+   noun       u  +  mu  +  ti      =  umuti     ("the medicine")
+              D     RT     C
+                    └──┬──┘
+                       └── prefix carries BOTH the vowel and the class
+
+   adjective       mu  +  shya     =  mushya    ("new")
+                    RS     C
+                    │
+                    └── prefix carries ONLY the class — no D vowel exists
+                        to drop, double, or worry about (cf. Chapter 1,
+                        Section 1.9's umuti/umuriti ambiguity)
+```
+
+The noun's D vowel is the piece that made Chapter 1's parsing genuinely
+hard — it can be silently absent (Section 1.9 there), which is exactly
+what created the `umuti`/class-1-or-3 ambiguity. The adjective formula
+simply has no equivalent piece to go missing. Hold onto that asymmetry;
+Section 4.7 builds an entire real finding out of it.
+
 ## 1.3 The concordance table: the same 16 markers, a new job
 
 Here is the detail that makes this entire chapter possible: **the RS
@@ -411,6 +435,94 @@ silent corruption and hard crashes. This exact guard,
 `if (noun_class < 1 || noun_class > 16)`, is quoted directly from this
 project's real `corrector.c`.
 
+## 2.3 A third way to crash: trusting the wrong buffer size
+
+This one happened while writing this very chapter, which is exactly why
+it belongs here. `kin_strip_adj_prefix` (Section 6.2) writes its
+result through an out-parameter, `stem_out` — the same pattern Section
+2.1 covered. What Section 2.1 didn't cover is *how big a buffer the
+caller has to provide.* The real header says:
+
+```c
+#define KIN_MAX_STEM 96
+bool kin_strip_adj_prefix(const char *word, char *stem_out, int *class_out);
+```
+
+Nothing in the function's signature enforces this — it's a comment-
+level contract, the same kind `strncpy`'s third argument is, and it's
+on the *caller* to honor it. Here is the test program actually written
+for this chapter, with the bug still in it:
+
+```c
+/* p_real_compare.c — first draft, BUGGY */
+#include "kinyarwanda.h"
+#include <stdio.h>
+
+int main(void) {
+    const char *tests[] = { "nziza", "nde", "mbi", NULL };
+    char stem[64];               /* looks generous. it is not. */
+    int cls;
+    printf("%-8s %-3s %-6s %-6s\n", "word", "ok", "class", "stem");
+    for (int i = 0; tests[i]; i++) {
+        int ok = kin_strip_adj_prefix(tests[i], stem, &cls);
+        printf("%-8s %-3d %-6d %-6s\n", tests[i], ok, ok ? cls : 0, ok ? stem : "-");
+    }
+    return 0;
+}
+```
+
+`64` looks like more than enough room for a stem that's never longer
+than about ten letters. It is not enough room for what
+`kin_strip_adj_prefix` actually does internally: Section 6.3 showed
+its reconstruction logic copying into a local `char restored[KIN_MAX_STEM]`
+— a 96-byte buffer — and then `strncpy`-ing up to 95 bytes of that into
+*your* `stem_out`. Pass a 64-byte buffer where the function is entitled
+to assume 96, and `strncpy` happily writes 31 bytes past the end of
+your array, into whatever the compiler placed next on the stack:
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_real_compare.c -L . -lkinyarwanda -o p_real_compare
+$ LD_LIBRARY_PATH=. ./p_real_compare
+word     ok  class  stem
+(null)   1   9      iza
+```
+
+Only one row prints, and the word column reads `(null)`. The overflow
+from the very first call corrupted the `tests[]` array sitting next to
+`stem` on the stack — including, by the time the *second* `printf`
+inside the loop runs, the pointer the loop is currently reading. The
+program doesn't crash. It doesn't even produce three obviously-wrong
+rows the way Section 2.2's soft failure did — it silently eats two of
+its own three test cases and prints something that *looks* like a
+single successful, slightly odd result. The fix is the one-line
+contract the header already documented:
+
+```c
+char stem[KIN_MAX_STEM];     /* not 64 — the size the function requires */
+```
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_real_compare.c -L . -lkinyarwanda -o p_real_compare
+$ LD_LIBRARY_PATH=. ./p_real_compare
+word     ok  class  stem
+nziza    1   9      iza
+nde      1   9      re
+mbi      1   9      bi
+```
+
+Three flavors of undefined behavior now, across this chapter and the
+last: an unbounded copy with no size limit at all (Chapter 1, Section
+2.2's `strcpy`), reading an array at an index outside its declared
+bounds (Section 2.2 above), and — this one — *writing* past the end of
+a buffer that was simply declared too small for the contract it was
+handed into. All three compiled cleanly, with `-Wall -Wextra`, and all
+three only revealed themselves at runtime, on specific inputs. This is
+the single most important habit this book can hand you: when a
+function takes a buffer and a size (`stem_out`, or `strncpy`'s third
+argument, or `fgets`'s second argument), the size is not decoration —
+it's the one fact the function trusts you to get right, because it has
+no way to check it for you.
+
 ---
 
 # Part 3 — Making It Interactive
@@ -701,6 +813,29 @@ documented words really do share five identical letters) but the
 `n` + whatever's left, full stop, and the only way to reach the other
 stem is to write a longer word with its own RS already in front.
 
+```
+   the five letters "n-z-i-m-a"
+              │
+   ┌──────────┴──────────────────────────────┐
+   │                                          │
+   ▼ as a BARE word, standing alone           ▼ as the TAIL of a longer word
+┌─────────────────────────┐         ┌─────────────────────────────────┐
+│ RS = "n" (class 9)       │         │ stem = "nzima" (closed-set entry, │
+│ + stem = "zima"           │         │ "heavy/sick"), preceded by ITS    │
+│ ("whole/healthy")          │         │ OWN RS: mu-, ba-, ki- ...          │
+│                           │         │  → munzima, banzima, kinzima       │
+│ THIS is the only parse    │         │                                    │
+│ kin_strip_adj_prefix ever │         │ THIS reading is only reachable     │
+│ returns for bare "nzima"  │         │ when there's more in front of it   │
+└─────────────────────────┘         └─────────────────────────────────┘
+```
+
+No step in `kin_strip_adj_prefix` ever has to *choose* between these
+two branches for the same input — the word itself (bare, or with an
+RS already attached) determines which branch is even reachable. That
+is the entire reason this is a harmless surface collision and not the
+unresolvable kind.
+
 `nzinya` (one of the augmentative "big" variants from Section 6.1's
 stem list) shows the identical pattern, one more time:
 
@@ -717,6 +852,86 @@ on what precedes it: with no further RS in front, it's class 9's
 geminate `n`+`n`→`n` simplification (Section 6.3); with `bu-` in front,
 it's class 14's `bu`+`nzinya`. Both are completely unambiguous, for the
 exact same reason as the `zima`/`nzima` case above.
+
+## 4.8 Capstone: one adjective for each of the sixteen classes
+
+Chapter 1's Part 4 capstone built one noun for each of the sixteen
+classes and discovered a real glide gap (`utwana`) by testing every
+class honestly instead of assuming the rules generalized. Do the same
+thing here: pick one real stem from `ADJ_STEMS[]` (Section 6.1) per
+class, combine it with that class's RS from Section 1.3's table, and
+check all sixteen against the real library at once.
+
+```c
+/* p_all16_adj.c */
+#include "kinyarwanda.h"
+#include <stdio.h>
+
+int main(void) {
+    struct { int want_cls; const char *word; } tests[] = {
+        { 1,  "munini" },       { 2,  "benshi" },
+        { 3,  "mubi" },         { 4,  "mitindi" },
+        { 5,  "rigari" },       { 6,  "meza" },
+        { 7,  "kisa" },         { 8,  "bizima" },
+        { 9,  "nto" },          { 10, "zike" },
+        { 11, "rukuru" },       { 12, "gabisi" },
+        { 13, "tushya" },       { 14, "bugufi" },
+        { 15, "kure" },         { 16, "hatagatifu" },
+    };
+    char stem[KIN_MAX_STEM];
+    int cls;
+    printf("%-3s %-12s %-3s %-5s %-5s %-10s\n",
+           "Nt.", "word", "ok", "want", "got", "stem");
+    for (int i = 0; i < 16; i++) {
+        int ok = kin_strip_adj_prefix(tests[i].word, stem, &cls);
+        printf("%-3d %-12s %-3d %-5d %-5d %-10s\n",
+               tests[i].want_cls, tests[i].word, ok,
+               tests[i].want_cls, ok ? cls : -1, ok ? stem : "-");
+    }
+    return 0;
+}
+```
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_all16_adj.c -L . -lkinyarwanda -o p_all16_adj
+$ LD_LIBRARY_PATH=. ./p_all16_adj
+Nt. word         ok  want  got   stem
+1   munini       1   1     1     nini
+2   benshi       1   2     2     inshi
+3   mubi         1   3     1     bi
+4   mitindi      1   4     4     tindi
+5   rigari       1   5     5     gari
+6   meza         1   6     6     iza
+7   kisa         1   7     7     sa
+8   bizima       1   8     8     zima
+9   nto          1   9     9     to
+10  zike         1   10    10    ke
+11  rukuru       1   11    11    kuru
+12  gabisi       1   12    12    bisi
+13  tushya       1   13    13    shya
+14  bugufi       1   14    14    gufi
+15  kure         1   15    15    re
+16  hatagatifu   1   16    16    tagatifu
+```
+
+Fifteen rows match exactly, including class 6's a+i fusion (`meza`)
+and class 12's voicing (`gabisi`) firing automatically as part of the
+same loop, with no special-casing needed in the test itself — the
+rules from Sections 4.2-4.4 are already inside `kin_strip_adj_prefix`,
+not something the caller has to know about. Row 3 is the one that
+doesn't match: `mubi` comes back as class 1, not the class 3 this test
+asked for. This is not a bug, and Chapter 1 already taught you why.
+`mu` is the RS for *both* class 1 and class 3 (Section 1.3's table —
+the same overlap as the noun RT markers it's reusing), and
+`ADJ_PREFIXES[]` (Section 6.6) lists `{ "mu", 1 }` before
+`{ "mu", 3 }`, so the first one found wins. There is no way to tell,
+from `mubi` alone, which class was meant — exactly the same shape of
+problem as Chapter 1's `umuti` (class 1 or class 3, Section 1.9), now
+confirmed to exist on the adjective side too, by testing rather than
+assuming. A real sentence resolves this the way Chapter 1's pipeline
+test did: the *noun* `mubi` is describing carries its own class, and
+`ERR_ADJ_AGREEMENT` (Section 7.3) checks the pair together, not the
+adjective alone.
 
 ---
 
@@ -945,6 +1160,232 @@ because real codebases that have grown over time often end up with two
 related but independently-evolved implementations of a similar idea,
 and knowing how to spot that — without necessarily rushing to "fix" it —
 is part of reading code like an engineer instead of a purist.
+
+## 6.6 A different kind of safety: validate-and-retry instead of strict ordering
+
+Chapter 1 (Section 6.2) defended noun-prefix matching with a single
+discipline: **check longer, more specific prefixes before shorter,
+more generic ones**, so that `"umuti"` never gets cut at `"u"` when
+`"umu"` is the prefix actually meant. That discipline only works if
+*you*, the programmer, get the array order right and keep it right
+every time someone adds a new prefix. Look again at the real
+`ADJ_PREFIXES[]` table (Section 6.1's neighbor in `morphology.c`):
+
+```c
+static const struct { const char *pfx; int cls; } ADJ_PREFIXES[] = {
+    { "mu",  1  }, { "ba",  2  }, { "mu",  3  }, { "mi",  4  },
+    { "ri",  5  }, { "ma",  6  }, { "ki",  7  }, { "bi",  8  },
+    { "n",   9  }, { "zi",  10 }, { "ru",  11 }, { "ka",  12 },
+    /* ... */
+    { "m",   9  }, /* n→m §3.3: mbisi, mbi (n before bilabial)        */
+    { "nd",  9  }, /* n+r→nd §3.5: ndere, nderenire (n before r-stem) */
+    { "nz",  9  }, /* n+V epenthetic z §2.4: nziza, nzinshi           */
+    /* ... */
+};
+```
+
+The single-letter, class-9 prefix `"n"` sits near the *top* of the
+array — checked **before** the more specific `"nd"` and `"nz"` entries
+that appear further down. By Chapter 1's ordering rule, this is
+backwards: `"n"` is a prefix of `"nde"` and of `"nziza"`, so a strict
+"first match wins" scan would grab `"n"` first and never reach `"nd"`
+or `"nz"` at all. A naive matcher that copied Chapter 1's discipline
+verbatim — first prefix that matches the start of the word wins, full
+stop — gets two of these wrong:
+
+```c
+int naive_strip(const char *word, char *stem_out) {
+    static const struct { const char *pfx; int cls; } P[] = {
+        { "mu", 1 }, { "n", 9 }, { "m", 9 }, { "nd", 9 }, { "nz", 9 }, { NULL, 0 }
+    };
+    for (int i = 0; P[i].pfx; i++) {
+        if (starts_with(word, P[i].pfx)) {
+            strcpy(stem_out, word + strlen(P[i].pfx));
+            return P[i].cls;
+        }
+    }
+    return 0;
+}
+```
+
+```
+$ ./p_naive_order
+word     class stem
+nziza    9     ziza
+mbi      9     bi
+nde      9     de
+```
+
+`mbi` happens to come out right — its true prefix is the unambiguous
+`"m"`, which has no shorter, more generic rival in the array to lose
+to. But `nziza` and `nde` are both wrong: the naive scan stops at
+generic `"n"` and returns garbage stems `"ziza"` and `"de"` that don't
+exist as adjective stems at all. The real library, asked the same
+three words, gets all three right:
+
+```
+$ LD_LIBRARY_PATH=. ./p_real_compare
+word     ok  class  stem
+nziza    1   9      iza
+nde      1   9      re
+mbi      1   9      bi
+```
+
+The fix is not a better ordering — it's that `kin_strip_adj_prefix`
+never trusts a prefix match on its own. Look back at the real loop
+(Section 6.2): after `if (!kin_starts_with(word, ADJ_PREFIXES[i].pfx))
+continue;` finds a candidate prefix, the very next line is
+`if (kin_is_adj_stem(sfx)) { ... return true; }` — **the candidate is
+only accepted if what's left over is a real, listed stem.** When `"n"`
+matches the front of `"nziza"`, the leftover `"ziza"` is checked
+against the closed stem set from Section 6.1 and fails (the real stem
+is `"iza"`, not `"ziza"`). Because it fails, none of the function's
+`return true` statements fire for this candidate, and the `for` loop
+simply falls through to `i++` and tries the *next* prefix — eventually
+reaching `"nz"`, whose leftover `"iza"` *is* a real stem, and matching
+correctly. The geminate-reconstruction and `nd`-reconstruction blocks
+you read in Section 6.3 are the same idea taken one step further: they
+don't just check the literal leftover, they try one specific repair
+(prepend `'n'`, or prepend `'r'`) and *then* re-run the same
+`kin_is_adj_stem` check before accepting.
+
+As a loop, running on `"nziza"`, this is what actually happens:
+
+```
+   word = "nziza"
+        │
+        ▼
+   ┌─────────────────────────────────┐
+   │ next candidate: pfx = "n" (Nt.9) │◀─────────────────┐
+   └─────────────────────────────────┘                   │
+        │ "nziza" starts with "n"? yes                   │
+        ▼                                                │
+   ┌─────────────────────────────────┐                   │
+   │ sfx = "ziza".                    │   not a real      │
+   │ is "ziza" in ADJ_STEMS[]?  NO    │───stem — reject,  │
+   │ try geminate-reconstruct? NO     │   try next pfx ───┘
+   │  (pfx isn't exactly "n"+nothing  │
+   │   special to retry here)          │
+   └─────────────────────────────────┘
+        │
+        │   ... loop advances through "zi","ru","ka", ... "m" ...
+        ▼
+   ┌─────────────────────────────────┐
+   │ next candidate: pfx = "nz" (Nt.9)│
+   └─────────────────────────────────┘
+        │ "nziza" starts with "nz"? yes
+        ▼
+   ┌─────────────────────────────────┐
+   │ sfx = "iza".                     │
+   │ is "iza" in ADJ_STEMS[]?  YES    │──▶ return true, class=9, stem="iza"
+   └─────────────────────────────────┘
+```
+
+Every rejected candidate costs nothing but one more loop iteration —
+there is no backtracking, no lookahead, just "did this guess's leftover
+turn out to be real," asked over and over until one does.
+
+This is only possible because adjective stems are a **closed set**
+(Section 5) — there is a finite list to check membership against, so
+"is this leftover real?" is a question the code can actually answer.
+Chapter 1's nouns have an open-ended stem set (Section 6.6 there), so
+`kin_strip_noun_prefix` has no such oracle available and must fall
+back on getting the array order right by hand instead. Two different
+designs, two different reasons, each one correct for the shape of the
+problem it solves: **order discipline when you can't verify the
+guess, validate-and-retry when you can.**
+
+## 6.7 Closed beats open: how the pipeline decides a word isn't a noun
+
+Every example so far in this chapter has handed `kin_strip_adj_prefix`
+a word and trusted that it's an adjective. But inside the real
+pipeline, nothing tells the tokenizer that in advance — `kin_analyze`
+sees `"munini"` with no label attached, and has to *decide* whether
+it's a noun, a verb, or an adjective before any of the functions you've
+read in this chapter even run. That decision lives in `pos_tagger.c`,
+and the comment sitting directly above the relevant check states the
+exact ambiguity Section 4.8's capstone surfaced by accident:
+
+```c
+/* Before committing to noun, check if this is an adjective.
+ * Adjective concordance prefixes (RS) are identical to noun-class
+ * prefixes, so adjective detection at step 7 is never reached for
+ * words caught here first.  e.g. "munini" = mu(RS Nt.1)+nini → adj,
+ * NOT an Nt.1 noun with stem "nini".                                */
+{
+    char a_stem[KIN_MAX_STEM] = "";
+    int  a_cls = 0;
+    if (kin_strip_adj_prefix(w, a_stem, &a_cls)) {
+        tok->pos        = POS_ADJECTIVE;
+        tok->noun_class = a_cls;
+        strncpy(tok->stem, a_stem, KIN_MAX_STEM - 1);
+        /* ... */
+        return;
+    }
+}
+tok->pos        = POS_NOUN;
+tok->noun_class = cls;
+strncpy(tok->stem, stem, KIN_MAX_STEM - 1);
+/* ... */
+```
+
+This code only runs *after* `kin_strip_noun_prefix` (Chapter 1,
+Section 6.6) has already succeeded on the same word — `"munini"` is a
+perfectly legal noun parse too: `mu-` (class 1 or 3) plus stem `"nini"`,
+accepted without complaint, because Chapter 1's noun stems are an
+**open set** (Chapter 1, Section 4.2 — established with this exact
+same word, `umuntu`, as its own example) that accepts any leftover
+string at all. By the time the tagger reaches this point, it already
+has a working noun answer in hand — and throws it away anyway, the
+moment `kin_strip_adj_prefix` succeeds on the same input. Verify both
+halves of that claim directly:
+
+```c
+/* p_pos.c */
+#include "kinyarwanda.h"
+#include <stdio.h>
+
+int main(void) {
+    const char *text = "Umuntu munini agenda.";
+    SentenceAnalysis sa = kin_analyze(text);
+    printf("Input: \"%s\"\n\n", text);
+    for (int i = 0; i < sa.token_count; i++) {
+        Token *t = &sa.tokens[i];
+        printf("  token[%d]=\"%-10s\" pos=%d noun_class=%d stem=%s\n",
+               i, t->surface, t->pos, t->noun_class, t->stem);
+    }
+    return 0;
+}
+```
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_pos.c -L . -lkinyarwanda -o p_pos
+$ LD_LIBRARY_PATH=. ./p_pos
+Input: "Umuntu munini agenda."
+
+  token[0]="Umuntu    " pos=1 noun_class=1 stem=ntu
+  token[1]="munini    " pos=2 noun_class=1 stem=nini
+  token[2]="agenda    " pos=6 noun_class=1 stem=gend
+  token[3]="."         " pos=17 noun_class=0 stem=
+```
+
+`munini` comes back `pos=2` (`POS_ADJECTIVE`), not `pos=1`
+(`POS_NOUN`) — confirming the comment exactly: the tagger had a valid
+noun reading sitting in hand (stem `"nini"`, open-set, always
+available) and discarded it in favor of the adjective reading, because
+the adjective reading only exists at all *if* `"nini"` happens to be
+one of the roughly forty entries in `ADJ_STEMS[]` (Section 6.1) — and
+it is. This is the same closed-vs-open asymmetry from Section 5 and
+Section 6.6, now doing a third job: not just "is this word valid" and
+not just "which prefix candidate is right," but **"which part of
+speech is this word, when more than one analyzer is willing to claim
+it."** A closed-set match is rarer and therefore stronger evidence of
+intent than an open-set match that virtually any string will satisfy
+— so when both succeed on the same word, the closed-set reading wins.
+(The same file has a parallel, far larger block of guards adjudicating
+noun-versus-verb ambiguity, which is genuinely a later chapter's
+subject — verb stems are open-ended too, so that fight can't be
+settled by "closed beats open" the way this one was.)
 
 ---
 
@@ -1203,6 +1644,141 @@ one's — but seeing it sitting quietly correct in this real output is a
 preview of how many of this project's checks run side by side on the
 same sentence at once.
 
+## 7.6 Case study: a sentence with nothing wrong in it
+
+Section 7.5's sentence was deliberately broken, to show the checker
+catching a mistake. Real text is mostly *not* broken, and a checker
+that only ever gets exercised on bad input is only half tested.
+`data/textbook_grammar_rules.md`'s own worked example for this
+chapter's grammar (`§8`, "NTERA") is a correct, two-adjective sentence:
+`"Umukinnyi mushya yatsinze ibitego byinshi."` ("The new player scored
+many goals.") Run it through the exact same pipeline as Section 7.5:
+
+```c
+/* p_clean_case.c */
+#include "kinyarwanda.h"
+#include <stdio.h>
+
+int main(void) {
+    const char *text = "Umukinnyi mushya yatsinze ibitego byinshi.";
+    SentenceAnalysis sa = kin_analyze(text);
+    kin_suggest_corrections(&sa);
+
+    printf("Input: \"%s\"\n\n", text);
+    for (int i = 0; i < sa.token_count; i++) {
+        Token *t = &sa.tokens[i];
+        printf("  token[%d]=\"%-10s\" pos=%d noun_class=%d\n",
+               i, t->surface, t->pos, t->noun_class);
+    }
+    printf("\nErrors found: %d\n", sa.error_count);
+    return 0;
+}
+```
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_clean_case.c -L . -lkinyarwanda -o p_clean_case
+$ LD_LIBRARY_PATH=. ./p_clean_case
+Input: "Umukinnyi mushya yatsinze ibitego byinshi."
+
+  token[0]="Umukinnyi " pos=1 noun_class=1
+  token[1]="mushya    " pos=2 noun_class=1
+  token[2]="yatsinze  " pos=6 noun_class=1
+  token[3]="ibitego   " pos=1 noun_class=8
+  token[4]="byinshi   " pos=2 noun_class=8
+  token[5]="."         " pos=17 noun_class=0
+
+Errors found: 0
+```
+
+Two separate noun-adjective pairs, both agreeing correctly: `Umukinnyi`
+(class 1) with `mushya` (class 1, the `mu→mu` glide-free form since
+`shya` doesn't start with a vowel — Section 6.3's glide rule simply
+doesn't fire here, and that's correct, not a gap), and `ibitego`
+(class 8) with `byinshi` (class 8, the `bi→by` glide *does* fire,
+because `inshi` starts with a vowel). `ERR_ADJ_AGREEMENT` (Section 7.3)
+checks `cur->noun_class != next->noun_class` for *every* adjacent
+noun-adjective pair it finds — it ran twice here, found no mismatch
+either time, and stayed silent both times. A checker's correctness
+isn't just "does it flag the bad sentence" — it's equally "does it
+leave the good sentence alone," and a checker that fires on everything
+is as useless as one that never fires at all. This is also a quiet
+demonstration of Section 6.6's closed-set validation at work twice in
+one sentence: `kin_strip_adj_prefix` had to correctly resolve `mushya`
+(`mu` + `shya`) and `byinshi` (`bi`→`by` + `inshi`) before agreement
+checking could even begin, and it got both right without you having to
+think about which prefix-table entry fired for either one.
+
+## 7.7 Case study: two independent mistakes, in one sentence
+
+Sections 7.5 and 7.6 each made one point — one error, then zero errors.
+Real text can do both at once: more than one noun-adjective pair, each
+checked completely independently, with no relationship between whether
+one pair is right and whether another is. Force two separate, unrelated
+mistakes into a single sentence and watch the real pipeline catch both:
+
+```c
+/* p_two_errors.c */
+#include "kinyarwanda.h"
+#include <stdio.h>
+
+int main(void) {
+    const char *text = "Umugore kinini yaguze ibitabo munini.";
+    SentenceAnalysis sa = kin_analyze(text);
+    kin_suggest_corrections(&sa);
+
+    printf("Input: \"%s\"\n\n", text);
+    for (int i = 0; i < sa.token_count; i++) {
+        Token *t = &sa.tokens[i];
+        printf("  token[%d]=\"%-10s\" pos=%d noun_class=%d\n",
+               i, t->surface, t->pos, t->noun_class);
+    }
+    printf("\nErrors found: %d\n", sa.error_count);
+    for (int i = 0; i < sa.error_count; i++) {
+        printf("  [%d] %s\n      -> %s\n", i,
+               sa.errors[i].message, sa.errors[i].suggestion);
+    }
+    return 0;
+}
+```
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p_two_errors.c -L . -lkinyarwanda -o p_two_errors
+$ LD_LIBRARY_PATH=. ./p_two_errors
+Input: "Umugore kinini yaguze ibitabo munini."
+
+  token[0]="Umugore   " pos=1 noun_class=1
+  token[1]="kinini    " pos=2 noun_class=7
+  token[2]="yaguze    " pos=6 noun_class=1
+  token[3]="ibitabo   " pos=1 noun_class=8
+  token[4]="munini    " pos=2 noun_class=1
+  token[5]="."         " pos=17 noun_class=0
+
+Errors found: 2
+  [0] Gushyira hamwe nabi: 'Umugore' (inteko 1) na 'kinini' (inteko 7). Agreement error: 'Umugore' (class 1) with 'kinini' (class 7).
+      -> Hindura 'kinini' ugakoresheje 'munini' kugira ngo ishyikire inteko 1 (Nt.1 – human singular (umuntu)). / Replace 'kinini' with 'munini' to agree with class 1 (Nt.1 – human singular (umuntu)).
+  [1] Gushyira hamwe nabi: 'ibitabo' (inteko 8) na 'munini' (inteko 1). Agreement error: 'ibitabo' (class 8) with 'munini' (class 1).
+      -> Hindura 'munini' ugakoresheje 'binini' kugira ngo ishyikire inteko 8 (Nt.8 – thing plural (ibigo)). / Replace 'munini' with 'binini' to agree with class 8 (Nt.8 – thing plural (ibigo)).
+```
+
+Both mistakes are built from the exact same stem, `nini` ("big"), each
+time wearing the wrong RS for its noun: `kinini` (class 7's RS) next
+to `Umugore` (class 1), and `munini` (class 1's RS) next to `ibitabo`
+(class 8). The interesting detail is in error `[1]`'s *suggestion*:
+the corrector proposes `binini` — class 8's RS — even though the word
+`munini` that's actually in the sentence is, by sheer coincidence,
+exactly the same surface form `kin_strip_adj_prefix` would also have
+accepted as a *correct* class-1 word on its own (compare Section 4.8's
+capstone row 1, `munini` → class 1, stem `nini`). Out of context,
+`munini` is perfectly valid Kinyarwanda. `ERR_ADJ_AGREEMENT` never
+asks "is this word valid on its own" — Section 7.3 showed the actual
+check is `cur->noun_class != next->noun_class`, a comparison between
+*two* tokens, not a property of either one alone. A word can be
+completely correct in isolation and still be the wrong word in the
+sentence it's actually sitting in — which is exactly why concordance
+has to be checked pairwise, token by token, the way `syntax.c` does
+it, and never by asking of a single word "is this spelled right?" in
+isolation.
+
 ---
 
 # Part 8 — Practice
@@ -1252,6 +1828,28 @@ same sentence at once.
    the two functions might plausibly disagree, and test both to see
    whether they actually do.
 
+9. **Reproduce Section 4.7's homograph directly.** Write a program that
+   calls `kin_strip_adj_prefix` on bare `nzima`, then on `munzima`,
+   `banzima`, and `kinzima`. Confirm by hand, from `ADJ_PREFIXES[]`'s
+   real order (Section 6.6), *why* the bare word can only ever resolve
+   to class 9's `zima`, never to the closed-set stem `nzima` — then
+   verify your reasoning against the real output.
+
+10. **Build the naive matcher yourself.** Write your own
+    `naive_strip()` (Section 6.6's shape: first prefix match wins, no
+    `kin_is_adj_stem` check) and find a *fourth* real word, besides
+    `nziza` and `nde`, that it gets wrong. Then explain in one sentence
+    why `mbi` was the one word in Section 6.6 that the naive version
+    happened to get right.
+
+11. **Find a second closed-beats-open collision.** Pick a different
+    class/stem pair from Section 4.8's capstone table, build a word
+    with it, and check (using `kin_strip_noun_prefix` and
+    `kin_strip_adj_prefix` separately, the way Section 6.7 did for
+    `munini`) whether the stem also happens to be a valid noun stem in
+    the open sense. Run the full word through `kin_analyze` and
+    confirm which `pos` actually wins.
+
 ## Key takeaways
 
 - An adjective is RS + C — concordance prefix plus stem — with no D
@@ -1281,6 +1879,36 @@ same sentence at once.
 - Real codebases sometimes carry small, harmless redundancy (the
   `kin_vv_join`/`build_adj` overlap) — recognizing it without rushing to
   "fix" it is part of reading code like an engineer.
+- A closed stem set isn't just simpler to search — it gives the parser
+  something to check its own guesses against. Two real stems can
+  collide on the surface (`nzima` the class-9 word vs. `nzima` the
+  closed-set stem) without ever causing a real ambiguity, because an
+  adjective's RS can never be silently absent the way a noun's D vowel
+  can.
+- `kin_strip_adj_prefix` doesn't rely on prefix-table ordering the way
+  Chapter 1's noun parser does: each candidate prefix's leftover is
+  validated against the closed stem set before being accepted, and a
+  failed validation falls through to the next candidate — so a generic
+  prefix like `"n"` sitting before more specific ones like `"nd"`/`"nz"`
+  in the array doesn't cause a wrong match, the way it would in a naive
+  first-match-wins scan.
+- A buffer that's merely "big enough for the data" isn't enough — it
+  has to be big enough for the *contract* (`KIN_MAX_STEM`), because the
+  function's own internal scratch space can be larger than its final
+  answer. Get the size wrong and the failure isn't a crash, it's silent
+  stack corruption that eats unrelated local variables — found and
+  fixed live, in this chapter's own test code, while writing it.
+- `ERR_ADJ_AGREEMENT` checks pairs, not words: the same surface word
+  (`munini`) can be perfectly correct standing next to one noun and
+  wrong standing next to another, and two unrelated agreement mistakes
+  in one sentence are caught completely independently of each other.
+- Before any of this chapter's functions run, `pos_tagger.c` has to
+  decide a word is an adjective at all — and it does so by letting a
+  closed-set match (adjective) override an open-set match (noun) on
+  the exact same word, because matching a ~40-entry list is rarer, and
+  therefore stronger evidence, than matching a stem set that accepts
+  almost anything. `munini` really is a valid noun parse; the real
+  pipeline finds that parse and discards it anyway.
 
 ## Sources quoted in this chapter
 
@@ -1296,6 +1924,7 @@ same sentence at once.
 - `src/morph_dispatch.c` (`analyse_adj`, `NOUN_RT[]`).
 - `src/syntax.c` (the `ERR_ADJ_AGREEMENT` check).
 - `src/corrector.c` (`build_adj`, `kin_suggest_corrections`).
+- `src/pos_tagger.c` (the closed-beats-open noun-vs-adjective tie-break).
 - Every `pN_*.c`/`p_*.c` program and every real-library run in this
   chapter was actually compiled with `gcc -std=c99 -Wall -Wextra` and
   actually executed to produce the exact output quoted above.
