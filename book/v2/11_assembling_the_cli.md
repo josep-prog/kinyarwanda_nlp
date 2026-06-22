@@ -215,7 +215,13 @@ exactly this input.
 
 ---
 
-# Part 4 — Capstone: Four Real Findings From Reading the Production Code
+# Part 4 — Capstone: Four Real Findings, and the Fix Applied to Each
+
+This part originally just found these four bugs. All four are now
+fixed in this project's own source — the same files this chapter has
+been reading, not a hypothetical patch. Each section below shows the
+bug as it was found, the fix that was actually applied, and the same
+reproduction re-run against the fixed code.
 
 ## 4.1 The headline bug: a corrected sentence can be replaced by a paragraph of advice
 
@@ -282,6 +288,76 @@ of the two real code paths that raise `ERR_SPELLING` was written to
 honor that assumption — each puts a full explanatory sentence in the
 same field `kin_correct` blindly substitutes in.
 
+### The fix
+
+`suggestion` and "a literal replacement word" are two different
+things, and the fix keeps them as two different fields instead of
+trying to make one do both jobs. `kinyarwanda.h`'s `Error` struct
+gained a new member:
+
+```c
+typedef struct {
+    ErrorType type;
+    int       token_index;
+    char      message[KIN_MAX_MSG];
+    char      suggestion[KIN_MAX_MSG];
+    /* A literal drop-in replacement word, when one is actually known —
+     * distinct from 'suggestion', which is a bilingual explanatory
+     * sentence and is NOT safe to substitute directly into a sentence.
+     * Empty ("") when no concrete replacement word was computed. */
+    char      corrected_word[KIN_MAX_WORD];
+} Error;
+```
+
+`syntax.c`'s vowel-harmony rule — the one call site that already
+computes a real corrected word (`corrected`, built a few lines above
+its own `add_error` call) — now copies that word into the new field
+right after raising the error:
+
+```c
+int err_idx = sa->error_count;
+add_error(sa, ERR_SPELLING, i, msg, sug);
+if (sa->error_count > err_idx)
+    strncpy(sa->errors[err_idx].corrected_word, corrected, KIN_MAX_WORD - 1);
+```
+
+The letter-`l` call site is left exactly as it was: it never computes
+a real correction (the engine genuinely doesn't know whether `balimo`
+is a typo, a foreign word, or a proper name missing capitalization),
+so `corrected_word` for that error simply stays empty — every `Error`
+starts zeroed out (`kin_analyze` runs `memset(&sa, 0, sizeof(sa))`
+before anything else), so "no correction known" and "field never
+touched" are the same state.
+
+`api.c`'s `kin_correct` now reads `corrected_word` instead of
+`suggestion`, and only substitutes when one was actually computed:
+
+```c
+const char *word = tok->surface;
+for (int e = 0; e < sa.error_count; e++) {
+    if (sa.errors[e].token_index == i
+        && sa.errors[e].type == ERR_SPELLING
+        && sa.errors[e].corrected_word[0] != '\0') {
+        word = sa.errors[e].corrected_word;
+        break;
+    }
+}
+```
+
+Re-running the exact reproduction from above, against the fixed code:
+
+```
+$ gcc -std=c99 -Wall -Wextra -I include p4_garbled.c -L . -lkinyarwanda -o p4_garbled
+$ LD_LIBRARY_PATH=. ./p4_garbled
+Input:     Abana balimo kwiga.
+Corrected: Abana balimo kwiga.
+```
+
+No more inserted paragraph. Because the letter-`l` rule has no real
+correction to offer, `kin_correct` now does the honest thing for that
+case: leave the word exactly as the caller wrote it, rather than
+replace it with anything — wrong or not.
+
 ## 4.2 Validating a `.doc`/`.docx` with neither converter installed looks exactly like success
 
 `kin_validate_file`'s fallback chain tries `antiword`, then
@@ -324,6 +400,64 @@ file — the `if (!fp)` error-message block a few lines later, which
 *would* have told the user to install one of the two tools, never
 gets a chance to run, because `fp` isn't `NULL`. It's a real word.
 It's just empty.
+
+### The fix
+
+The fix tracks the *actual exit status* of each conversion attempt in
+a `bool converted`, instead of inferring success from whether a file
+happens to exist afterward — and explicitly deletes `antiword`'s
+empty leftover file before trying `libreoffice`, so no stale file
+survives to be opened by accident:
+
+```c
+snprintf(cmd, sizeof(cmd),
+    "antiword \"%s\" > \"%s\" 2>/dev/null", path, tmpfile);
+bool converted = (system(cmd) == 0);
+if (!converted) {
+    remove(tmpfile);  /* discard antiword's empty/partial redirect target */
+    snprintf(cmd, sizeof(cmd),
+        "libreoffice --headless --convert-to txt:Text "
+        "\"%s\" --outdir /tmp/ 2>/dev/null", path);
+    if (system(cmd) == 0) {
+        /* ...build lo_out, the path libreoffice actually wrote to... */
+        converted = (rename(lo_out, tmpfile) == 0);
+    }
+}
+if (!converted) {
+    fprintf(stderr,
+        "Ikosa: Ntibishoboka guhindura '%s'. "
+        "Shyiraho 'antiword' cyangwa 'libreoffice'.\n"
+        "Error: cannot convert '%s'. "
+        "Install antiword or libreoffice.\n", path, path);
+    return;
+}
+fp = fopen(tmpfile, "r");
+```
+
+`rename()`'s return value — the exact check the old comment claimed
+existed — now actually gates `converted`. Re-running the identical
+reproduction:
+
+```
+$ which antiword libreoffice
+antiword not found
+libreoffice not found
+$ echo "Umuntu munini aragenda kandi ariko." > /tmp/fake.docx
+$ ./kinyarwanda_nlp -validation /tmp/fake.docx
+Ikosa: Ntibishoboka guhindura '/tmp/fake.docx'. Shyiraho 'antiword' cyangwa 'libreoffice'.
+Error: cannot convert '/tmp/fake.docx'. Install antiword or libreoffice.
+$ echo "exit code: $?"
+exit code: 0
+```
+
+The user now gets the actual error message this function always had
+the *words* for, just never the working code path to reach. (The exit
+code is still `0` — `kin_validate_file` itself returns `void`, and
+`main.c`'s `-validation` dispatch doesn't inspect anything further.
+Surfacing this failure as a non-zero process exit code would mean
+changing `kin_validate_file`'s public signature, a larger change than
+this specific bug — found and described in this chapter as "the
+report looks like success" — actually called for.)
 
 ## 4.3 A comment describing a fix that was never written
 
@@ -371,6 +505,25 @@ practice — the label is arguably more informative than confusing
 here — but it's a real, verifiable case of a comment documenting an
 intention that the code beside it doesn't carry out.
 
+### The fix
+
+Since the actual behavior (always showing `[Interuro N]`, even for
+one sentence) was never the problem — only the comment's claim about
+it was — the fix doesn't touch the logic at all, only the comment:
+
+```c
+int sent_num = 0, total = 0;
+/* validate_text_block() increments sent_num for every sentence it
+ * finds, including the only one in single-sentence input, so
+ * print_report's "[Interuro N / Sentence N]" prefix is shown even
+ * when the input is just one sentence. */
+validate_text_block(text, &sent_num, &total);
+```
+
+The output is unchanged, which is itself the point: the comment now
+describes what the three lines beside it actually do, instead of
+describing a feature that was never built.
+
 ## 4.4 `--gloss` (and `--g2p`) silently do nothing when combined with `-f` or `-p`
 
 `main.c`'s gloss-mode dispatch only fires when both flags are present:
@@ -414,6 +567,66 @@ recognized flag) and then quietly never consulted again. The same gap
 applies to `--g2p -f`/`--g2p -p`, for the identical structural reason:
 both special modes are wired to `sentence` alone, with no equivalent
 branch for `filename` or `pdffile`.
+
+### The fix
+
+`main.c` gained `gloss_line`/`gloss_stream`/`gloss_pdf` and
+`g2p_line`/`g2p_stream`/`g2p_pdf` — three-function sets mirroring the
+exact shape `analyse_line`/`analyse_stream`/`analyse_pdf` already
+had, so each special mode can now run over one sentence, a whole file,
+or a PDF the same way plain analysis always could. The dispatch itself
+changed from "only fires if both flags are present" to "fires on the
+mode flag, then picks whichever input source was actually given — and
+says so clearly if none was":
+
+```c
+if (gloss_mode) {
+    if (sentence) { gloss_line(sentence, verbose); return 0; }
+    if (filename) { /* open filename, gloss_stream(fp, verbose) */ return 0; }
+    if (pdffile)  { return gloss_pdf(pdffile, verbose); }
+    fprintf(stderr,
+        "Ikosa: --gloss ikeneye -s, -f cyangwa -p.\n"
+        "Error: --gloss requires one of -s, -f, or -p.\n");
+    return 1;
+}
+```
+
+(`g2p_mode`'s dispatch is the same shape, calling `g2p_line`/
+`g2p_stream`/`g2p_pdf` instead.) Re-running the exact reproduction:
+
+```
+$ echo "Umuntu munini aragenda." > /tmp/glosstest.txt
+$ ./kinyarwanda_nlp --gloss -f /tmp/glosstest.txt
+...
+  ═══ Interlinear Gloss (Amategeko y'Igenamajwi) ══════════════
+  Morpheme chain and English gloss for each word / akaramejambo
+  ...
+  Umuntu             u        – mu       – ntu
+                     CL1.SG   – Nt.1     – person
+
+  munini             mu       – nini
+                     AGR.CL1  – big/adult
+
+  aragenda           a        – ra       – gend     – a
+                     3SG.HUM  – PRES     – go/travel – IND
+
+  .                  [.]
+  ─── Translation hint: person [big/adult] go/travel.
+  ═══════════════════════════════════════════════════════
+```
+
+The interlinear section Chapter 8 introduced now actually appears —
+`--gloss -f` runs the same gloss pipeline `--gloss -s` always did,
+just once per line of the file. And the case that used to fall
+through silently now says exactly what's wrong:
+
+```
+$ ./kinyarwanda_nlp --gloss
+Ikosa: --gloss ikeneye -s, -f cyangwa -p.
+Error: --gloss requires one of -s, -f, or -p.
+$ echo "exit: $?"
+exit: 1
+```
 
 ---
 
@@ -661,14 +874,22 @@ everything needed to open `morphology.c` next and keep going.
 
 ### Advanced
 
-6. Propose a minimal fix for Section 4.1 that doesn't require changing
-   `ERR_SPELLING`'s two real call sites in `syntax.c` — what would
-   `kin_correct` need to check before trusting `suggestion` as a
-   literal replacement word?
-7. Propose a minimal fix for Section 4.2 that closes the silent-empty-
-   file gap without requiring either `antiword` or `libreoffice` to be
-   installed — what should `kin_validate_file` check before calling
-   `fopen(tmpfile, "r")`?
+6. Section 4.1's real fix added `corrected_word` as a field separate
+   from `suggestion`, rather than, say, parsing a corrected word back
+   out of the bilingual `suggestion` sentence. Read the actual diff in
+   `kinyarwanda.h` and `syntax.c`. Why is a dedicated field safer here
+   than trying to extract a quoted word from `sug` with `strstr`,
+   given that `message`/`suggestion` strings are meant for bilingual
+   human-facing prose, not machine parsing?
+7. Section 4.2's real fix tracks `bool converted` from each `system()`
+   call's actual exit status — not from whether `tmpfile` happens to
+   exist afterward, which was the original bug's exact failure mode.
+   Given that, is the fix's `remove(tmpfile)` call (made right before
+   trying `libreoffice`) actually load-bearing for correctness, or is
+   it cleanup that happens to also be good practice? Trace what
+   `converted` would end up being, with that `remove()` call deleted,
+   in the case where `libreoffice` also fails — does the function
+   still correctly refuse to call `fopen`?
 8. Section 5.2 found the same sentence-splitting logic duplicated in
    `main.c` and `validator.c`. Sketch the signature of a single shared
    helper both files could call instead, and name which header it
@@ -688,24 +909,34 @@ everything needed to open `morphology.c` next and keep going.
   (`kin_correct`, `kin_g2p`) — both documented to return a pointer
   into a `static` buffer, a real, demonstrated aliasing risk distinct
   from every fixed-buffer-overflow risk this book has flagged before.
-- The headline real finding: `kin_correct` assumes every
-  `ERR_SPELLING` error's `suggestion` field is a drop-in replacement
-  word, but the two real places that raise `ERR_SPELLING` both write
-  a full bilingual explanatory sentence into that field instead — so
-  a real spelling error doesn't just go uncorrected, it replaces one
-  word with an entire paragraph in the "corrected" output.
-- A second real finding: when neither `antiword` nor `libreoffice` is
-  installed, validating a `.doc`/`.docx` file produces an empty
-  report and exit code `0` — indistinguishable from genuine success —
-  because a failed shell redirect still creates the temp file
-  `kin_validate_file` goes on to successfully `fopen`.
-- A third real finding: a comment in `kin_validate_text` describes
-  counting terminal punctuation marks to suppress a label for
-  single-sentence input; no such counting exists anywhere in the
-  function, and the label prints every time.
-- A fourth real finding: `--gloss` and `--g2p` are only wired to the
-  `-s` (inline sentence) input source; combined with `-f` or `-p`,
-  both flags are silently accepted and then never consulted again.
+- The headline real finding, now fixed: `kin_correct` assumed every
+  `ERR_SPELLING` error's `suggestion` field was a drop-in replacement
+  word, but the two real places that raise `ERR_SPELLING` both wrote
+  a full bilingual explanatory sentence into that field instead. The
+  fix adds a separate `corrected_word` field to `Error`, populated
+  only where a real replacement word is actually computed; `kin_correct`
+  now reads that field instead of `suggestion`, and leaves a word
+  untouched rather than guess when no real correction is known.
+- A second real finding, now fixed: when neither `antiword` nor
+  `libreoffice` was installed, validating a `.doc`/`.docx` file
+  produced an empty report and exit code `0` — indistinguishable from
+  genuine success — because a failed shell redirect still created the
+  temp file `kin_validate_file` went on to successfully `fopen`. The
+  fix tracks each conversion step's real exit/rename status in a
+  `bool converted`, instead of inferring success from file existence.
+- A third real finding, now fixed: a comment in `kin_validate_text`
+  described counting terminal punctuation marks to suppress a label
+  for single-sentence input; no such counting existed anywhere in the
+  function, and the label printed every time regardless. The fix
+  rewrites the comment to describe what the code actually does,
+  since the existing behavior was harmless and didn't need to change.
+- A fourth real finding, now fixed: `--gloss` and `--g2p` were only
+  wired to the `-s` (inline sentence) input source; combined with
+  `-f` or `-p`, both flags were silently accepted and then never
+  consulted again. The fix adds real file- and PDF-stream support for
+  both modes (mirroring the existing `analyse_stream`/`analyse_pdf`
+  shape) and a clear error when neither flag is given any usable
+  input source at all.
 - Two of this project's largest files, `morphology.c` and
   `morph_dispatch.c` (over 6,800 lines combined), were used in every
   chapter's case studies but never opened directly in this book — an
@@ -715,11 +946,17 @@ everything needed to open `morphology.c` next and keep going.
 ## Sources quoted in this chapter
 
 - `src/main.c` (the full mode-dispatch chain, `analyse_text`,
-  `analyse_line`).
+  `analyse_line`, and the new `gloss_*`/`g2p_*` functions added by
+  Section 4.4's fix).
 - `src/validator.c` (`kin_validate_text`, `kin_validate_file`,
-  `print_report`, `build_context`, `validate_text_block`).
-- `src/api.c` (`kin_correct`, `kin_g2p`, in full).
-- `src/syntax.c` (both real `ERR_SPELLING` call sites).
+  `print_report`, `build_context`, `validate_text_block`, all as
+  fixed by Sections 4.2 and 4.3).
+- `src/api.c` (`kin_correct`, `kin_g2p`, in full, as fixed by
+  Section 4.1).
+- `src/syntax.c` (both real `ERR_SPELLING` call sites, one of them
+  updated by Section 4.1's fix).
+- `include/kinyarwanda.h` (the `Error` struct's new `corrected_word`
+  field, added by Section 4.1's fix).
 - Every `pN_*.c` program and every real CLI invocation in this chapter
   was actually compiled or run against the real
   `gcc -std=c99 -Wall -Wextra` build to produce the exact output
@@ -737,7 +974,15 @@ transcript; and when a comment and the code beside it disagree, trust
 what actually ran. That discipline is what found every real, verified
 bug in this book — not a tool, not a hunch, just running the project's
 own documented examples against itself and writing down what actually
-happened. A reader who has worked through all eleven chapters has
+happened. This chapter went one step further than every chapter before
+it: the four bugs Part 4 found are no longer bugs — `kinyarwanda.h`,
+`syntax.c`, `api.c`, `validator.c`, and `main.c` all carry real fixes
+now, verified the same way every finding in this book was verified,
+by compiling and running the exact reproduction again afterward. That
+last step — not just finding what's wrong, but reading the surrounding
+code closely enough to fix it without breaking anything this book
+already verified — was the actual goal of every chapter before this
+one. A reader who has worked through all eleven chapters has
 everything needed to open any remaining file in `src/` — `morphology.c`
 and `morph_dispatch.c` chief among them — and keep going: find the
 header comment, find the real function, compile it, run it, and trust
