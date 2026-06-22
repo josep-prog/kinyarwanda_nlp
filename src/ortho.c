@@ -353,12 +353,18 @@ static bool apply_nasal_elision(char *buf, int bpos, int *len) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 static bool apply_voicing(char *buf, int bpos, int *len) {
     /* §3.7.1/3.7.2: k→g, t→d for short class-marker prefixes.
-     * Applied unconditionally to any 2-char prefix ending in k or t.
+     * Applies to a 2-char prefix ending in k or t, but ONLY when the
+     * following morpheme is consonant-initial (igitabo: ki+tabo → igi+tabo).
+     * Before a vowel-initial following morpheme the boundary is a
+     * vowel-contact site instead (ki+atsi → cyatsi, ku+ezi → kwezi), which
+     * the glide/cons-loss passes handle; voicing there is wrong and would
+     * give "igyatsi"/"ugwezi" instead of "icyatsi"/"ukwezi".
      *
      * Algorithm: walk back from bpos to find the start of the preceding morpheme.
      * If (bpos - prec_start) == 2 and buf[prec_start] is 'k' or 't', voice it.
      * The boundary '|' is left in place (strip_boundaries removes it later). */
     if (bpos < 2 || bpos+1 >= *len) return false;
+    if (ov(buf[bpos+1])) return false;  /* vowel-initial: vowel-contact site, not voicing */
 
     /* Find start of preceding morpheme */
     int prec_start = bpos - 1;

@@ -25,11 +25,15 @@ static void test_ortho_gen(TestResult *r) {
     kin_ortho_gen("ba|nini", false, buf, sizeof(buf));
     ASSERT_STR(r, buf, "banini", "ba|nini → banini (consonant-initial stem)");
 
-    /* §1.1  u → w before vowel; §3.7 then voices k before the resulting glide.
-     * Engine applies both rules in sequence: ku+eza → kw+eza → gw+eza = gweza.
-     * (kin_vv_join produces "kweza"; kin_ortho_gen additionally applies voicing) */
+    /* §1.1  u → w before vowel. §3.7 voicing (k→g) only applies before a
+     * CONSONANT-initial following morpheme (igitabo: ki+tabo); before a
+     * vowel-initial morpheme the boundary is a vowel-contact site instead,
+     * so voicing must NOT fire here: ku+eza → kw+eza = kweza, not "gweza".
+     * "kweza" (to purify) is the real, attested word — confirmed below by
+     * kin_ortho_validate("kweza") reporting 0 violations, and present in
+     * the lexicon as the causative of "kwera". */
     kin_ortho_gen("ku|eza", false, buf, sizeof(buf));
-    ASSERT_STR(r, buf, "gweza", "ku|eza → gweza (u→w then k→g §3.7)");
+    ASSERT_STR(r, buf, "kweza", "ku|eza → kweza (u→w §1.1; no voicing before a vowel)");
 
     /* §1.2  a + i → e (vowel fusion, confirmed working case) */
     kin_ortho_gen("ba|inja", false, buf, sizeof(buf));

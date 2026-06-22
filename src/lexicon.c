@@ -2075,7 +2075,8 @@ static const KnownWord KNOWN_WORDS[] = {
     { "busabe",   14,  "sabe"   }, /* = ubusabe (prayer / request)         */
     { "buhemu",   14,  "hemu"   }, /* = ubuhemu (betrayal / treason)       */
     /* Nt.15 common nouns with dropped D-vowel 'u' from "uku" */
-    { "kwezi",    15,  "wezi"   }, /* = ukwezi (moon / month)              */
+    { "kwezi",    15,  "ezi"    }, /* = ukwezi (moon / month); stem excludes the
+                                       u→w glide §1.1, cf. "bwenge"→"enge" above */
     /* Nt.2 common nouns with dropped D-vowel 'a' from "aba" */
     { "bantu",     2,  "ntu"    }, /* = abantu (people)                    */
     /* Nt.9 common nouns with dropped D-vowel 'i' */
@@ -2504,7 +2505,8 @@ static const NounPluralPair NOUN_PLURAL_PAIRS[] = {
     { "ubutegetsi",    NULL,              "tegetsi",   14,  0  },
     { "ubuhamya",      NULL,              "hamya",     14,  0  },
     /* ── Class 15 (verbal noun / infinitive; no plural) ────────────────────── */
-    { "ukwezi",        NULL,              "wezi",      15,  0  },  /* u→w§1.1 */
+    { "ukwezi",        NULL,              "ezi",       15,  0  },  /* u→w§1.1;
+                            igicumbi excludes the glide, cf. "amezi" above */
     /* ── Class 16 (locative; no plural) ────────────────────────────────────── */
     { "ahantu",        NULL,              "ntu",       16,  0  },
     { NULL, NULL, NULL, 0, 0 }
