@@ -768,7 +768,10 @@ void kin_check_syntax(SentenceAnalysis *sa) {
         snprintf(sug, sizeof(sug), "Hindura '%s' ugakoresheje '%s'."
             " / Replace '%s' with '%s'.",
             t->surface, corrected, t->surface, corrected);
+        int err_idx = sa->error_count;
         add_error(sa, ERR_SPELLING, i, msg, sug);
+        if (sa->error_count > err_idx)
+            strncpy(sa->errors[err_idx].corrected_word, corrected, KIN_MAX_WORD - 1);
     }
 
     /* RULE 10: Cross-word connector elision (ikata ry'inyajwi hagati y'amagambo)

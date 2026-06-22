@@ -276,10 +276,10 @@ void kin_validate_text(const char *text) {
     if (!text || !text[0]) return;
     print_header(NULL);
     int sent_num = 0, total = 0;
-    /* For a single sentence (no trailing punctuation) send_num stays 0 in
-     * print_report, so the "[Interuro N]" prefix is suppressed.  We correct
-     * this by using sent_num=0 for the first call when input is one sentence.
-     * To detect: count terminal marks in text.                               */
+    /* validate_text_block() increments sent_num for every sentence it
+     * finds, including the only one in single-sentence input, so
+     * print_report's "[Interuro N / Sentence N]" prefix is shown even
+     * when the input is just one sentence. */
     validate_text_block(text, &sent_num, &total);
     print_footer(sent_num, total);
 }
@@ -337,33 +337,43 @@ void kin_validate_file(const char *path) {
     } else if (has_ext(path, ".doc") || has_ext(path, ".docx")) {
         snprintf(tmpfile, sizeof(tmpfile), "/tmp/kin_val_%d.txt", (int)getpid());
         char cmd[1024];
-        /* Try antiword first; fall back to libreoffice */
+        /* Try antiword first; fall back to libreoffice. Track success via
+         * the actual exit status of each step -- a failed shell redirect
+         * can still leave behind an empty tmpfile, so file existence alone
+         * is not a reliable signal that conversion actually worked. */
         snprintf(cmd, sizeof(cmd),
             "antiword \"%s\" > \"%s\" 2>/dev/null", path, tmpfile);
-        if (system(cmd) != 0) {
+        bool converted = (system(cmd) == 0);
+        if (!converted) {
+            remove(tmpfile);  /* discard antiword's empty/partial redirect target */
             snprintf(cmd, sizeof(cmd),
                 "libreoffice --headless --convert-to txt:Text "
                 "\"%s\" --outdir /tmp/ 2>/dev/null", path);
-            if (system(cmd) != 0) {
-                /* libreoffice unavailable; rename below will detect failure */
+            if (system(cmd) == 0) {
+                /* libreoffice writes <basename>.txt in /tmp/ */
+                const char *base = strrchr(path, '/');
+                base = base ? base + 1 : path;
+                const char *dot  = strrchr(base, '.');
+                int  blen = dot ? (int)(dot - base) : (int)strlen(base);
+                char lo_out[512];
+                snprintf(lo_out, sizeof(lo_out), "/tmp/%.*s.txt", blen, base);
+                converted = (rename(lo_out, tmpfile) == 0);
             }
-            /* libreoffice writes <basename>.txt in /tmp/ */
-            const char *base = strrchr(path, '/');
-            base = base ? base + 1 : path;
-            const char *dot  = strrchr(base, '.');
-            int  blen = dot ? (int)(dot - base) : (int)strlen(base);
-            char lo_out[512];
-            snprintf(lo_out, sizeof(lo_out), "/tmp/%.*s.txt", blen, base);
-            rename(lo_out, tmpfile);
+        }
+        if (!converted) {
+            fprintf(stderr,
+                "Ikosa: Ntibishoboka guhindura '%s'. "
+                "Shyiraho 'antiword' cyangwa 'libreoffice'.\n"
+                "Error: cannot convert '%s'. "
+                "Install antiword or libreoffice.\n", path, path);
+            return;
         }
         fp = fopen(tmpfile, "r");
         is_tmp = true;
         if (!fp) {
             fprintf(stderr,
-                "Ikosa: Ntibishoboka gufungura '%s'. "
-                "Shyiraho 'antiword' cyangwa 'libreoffice'.\n"
-                "Error: cannot convert '%s'. "
-                "Install antiword or libreoffice.\n", path, path);
+                "Ikosa: Ntibishoboka gufungura dosiye yahinduwe ya '%s'.\n"
+                "Error: cannot open converted output for '%s'.\n", path, path);
             return;
         }
 

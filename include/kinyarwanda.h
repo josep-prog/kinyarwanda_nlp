@@ -537,6 +537,11 @@ typedef struct {
     int       token_index;
     char      message[KIN_MAX_MSG];
     char      suggestion[KIN_MAX_MSG];
+    /* A literal drop-in replacement word, when one is actually known —
+     * distinct from 'suggestion', which is a bilingual explanatory
+     * sentence and is NOT safe to substitute directly into a sentence.
+     * Empty ("") when no concrete replacement word was computed. */
+    char      corrected_word[KIN_MAX_WORD];
 } Error;
 
 /* ─── Analysed token ──────────────────────────────────────────────────────── */

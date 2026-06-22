@@ -209,6 +209,138 @@ static int analyse_pdf(const char *pdfpath, bool verbose) {
     return 0;
 }
 
+/* ── Interlinear gloss mode (--gloss): one line, one stream, one PDF ───────── */
+
+static void gloss_line(const char *line, bool verbose) {
+    if (line[0] == '\0' || line[0] == '#') return;
+    char buf[MAX_LINE];
+    snprintf(buf, sizeof(buf), "%s", line);
+    kin_str_trim(buf);
+    if (!buf[0]) return;
+
+    SentenceAnalysis sa = kin_analyze(buf);
+    printf("\nInput: %s\n", buf);
+    kin_print_analysis(&sa, verbose);
+    kin_print_interlinear(&sa);
+}
+
+static void gloss_stream(FILE *fp, bool verbose) {
+    char line[MAX_LINE];
+    int lineno = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        lineno++;
+        size_t l = strlen(line);
+        if (l > 0 && line[l-1] == '\n') line[--l] = '\0';
+        if (l > 0 && line[l-1] == '\r') line[--l] = '\0';
+        kin_str_trim(line);
+        l = strlen(line);
+        if (l == 0 || line[0] == '#') continue;
+        printf("\n[Umurongo %d / Line %d]\n", lineno, lineno);
+        gloss_line(line, verbose);
+    }
+}
+
+static int gloss_pdf(const char *pdfpath, bool verbose) {
+    char tmpfile[512];
+    snprintf(tmpfile, sizeof(tmpfile), "/tmp/kin_nlp_%d.txt", (int)getpid());
+
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "pdftotext -layout \"%s\" \"%s\" 2>/dev/null", pdfpath, tmpfile);
+
+    int rc = system(cmd);
+    if (rc != 0) {
+        fprintf(stderr,
+            "Ikosa: pdftotext yaretse. Reba ko 'poppler-utils' yashyizweho.\n"
+            "Error: pdftotext failed. Make sure 'poppler-utils' is installed.\n"
+            "  sudo apt install poppler-utils\n");
+        return 1;
+    }
+
+    FILE *fp = fopen(tmpfile, "r");
+    if (!fp) {
+        fprintf(stderr, "Ikosa: Ntashobora gufungura dosiye y'agateganyo.\n"
+                        "Error: Cannot open temp file '%s'.\n", tmpfile);
+        return 1;
+    }
+
+    printf("PDF: %s\n", pdfpath);
+    gloss_stream(fp, verbose);
+    fclose(fp);
+    remove(tmpfile);
+    return 0;
+}
+
+/* ── G2P / phoneme mode (--g2p): one line, one stream, one PDF ─────────────── */
+
+static void g2p_line(const char *line) {
+    if (line[0] == '\0' || line[0] == '#') return;
+    char buf[MAX_LINE];
+    snprintf(buf, sizeof(buf), "%s", line);
+    kin_str_trim(buf);
+    if (!buf[0]) return;
+
+    char norm[G2P_MAX_NORM];
+    kin_normalize_text(buf, norm, sizeof(norm));
+    printf("Input:      %s\n", buf);
+    printf("Normalized: %s\n", norm);
+
+    KinPhonemeSeq seq;
+    if (kin_g2p_sentence(buf, &seq)) {
+        printf("Phonemes:   %s\n", seq.repr);
+        printf("Count:      %d phoneme tokens\n", seq.count);
+    } else {
+        printf("G2P failed: no phonemes produced.\n");
+    }
+}
+
+static void g2p_stream(FILE *fp) {
+    char line[MAX_LINE];
+    int lineno = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        lineno++;
+        size_t l = strlen(line);
+        if (l > 0 && line[l-1] == '\n') line[--l] = '\0';
+        if (l > 0 && line[l-1] == '\r') line[--l] = '\0';
+        kin_str_trim(line);
+        l = strlen(line);
+        if (l == 0 || line[0] == '#') continue;
+        printf("\n[Umurongo %d / Line %d]\n", lineno, lineno);
+        g2p_line(line);
+    }
+}
+
+static int g2p_pdf(const char *pdfpath) {
+    char tmpfile[512];
+    snprintf(tmpfile, sizeof(tmpfile), "/tmp/kin_nlp_%d.txt", (int)getpid());
+
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "pdftotext -layout \"%s\" \"%s\" 2>/dev/null", pdfpath, tmpfile);
+
+    int rc = system(cmd);
+    if (rc != 0) {
+        fprintf(stderr,
+            "Ikosa: pdftotext yaretse. Reba ko 'poppler-utils' yashyizweho.\n"
+            "Error: pdftotext failed. Make sure 'poppler-utils' is installed.\n"
+            "  sudo apt install poppler-utils\n");
+        return 1;
+    }
+
+    FILE *fp = fopen(tmpfile, "r");
+    if (!fp) {
+        fprintf(stderr, "Ikosa: Ntashobora gufungura dosiye y'agateganyo.\n"
+                        "Error: Cannot open temp file '%s'.\n", tmpfile);
+        return 1;
+    }
+
+    printf("PDF: %s\n", pdfpath);
+    g2p_stream(fp);
+    fclose(fp);
+    remove(tmpfile);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     bool verbose         = false;
     bool g2p_mode        = false;
@@ -294,30 +426,46 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    /* G2P / phoneme mode: --g2p -s "text" */
-    if (g2p_mode && sentence) {
-        char norm[G2P_MAX_NORM];
-        kin_normalize_text(sentence, norm, sizeof(norm));
-        printf("Input:      %s\n", sentence);
-        printf("Normalized: %s\n", norm);
-
-        KinPhonemeSeq seq;
-        if (kin_g2p_sentence(sentence, &seq)) {
-            printf("Phonemes:   %s\n", seq.repr);
-            printf("Count:      %d phoneme tokens\n", seq.count);
-        } else {
-            printf("G2P failed: no phonemes produced.\n");
+    /* G2P / phoneme mode: --g2p -s "text" | -f file.txt | -p file.pdf */
+    if (g2p_mode) {
+        if (sentence) { g2p_line(sentence); return 0; }
+        if (filename) {
+            FILE *fp = fopen(filename, "r");
+            if (!fp) {
+                fprintf(stderr, "Ikosa: Ntashobora gufungura '%s'\n"
+                                "Error: cannot open '%s'\n", filename, filename);
+                return 1;
+            }
+            g2p_stream(fp);
+            fclose(fp);
+            return 0;
         }
-        return 0;
+        if (pdffile) return g2p_pdf(pdffile);
+        fprintf(stderr,
+            "Ikosa: --g2p ikeneye -s, -f cyangwa -p.\n"
+            "Error: --g2p requires one of -s, -f, or -p.\n");
+        return 1;
     }
 
-    /* Interlinear gloss mode: --gloss -s "text" */
-    if (gloss_mode && sentence) {
-        SentenceAnalysis sa = kin_analyze(sentence);
-        printf("\nInput: %s\n", sentence);
-        kin_print_analysis(&sa, verbose);
-        kin_print_interlinear(&sa);
-        return 0;
+    /* Interlinear gloss mode: --gloss -s "text" | -f file.txt | -p file.pdf */
+    if (gloss_mode) {
+        if (sentence) { gloss_line(sentence, verbose); return 0; }
+        if (filename) {
+            FILE *fp = fopen(filename, "r");
+            if (!fp) {
+                fprintf(stderr, "Ikosa: Ntashobora gufungura '%s'\n"
+                                "Error: cannot open '%s'\n", filename, filename);
+                return 1;
+            }
+            gloss_stream(fp, verbose);
+            fclose(fp);
+            return 0;
+        }
+        if (pdffile) return gloss_pdf(pdffile, verbose);
+        fprintf(stderr,
+            "Ikosa: --gloss ikeneye -s, -f cyangwa -p.\n"
+            "Error: --gloss requires one of -s, -f, or -p.\n");
+        return 1;
     }
 
     /* Single sentence mode */

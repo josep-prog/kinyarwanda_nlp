@@ -14,13 +14,16 @@
 
 /* ── kin_correct ─────────────────────────────────────────────────────────────
  *
- * Run the full NLP pipeline, collect spelling suggestions, then reconstruct
+ * Run the full NLP pipeline, collect spelling corrections, then reconstruct
  * the sentence substituting corrected forms where available.
  *
  * Algorithm:
  *   1. kin_analyze() → tokenise, tag, morpheme-analyse, syntax-check
  *   2. kin_suggest_corrections() → fill Error entries with suggestions
- *   3. For each token, use the suggestion if one exists, else the surface form
+ *   3. For each token, use the error's corrected_word if one was actually
+ *      computed, else the surface form. 'suggestion' is deliberately NOT
+ *      used here — it is a bilingual explanatory sentence, not a word, and
+ *      is not always populated even when corrected_word is.
  *   4. Join with spaces; punctuation tokens are appended without a leading space
  *
  * Static buffer: 4096 bytes — sufficient for the longest plausible sentence.
@@ -43,13 +46,16 @@ const char *kin_correct(const char *text)
     for (int i = 0; i < sa.token_count; i++) {
         Token *tok = &sa.tokens[i];
 
-        /* Determine the word to emit: prefer a correction suggestion */
+        /* Determine the word to emit: prefer a literal corrected word.
+         * 'suggestion' is never used here -- it is bilingual explanatory
+         * prose, not a replacement token, and substituting it would corrupt
+         * the reconstructed sentence. */
         const char *word = tok->surface;
         for (int e = 0; e < sa.error_count; e++) {
             if (sa.errors[e].token_index == i
                 && sa.errors[e].type == ERR_SPELLING
-                && sa.errors[e].suggestion[0] != '\0') {
-                word = sa.errors[e].suggestion;
+                && sa.errors[e].corrected_word[0] != '\0') {
+                word = sa.errors[e].corrected_word;
                 break;
             }
         }
