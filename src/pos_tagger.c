@@ -655,8 +655,13 @@ void kin_tag_token(Token *tok) {
      *     Accept only when the extracted stem is a KNOWN verb root.
      *   • SUBJUNCTIVE is similarly permissive (SP+C+e).
      *     Accept only when stem is known.
-     *   • All other tenses carry unambiguous morphological markers (ra, aga,
-     *     za, ye, ta-, ka-) that are strong enough evidence on their own.
+     *   • Most other tenses carry unambiguous morphological markers (ra,
+     *     aga, za, ye, ta-) that are strong enough evidence on their own.
+     *   • NARRATIVE ("ka-") is NOT unambiguous on its own -- some real
+     *     roots (gukata/kat, gukaza/kaz, gukanguka/kang) begin with the
+     *     same two letters as the marker.  verb_match_inner() itself now
+     *     requires a known stem before returning a NARRATIVE match, so
+     *     this guard does not need to repeat that check here.
      *
      * Additionally, single-char stems ("d", "a", "e", etc.) are accepted
      * only for the small set of confirmed monosyllabic Kinyarwanda verb
