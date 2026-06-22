@@ -387,12 +387,12 @@ ji + iza -> jyiza   (by the same symmetric rule, expected: gi-shaped)
 The `e` case matches the doc exactly. The `i` case doesn't reverse at
 all — `jyiza` keeps the un-reversed `jy` cluster the doc comment says
 shouldn't be written before a front vowel. (`kin_has_invalid_cluster`,
-read in Chapter — wait, read directly in this file's own §1, doesn't
-catch this: it accepts *any* consonant followed by `y` unconditionally,
-so `jy` passes that check regardless of what precedes it. The
-asymmetry is real, but it's invisible to this project's own
-cluster validator, which is a separate, broader rule than the
-narrower cy/jy-specific reversal this function's comment describes.)
+read directly in this file's own §1, doesn't catch this: it accepts
+*any* consonant followed by `y` unconditionally, so `jy` passes that
+check regardless of what precedes it. The asymmetry is real, but it's
+invisible to this project's own cluster validator, which is a
+separate, broader rule than the narrower cy/jy-specific reversal this
+function's comment describes.)
 
 ---
 

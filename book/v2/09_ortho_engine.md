@@ -302,7 +302,7 @@ second line stops printing "0 violation(s)".
 
 # Part 4 — Capstone: Four Real Findings From Reading the Production Code
 
-## 4.1 The headline bug: the voicing rule can't tell a noun prefix from a verb prefix
+## 4.1 The headline bug, and what later fixing it elsewhere left behind
 
 `apply_voicing`'s own comment justifies its rule with a real word:
 
@@ -339,24 +339,55 @@ $ gcc -std=c99 -Wall -Wextra -I include p4_voicing.c -L . -lkinyarwanda -o p4_vo
 $ LD_LIBRARY_PATH=. ./p4_voicing
 i|ki|tabo          -> igitabo
 ku|0|ubak|a        -> guubaka
-ku|eza             -> gweza
-ki|eza             -> gyeza
+ku|eza             -> kweza
+ki|eza             -> kyeza
 ```
 
 `i|ki|tabo` confirms the rule's own evidence: noun-class-7's `ki`
 prefix really does voice to `gi` before a stem, exactly as advertised
-— `igitabo`, correct. But all three remaining lines, every one of
-them lifted directly from this project's own documented examples, are
-wrong: `kubaka` ("to build") comes out `guubaka`; `kweza` ("to purify
-[someone]") comes out `gweza`; `kyeza` ("to clean") comes out `gyeza`.
-Every one of these is the *infinitive marker* `ku-`/`ki-`, not the
-noun-class-7 marker — and `apply_voicing` has no way to tell them
-apart. Both are surface-identical: a 2-character morpheme ending in
-`k`. The function's bounds check (`prec_len == 2`) only verifies
-*length*, never *grammatical category*, so the exact same rule that
-correctly turns class-7's `ki` into `gi` also turns the completely
-unrelated verb infinitive `ku-` into `gu-`, every time, for every
-vowel-initial verb stem in the language.
+— `igitabo`, correct. The other two single-boundary cases, `ku|eza`
+and `ki|eza`, now *also* come out correct — `kweza`, `kyeza` — which is
+worth pausing on, because earlier printings of this chapter (and the
+book's research for it) found both wrong, producing `gweza`/`gyeza`.
+What changed is not this function's intent but a guard added to it in
+a later chapter: `apply_voicing` now refuses to voice when the very
+next character is a vowel (`if (ov(buf[bpos+1])) return false;` —
+traced in full in Chapter 13, where it was added to fix an unrelated
+noun, `ukwezi`). That guard doesn't know or care whether the
+2-character prefix in front of it is a noun-class marker or a verb
+infinitive marker — it only checks what comes immediately after the
+boundary — and for `ku|eza`/`ki|eza`, the vowel `e` sits directly
+there, so the guard correctly blocks voicing for both, incidentally
+fixing what this chapter originally found broken.
+
+`ku|0|ubak|a` is the one case the same guard does *not* catch, and
+testing why narrows the real bug considerably:
+
+```c
+show("ku|ubak|a");      /* no intervening placeholder morpheme */
+show("ku|0|ubak|a");    /* the documented form, with a "0" slot   */
+```
+```
+ku|ubak|a          -> kwubaka
+ku|0|ubak|a        -> guubaka
+```
+
+Remove the literal `"0"` morpheme (a placeholder this project's own
+morpheme strings use for an elided object-marker slot) and the voicing
+guard works correctly here too. With the `"0"` present, the character
+immediately after the `ku|` boundary is the digit `'0'` itself, not a
+vowel — `ov('0')` is false, so Chapter 13's guard does not fire, and
+voicing proceeds exactly as it did before that fix, turning `ku` into
+`gu`. The real vowel that should have blocked it, the `u` starting
+`ubak`, is one morpheme further away than the guard looks. This is a
+narrower, more precise finding than this chapter originally made: the
+voicing rule was never really blind to "noun prefix vs. verb prefix"
+as a category — it was blind to whether a vowel sits within sight, and
+a one-character lookahead is exactly as far as "in sight" reaches.
+Chapter 13's fix corrected that for every boundary where the vowel is
+the very next character; it left this one case, where an empty
+placeholder morpheme sits between the boundary and the vowel that
+should have blocked voicing, exactly as broken as before.
 
 `guubaka` has a second problem worth catching with the engine's own
 other public function:
@@ -831,13 +862,20 @@ in Part 6.
   documented to run before nasal elision specifically so a later pass
   sees its output, and Section 4.2 found a second code path
   (`kin_ortho_fix`) that doesn't preserve that same ordering.
-- The headline real finding: an unconditional rule that voices any
-  2-character `k`/`t`-initial morpheme correctly handles noun-class
-  prefixes (`ki→gi` in `igitabo`) but incorrectly applies the same
-  voicing to the verb infinitive marker `ku-`/`ki-`, confirmed against
-  three of this project's own documented examples (`kubaka`, `kweza`,
-  `kyeza`, all produced wrong), with the resulting hiatus in `guubaka`
-  independently caught by the module's own `kin_ortho_validate`.
+- The headline real finding, as this chapter originally found it: an
+  unconditional rule voicing any 2-character `k`/`t`-initial morpheme
+  misfired on the verb infinitive marker `ku-`/`ki-` as well as on
+  noun-class prefixes, confirmed against three of this project's own
+  documented examples (`kubaka`, `kweza`, `kyeza`, all produced wrong).
+  A guard added in Chapter 13 (for an unrelated noun, `ukwezi`) checks
+  whether a vowel immediately follows the voicing boundary, and as a
+  side effect now correctly produces `kweza`/`kyeza` — re-verified
+  directly against the current source for this chapter. `kubaka`
+  (documented as `ku|0|ubak|a`, with a placeholder "0" morpheme for an
+  elided object marker) still produces `guubaka`, because the
+  vowel that should block voicing sits one morpheme past where the
+  one-character guard looks — the resulting hiatus is independently
+  caught by the module's own `kin_ortho_validate`.
 - A second real finding: `kin_ortho_gen` and `kin_ortho_fix` disagree
   about the same underlying word (`imanza` vs. `imbanza`) because only
   the generator's pipeline includes a `b→m` pre-pass the fixer's

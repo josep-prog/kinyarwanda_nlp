@@ -428,6 +428,18 @@ check first means every word that *can* be resolved with total
 confidence is resolved that way, before any heuristic gets a chance
 to guess wrong about it.
 
+```
+   Step 1 ── Tree 5 (Amagambo adahinduka): exact match, no ambiguity
+                │
+                ▼  (no match)
+   Step 2+ ── Tree 1 (Noun), Tree 2 (Adjective), Tree 3 (Verb),
+               Tree 4 (Pronoun): each a heuristic, each can be
+               fooled by a word that merely resembles its pattern
+                │
+                ▼
+            POS assigned
+```
+
 ---
 
 # Part 6 — Reading the Real Production Code
