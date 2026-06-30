@@ -66,6 +66,8 @@ void kin_suggest_corrections(SentenceAnalysis *sa) {
                     char corrected[KIN_MAX_WORD];
                     build_adj(noun_tok->noun_class, adj_tok->stem,
                               corrected, sizeof(corrected));
+                    /* Store the literal replacement so kin_correct() can apply it */
+                    strncpy(err->corrected_word, corrected, KIN_MAX_WORD - 1);
                     char sug[KIN_MAX_MSG * 2];
                     snprintf(sug, sizeof(sug),
                         "Hindura '%s' ugakoresheje '%s' kugira ngo ishyikire "

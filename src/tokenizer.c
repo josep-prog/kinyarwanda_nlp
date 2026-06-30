@@ -95,6 +95,7 @@ static const char * const FITE_FORMS[] = {
 int kin_tokenize(const char *text, Token *out, int max_tokens) {
     int count = 0;
     const char *p = text;
+    bool next_preceded_by_apostrophe = false;
 
     while (*p && count < max_tokens) {
         /* Skip all whitespace:
@@ -227,8 +228,11 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
                 out[count].surface[len] = '\0';
                 kin_strlower(out[count].surface, out[count].lower,
                              KIN_MAX_WORD);
+                out[count].preceded_by_apostrophe = next_preceded_by_apostrophe;
+                next_preceded_by_apostrophe = false;
                 count++;
             }
+            next_preceded_by_apostrophe = true; /* next token follows apostrophe */
             p = apos + apos_len; /* skip past apostrophe bytes */
             continue;
         }
@@ -242,6 +246,8 @@ int kin_tokenize(const char *text, Token *out, int max_tokens) {
         memcpy(out[count].surface, p, wlen);
         out[count].surface[wlen] = '\0';
         kin_strlower(out[count].surface, out[count].lower, KIN_MAX_WORD);
+        out[count].preceded_by_apostrophe = next_preceded_by_apostrophe;
+        next_preceded_by_apostrophe = false;
 
         /* Detect proper noun (izina bwite): capitalised words.
          *

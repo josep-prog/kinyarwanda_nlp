@@ -561,6 +561,7 @@ typedef struct {
     bool is_negative;               /* nt- / si- negative prefix detected   */
     bool is_hortative;              /* ni- hortative particle detected       */
     bool is_reduplicated;           /* Stem is a reduplicated verb form      */
+    bool preceded_by_apostrophe;   /* Immediately follows an elision apostrophe (bw'X, n'X, ry'X) */
     char redup_surface[KIN_MAX_STEM]; /* Surface of REDUP: 'a' + 2nd copy   */
     int  error_count;               /* Number of errors on this token       */
     /* ── Deverbative noun (izina rivuye mu nshinga) ──────────────────────── */

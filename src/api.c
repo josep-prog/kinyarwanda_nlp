@@ -49,24 +49,33 @@ const char *kin_correct(const char *text)
         /* Determine the word to emit: prefer a literal corrected word.
          * 'suggestion' is never used here -- it is bilingual explanatory
          * prose, not a replacement token, and substituting it would corrupt
-         * the reconstructed sentence. */
+         * the reconstructed sentence.
+         * Apply: ERR_SPELLING (typos) and ERR_ADJ_AGREEMENT (noun-class
+         * concordance, e.g. "umugabo yose" → "umugabo wese"). */
         const char *word = tok->surface;
         for (int e = 0; e < sa.error_count; e++) {
+            ErrorType et = sa.errors[e].type;
             if (sa.errors[e].token_index == i
-                && sa.errors[e].type == ERR_SPELLING
+                && (et == ERR_SPELLING || et == ERR_ADJ_AGREEMENT)
                 && sa.errors[e].corrected_word[0] != '\0') {
                 word = sa.errors[e].corrected_word;
                 break;
             }
         }
 
-        /* Spacing: no leading space before punctuation that attaches left */
+        /* Spacing: apostrophe-split tokens rejoin with apostrophe (no space);
+         * closing punctuation attaches directly; everything else gets a space. */
         bool attach_left = (tok->pos == POS_PUNCTUATION
                             && tok->punct_type != PUNCT_QUOTE_OPEN);
 
-        if (pos > 0 && !attach_left) {
-            if (pos < sizeof(buf) - 1)
-                buf[pos++] = ' ';
+        if (pos > 0) {
+            if (tok->preceded_by_apostrophe) {
+                if (pos < sizeof(buf) - 1)
+                    buf[pos++] = '\'';
+            } else if (!attach_left) {
+                if (pos < sizeof(buf) - 1)
+                    buf[pos++] = ' ';
+            }
         }
 
         size_t wlen = strlen(word);
