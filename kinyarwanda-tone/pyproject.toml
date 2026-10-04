@@ -1,0 +1,36 @@
+[project]
+name = "amasaku"
+version = "0.1.0"
+description = "Amasaku n'ubutinde: measuring and predicting Kinyarwanda tone and vowel length from speech"
+authors = [
+    { name = "Joseph Nishimwe", email = "j.nishimwe@alustudent.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "gradio>=6.29.0",
+    "kintts[data]",
+    "librosa>=0.11",
+    "praat-parselmouth>=0.4.7",
+    "torch>=2.14.0",
+    "torchaudio==2.11.*",
+]
+
+[project.scripts]
+amasaku-align = "amasaku.align:main"
+amasaku-workbench = "amasaku.workbench:main"
+amasaku-batch = "amasaku.batch:main"
+amasaku-studio = "amasaku.studio:main"
+
+[tool.uv.sources]
+kintts = { path = "../kinyarwanda-tts", editable = true }
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
